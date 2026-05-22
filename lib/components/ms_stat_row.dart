@@ -26,38 +26,45 @@ class MSStatRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (cells.isEmpty) return const SizedBox.shrink();
 
-    final c = context.c;
-    final List<Widget> children = [];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool bounded = constraints.hasBoundedWidth;
+        final c = context.c;
+        final List<Widget> children = [];
 
-    for (int i = 0; i < cells.length; i++) {
-      children.add(
-        Expanded(
-          child: _buildCell(context, cells[i]),
-        ),
-      );
+        for (int i = 0; i < cells.length; i++) {
+          final cell = _buildCell(context, cells[i]);
+          children.add(
+            bounded
+                ? Expanded(child: cell)
+                : Flexible(child: IntrinsicWidth(child: cell)),
+          );
 
-      if (i < cells.length - 1) {
-        children.add(
-          Container(
-            width: 1,
-            color: c.line,
+          if (i < cells.length - 1) {
+            children.add(
+              Container(
+                width: 1,
+                color: c.line,
+              ),
+            );
+          }
+        }
+
+        return Container(
+          decoration: BoxDecoration(
+            color: c.bg,
+            border: Border.all(color: c.line),
+            borderRadius: BorderRadius.circular(AppTokens.r3),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              mainAxisSize: bounded ? MainAxisSize.max : MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
           ),
         );
-      }
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: c.bg,
-        border: Border.all(color: c.line),
-        borderRadius: BorderRadius.circular(AppTokens.r3),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
-        ),
-      ),
+      },
     );
   }
 
