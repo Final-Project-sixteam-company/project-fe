@@ -76,6 +76,7 @@ class _MSButtonState extends State<MSButton> {
     }
 
     final Widget content = Container(
+      width: widget.expanded ? double.infinity : null,
       height: 36,
       padding: const EdgeInsets.symmetric(
         horizontal: AppTokens.sp4,
@@ -135,9 +136,6 @@ class _MSButtonState extends State<MSButton> {
       ),
     );
 
-    if (widget.expanded) {
-      return Expanded(child: buttonNode);
-    }
     return buttonNode;
   }
 }
@@ -202,10 +200,12 @@ class MSButtonExample extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              MSButton(
-                label: '확장 버튼',
-                onPressed: () {},
-                expanded: true,
+              Expanded(
+                child: MSButton(
+                  label: '확장 버튼',
+                  onPressed: () {},
+                  expanded: true,
+                ),
               ),
             ],
           )
