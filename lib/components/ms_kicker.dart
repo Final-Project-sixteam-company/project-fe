@@ -13,6 +13,7 @@ class MSKicker extends StatelessWidget {
     final c = context.c;
 
     return Row(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
@@ -23,7 +24,7 @@ class MSKicker extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppTokens.sp2),
-        Expanded(
+        Flexible(
           child: Divider(
             color: c.line,
             thickness: 1,
