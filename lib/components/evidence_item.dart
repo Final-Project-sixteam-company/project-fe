@@ -21,8 +21,8 @@ class EvidenceItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppTokens.r4),
       child: InkWell(
         onTap: onTap,
-        splashColor: c.primary.withOpacity(.08),
-        highlightColor: c.primary.withOpacity(.04),
+        splashColor: c.primary.withValues(alpha: .08),
+        highlightColor: c.primary.withValues(alpha: .04),
         borderRadius: BorderRadius.circular(AppTokens.r4),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),

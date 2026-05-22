@@ -82,8 +82,8 @@ class _NavItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppTokens.r2),
         child: InkWell(
           onTap: onTap,
-          splashColor: c.primary.withOpacity(.06),
-          highlightColor: c.primary.withOpacity(.04),
+          splashColor: c.primary.withValues(alpha: .06),
+          highlightColor: c.primary.withValues(alpha: .04),
           borderRadius: BorderRadius.circular(AppTokens.r2),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),

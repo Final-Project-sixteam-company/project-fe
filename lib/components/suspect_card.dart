@@ -21,8 +21,8 @@ class SuspectCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppTokens.r4),
       child: InkWell(
         onTap: onTap,
-        splashColor: c.primary.withOpacity(.08),
-        highlightColor: c.primary.withOpacity(.04),
+        splashColor: c.primary.withValues(alpha: .08),
+        highlightColor: c.primary.withValues(alpha: .04),
         borderRadius: BorderRadius.circular(AppTokens.r4),
         child: Container(
           padding: const EdgeInsets.all(AppTokens.sp4),
@@ -36,7 +36,7 @@ class SuspectCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  _Avatar(initial: suspect.name.characters.first),
+                  _Avatar(initial: suspect.name.isNotEmpty ? suspect.name.characters.first : '?'),
                   const SizedBox(width: AppTokens.sp3),
                   Expanded(
                     child: Column(
