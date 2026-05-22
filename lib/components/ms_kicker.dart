@@ -12,26 +12,42 @@ class MSKicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: AppText.monoLabel.copyWith(
-            color: c.textMute,
-            height: 1.0, // 수직 정렬을 위해 높이 조정
-          ),
-        ),
-        const SizedBox(width: AppTokens.sp2),
-        Flexible(
-          child: Divider(
-            color: c.line,
-            thickness: 1,
-            height: 1, // Row의 crossAxisAlignment.center 와 함께 중앙 정렬
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool bounded = constraints.hasBoundedWidth;
+
+        if (!bounded) {
+          // unbounded 컨텍스트에서는 Divider 없이 라벨만 렌더링
+          return Text(
+            label.toUpperCase(),
+            style: AppText.monoLabel.copyWith(
+              color: c.textMute,
+              height: 1.0,
+            ),
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              label.toUpperCase(),
+              style: AppText.monoLabel.copyWith(
+                color: c.textMute,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(width: AppTokens.sp2),
+            Expanded(
+              child: Divider(
+                color: c.line,
+                thickness: 1,
+                height: 1,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
