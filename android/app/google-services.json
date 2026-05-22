@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "820435160356",
+    "project_id": "clueroom-578ab",
+    "storage_bucket": "clueroom-578ab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:820435160356:android:ca7e34975ee833c9cc37b1",
+        "android_client_info": {
+          "package_name": "xyz.clueroom.clueroom"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCuTraDS2zgjFR9dKjkUBk45D0wgfL9ll0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
