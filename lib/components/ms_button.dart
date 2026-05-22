@@ -75,68 +75,72 @@ class _MSButtonState extends State<MSButton> {
         break;
     }
 
-    final Widget content = Container(
-      width: widget.expanded ? double.infinity : null,
-      height: 36,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTokens.sp4,
-        vertical: AppTokens.sp2,
-      ),
-      decoration: BoxDecoration(
-        color: bg,
-        border: border,
-        borderRadius: BorderRadius.circular(AppTokens.r3),
-      ),
-      child: Row(
-        mainAxisSize: widget.expanded ? MainAxisSize.max : MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (widget.loading)
-            SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: fg,
-              ),
-            )
-          else ...[
-            if (widget.icon != null) ...[
-              Icon(widget.icon, size: 16, color: fg),
-              const SizedBox(width: 6),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool shouldExpand = widget.expanded && constraints.hasBoundedWidth;
+
+        final Widget content = Container(
+          width: shouldExpand ? double.infinity : null,
+          height: 36,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.sp4,
+            vertical: AppTokens.sp2,
+          ),
+          decoration: BoxDecoration(
+            color: bg,
+            border: border,
+            borderRadius: BorderRadius.circular(AppTokens.r3),
+          ),
+          child: Row(
+            mainAxisSize: shouldExpand ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (widget.loading)
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: fg,
+                  ),
+                )
+              else ...[
+                if (widget.icon != null) ...[
+                  Icon(widget.icon, size: 16, color: fg),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  widget.label,
+                  style: AppText.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.05,
+                    color: fg,
+                    height: 1.0, // Avoid vertical overflow in 36px height
+                  ),
+                ),
+              ],
             ],
-            Text(
-              widget.label,
-              style: AppText.body.copyWith(
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.05,
-                color: fg,
-                height: 1.0, // Avoid vertical overflow in 36px height
-              ),
+          ),
+        );
+
+        return GestureDetector(
+          onTapDown: cannotPress ? null : _handleTapDown,
+          onTapUp: cannotPress ? null : _handleTapUp,
+          onTapCancel: cannotPress ? null : _handleTapCancel,
+          onTap: cannotPress ? null : widget.onPressed,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedScale(
+            scale: _isPressed ? 0.98 : 1.0,
+            duration: AppMotion.dur1,
+            curve: AppMotion.easeOut,
+            child: Opacity(
+              opacity: disabled ? 0.42 : 1.0,
+              child: content,
             ),
-          ],
-        ],
-      ),
+          ),
+        );
+      },
     );
-
-    Widget buttonNode = GestureDetector(
-      onTapDown: cannotPress ? null : _handleTapDown,
-      onTapUp: cannotPress ? null : _handleTapUp,
-      onTapCancel: cannotPress ? null : _handleTapCancel,
-      onTap: cannotPress ? null : widget.onPressed,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.98 : 1.0,
-        duration: AppMotion.dur1,
-        curve: AppMotion.easeOut,
-        child: Opacity(
-          opacity: disabled ? 0.42 : 1.0,
-          child: content,
-        ),
-      ),
-    );
-
-    return buttonNode;
   }
 }
 
