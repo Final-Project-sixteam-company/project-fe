@@ -9,6 +9,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
+import 'interrogation_chat_screen.dart';
 
 class SuspectDetailScreen extends StatefulWidget {
   const SuspectDetailScreen({required this.suspect, super.key});
@@ -304,6 +305,20 @@ class _BottomBar extends StatelessWidget {
                 variant: MSButtonVariant.secondary,
                 expanded: true,
                 onPressed: () => Navigator.of(context).pop(),
+              ),
+
+            ),
+            Expanded(
+              flex: 2,
+              child: MSButton(
+                label: '심문하기',
+                variant: MSButtonVariant.primary,
+                expanded: true,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => InterrogationChatScreen(suspect: suspect),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: AppTokens.sp3),

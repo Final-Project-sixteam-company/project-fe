@@ -69,6 +69,20 @@ evidences: <Evidence>[
     isNew: false,
     isAnalyzed: false,
   ),
+  Evidence(
+    id: 'e6',
+    name: '암호화된 노트북',
+    location: '6F · 대표실 · 잠금 해제 필요',
+    icon: Icons.laptop_outlined,
+    isLocked: true,
+  ),
+  Evidence(
+    id: 'e7',
+    name: '금고 내부 문서',
+    location: '지하 1층 · 금고실 · 접근 제한',
+    icon: Icons.folder_outlined,
+    isLocked: true,
+  ),
 ],
 timeline: <TimelineEntry>[
   TimelineEntry(

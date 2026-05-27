@@ -1,3 +1,4 @@
+// lib/models/case.dart
 import 'package:flutter/material.dart';
 
 class Suspect {
@@ -21,6 +22,7 @@ class Evidence {
   final IconData icon;
   final bool isNew;
   final bool isAnalyzed;
+  final bool isLocked;
 
   const Evidence({
     required this.id,
@@ -29,6 +31,7 @@ class Evidence {
     required this.icon,
     this.isNew = false,
     this.isAnalyzed = false,
+    this.isLocked = false,
   });
 }
 
