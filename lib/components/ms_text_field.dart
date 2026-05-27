@@ -1,3 +1,4 @@
+// lib/components/ms_text_field.dart
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_tokens.dart';
@@ -9,6 +10,7 @@ class MSTextField extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final IconData? suffixIcon;
   final int? maxLength;
+  final int maxLines;
 
   const MSTextField({
     this.controller,
@@ -16,6 +18,7 @@ class MSTextField extends StatefulWidget {
     this.onChanged,
     this.suffixIcon,
     this.maxLength,
+    this.maxLines = 1,
     super.key,
   });
 
@@ -50,6 +53,7 @@ class _MSTextFieldState extends State<MSTextField> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final bool isMultiLine = widget.maxLines > 1;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -60,6 +64,7 @@ class _MSTextFieldState extends State<MSTextField> {
           focusNode: _focusNode,
           onChanged: widget.onChanged,
           maxLength: widget.maxLength,
+          maxLines: widget.maxLines,
           style: AppText.body.copyWith(color: c.text),
           cursorColor: c.primary,
           decoration: InputDecoration(
@@ -69,11 +74,11 @@ class _MSTextFieldState extends State<MSTextField> {
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
             isDense: true,
-            counterText: '', // maxLength가 있어도 하단 카운터 숨김
+            counterText: '',
             contentPadding: EdgeInsets.only(
               left: AppTokens.sp3,
-              top: 9,
-              bottom: 9,
+              top: isMultiLine ? AppTokens.sp3 : 9,
+              bottom: isMultiLine ? AppTokens.sp3 : 9,
               right: widget.suffixIcon != null ? 8 : AppTokens.sp3,
             ),
           ),
@@ -82,7 +87,6 @@ class _MSTextFieldState extends State<MSTextField> {
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            // Glow Background
             Positioned.fill(
               child: AnimatedContainer(
                 duration: AppMotion.dur2,
@@ -91,17 +95,16 @@ class _MSTextFieldState extends State<MSTextField> {
                   borderRadius: BorderRadius.circular(AppTokens.r3),
                   boxShadow: _isFocused
                       ? [
-                          BoxShadow(
-                            color: c.primary.withOpacity(0.28),
-                            blurRadius: 0,
-                            spreadRadius: 3,
-                          )
-                        ]
+                    BoxShadow(
+                      color: c.primary.withValues(alpha: .28),
+                      blurRadius: 0,
+                      spreadRadius: 3,
+                    ),
+                  ]
                       : [],
                 ),
               ),
             ),
-            // Main TextField
             AnimatedContainer(
               duration: AppMotion.dur2,
               curve: AppMotion.easeOut,
@@ -115,14 +118,19 @@ class _MSTextFieldState extends State<MSTextField> {
               ),
               child: Row(
                 mainAxisSize: bounded ? MainAxisSize.max : MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: isMultiLine
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.center,
                 children: [
                   bounded
                       ? Expanded(child: textField)
                       : Flexible(child: IntrinsicWidth(child: textField)),
                   if (widget.suffixIcon != null)
                     Padding(
-                      padding: const EdgeInsets.only(right: AppTokens.sp3),
+                      padding: EdgeInsets.only(
+                        right: AppTokens.sp3,
+                        top: isMultiLine ? AppTokens.sp3 : 0,
+                      ),
                       child: Icon(
                         widget.suffixIcon,
                         color: c.textSub,
@@ -135,33 +143,6 @@ class _MSTextFieldState extends State<MSTextField> {
           ],
         );
       },
-    );
-  }
-}
-
-// ----------------------------------------------------------------------
-// [사용 예시]
-// ----------------------------------------------------------------------
-class MSTextFieldExample extends StatelessWidget {
-  const MSTextFieldExample({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          MSTextField(
-            hintText: '사건 번호를 입력하세요',
-          ),
-          SizedBox(height: 16),
-          MSTextField(
-            hintText: '검색어를 입력하세요',
-            suffixIcon: Icons.search,
-          ),
-        ],
-      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 // lib/screens/suspect_detail_screen.dart
+import 'package:clueroom/screens/result_screen.dart';
 import 'package:flutter/material.dart';
 import '../components/evidence_item.dart';
 import '../components/ms_button.dart';
@@ -9,6 +10,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
+import 'interrogation_chat_screen.dart';
 
 class SuspectDetailScreen extends StatefulWidget {
   const SuspectDetailScreen({required this.suspect, super.key});
@@ -305,6 +307,20 @@ class _BottomBar extends StatelessWidget {
                 expanded: true,
                 onPressed: () => Navigator.of(context).pop(),
               ),
+
+            ),
+            Expanded(
+              flex: 2,
+              child: MSButton(
+                label: '심문하기',
+                variant: MSButtonVariant.primary,
+                expanded: true,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => InterrogationChatScreen(suspect: suspect),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: AppTokens.sp3),
             Expanded(
@@ -384,7 +400,11 @@ class _ConfirmDialog extends StatelessWidget {
                     expanded: true,
                     onPressed: () {
                       Navigator.of(context).pop();
-                      // TODO: 결과 화면으로 이동
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => const ResultScreen(),
+                        ),
+                      );
                     },
                   ),
                 ),

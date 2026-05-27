@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
-import '../components/evidence_item.dart';
+import '../components/ms_kicker.dart';
 import '../components/ms_text_field.dart';
+import '../components/states.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 
-enum _Filter { all, newOnly, analyzed, pending }
+enum _Filter { all, acquired, locked, key }
 
 extension _FilterLabel on _Filter {
   String get label => switch (this) {
     _Filter.all => '전체',
-    _Filter.newOnly => 'NEW',
-    _Filter.analyzed => '분석완료',
-    _Filter.pending => '미확인',
+    _Filter.acquired => '확보됨',
+    _Filter.locked => '잠긴 증거',
+    _Filter.key => '핵심 증거',
   };
 }
 
@@ -37,22 +38,23 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
   }
 
   List<Evidence> get _filtered {
-    final all = List<Evidence>.from(sampleCase.evidences)
+    final sorted = List<Evidence>.from(sampleCase.evidences)
       ..sort((a, b) {
+        if (a.isLocked != b.isLocked) return a.isLocked ? 1 : -1;
         if (a.isNew != b.isNew) return a.isNew ? -1 : 1;
         return 0;
       });
 
-    return all.where((e) {
+    return sorted.where((e) {
       final matchesQuery = _query.isEmpty ||
           e.name.contains(_query) ||
           e.location.contains(_query);
 
       final matchesFilter = switch (_filter) {
         _Filter.all => true,
-        _Filter.newOnly => e.isNew,
-        _Filter.analyzed => e.isAnalyzed,
-        _Filter.pending => !e.isAnalyzed,
+        _Filter.acquired => e.isNew && !e.isLocked,
+        _Filter.locked => e.isLocked,
+        _Filter.key => e.isAnalyzed,
       };
 
       return matchesQuery && matchesFilter;
@@ -89,7 +91,9 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
                     final bool active = _filter == f;
                     return Padding(
                       padding: EdgeInsets.only(
-                        right: f != _Filter.values.last ? AppTokens.sp2 : 0,
+                        right: f != _Filter.values.last
+                            ? AppTokens.sp2
+                            : 0,
                       ),
                       child: _FilterChip(
                         label: f.label,
@@ -101,25 +105,154 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
                 ),
               ),
               const SizedBox(height: AppTokens.sp4),
-              // ── 3. 결과 카운트 ──────────────────────────────────────
-              Text(
-                '결과 ${results.length}개',
-                style: AppText.monoLabel.copyWith(color: c.textMute),
-              ),
+              // ── 3. 섹션 타이틀 ──────────────────────────────────────
+              const MSKicker('사건 증거 보드'),
               const SizedBox(height: AppTokens.sp3),
               // ── 4. 리스트 ───────────────────────────────────────────
               Expanded(
                 child: results.isEmpty
-                    ? _EmptyState()
+                    ? const MSEmpty(
+                  icon: Icons.search_off,
+                  title: '일치하는 증거가 없습니다',
+                )
                     : ListView.separated(
                   physics: const BouncingScrollPhysics(),
                   itemCount: results.length,
                   separatorBuilder: (_, __) =>
                   const SizedBox(height: AppTokens.sp2),
-                  itemBuilder: (_, i) => EvidenceItem(
-                    results[i],
-                    onTap: () {},
+                  itemBuilder: (_, i) => _EvidenceRow(
+                    evidence: results[i],
                   ),
+                  padding: const EdgeInsets.only(
+                    bottom: AppTokens.sp10,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 증거 행 (잠금 처리 포함) ──────────────────────────────────────────────────
+
+class _EvidenceRow extends StatelessWidget {
+  const _EvidenceRow({required this.evidence});
+
+  final Evidence evidence;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    if (evidence.isLocked) {
+      return Opacity(
+        opacity: 0.5,
+        child: Stack(
+          alignment: Alignment.centerRight,
+          children: [
+            _EvidenceTile(evidence: evidence),
+            Padding(
+              padding: const EdgeInsets.only(right: AppTokens.sp4),
+              child: Icon(
+                Icons.lock_outline,
+                size: 16,
+                color: c.textMute,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _EvidenceTile(evidence: evidence, onTap: () {});
+  }
+}
+
+// ── 증거 타일 (EvidenceItem 인라인 구현) ──────────────────────────────────────
+
+class _EvidenceTile extends StatelessWidget {
+  const _EvidenceTile({required this.evidence, this.onTap});
+
+  final Evidence evidence;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Material(
+      color: c.bg,
+      borderRadius: BorderRadius.circular(AppTokens.r4),
+      child: InkWell(
+        onTap: onTap,
+        splashColor: c.primary.withValues(alpha: .08),
+        highlightColor: c.primary.withValues(alpha: .04),
+        borderRadius: BorderRadius.circular(AppTokens.r4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 13,
+            vertical: 11,
+          ),
+          decoration: BoxDecoration(
+            color: c.bg,
+            border: Border.all(color: c.line),
+            borderRadius: BorderRadius.circular(AppTokens.r4),
+            boxShadow: evidence.isNew
+                ? [
+              BoxShadow(
+                color: c.primarySoft,
+                spreadRadius: 2,
+                blurRadius: 0,
+              ),
+            ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: c.bgHover,
+                  border: Border.all(color: c.line),
+                  borderRadius: BorderRadius.circular(AppTokens.r2),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  evidence.icon,
+                  size: 17,
+                  color: evidence.isAnalyzed ? c.success : c.primary,
+                ),
+              ),
+              const SizedBox(width: AppTokens.sp3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      evidence.name,
+                      style: AppText.body.copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                        color: c.text,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      evidence.location,
+                      style: AppText.monoLabel.copyWith(
+                        fontSize: 9.5,
+                        letterSpacing: 9.5 * 0.06,
+                        color: c.textMute,
+                        height: 1.0,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -165,29 +298,6 @@ class _FilterChip extends StatelessWidget {
             height: 1.0,
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ── 빈 상태 ───────────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.search_off, size: 32, color: c.textMute),
-          const SizedBox(height: AppTokens.sp3),
-          Text(
-            '일치하는 증거가 없습니다',
-            style: AppText.bodySm.copyWith(color: c.textSub),
-          ),
-        ],
       ),
     );
   }
