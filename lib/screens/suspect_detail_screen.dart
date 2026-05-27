@@ -104,7 +104,10 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
             ...sampleCase.evidences.take(2).map(
                   (e) => Padding(
                 padding: const EdgeInsets.only(bottom: AppTokens.sp3),
-                child: EvidenceItem(e, onTap: () {}),
+                child: EvidenceItem(
+                  e,
+                  onTap: () {},
+                ),
               ),
             ),
             const SizedBox(height: AppTokens.sp3),
