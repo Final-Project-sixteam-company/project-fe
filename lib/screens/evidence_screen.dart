@@ -167,7 +167,10 @@ class _EvidenceRow extends StatelessWidget {
       );
     }
 
-    return _EvidenceTile(evidence: evidence, onTap: () {});
+    return _EvidenceTile(
+      evidence: evidence,
+      onTap: () {},
+    );
   }
 }
 
