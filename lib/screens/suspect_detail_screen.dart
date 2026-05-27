@@ -1,4 +1,5 @@
 // lib/screens/suspect_detail_screen.dart
+import 'package:clueroom/screens/result_screen.dart';
 import 'package:flutter/material.dart';
 import '../components/evidence_item.dart';
 import '../components/ms_button.dart';
@@ -399,7 +400,11 @@ class _ConfirmDialog extends StatelessWidget {
                     expanded: true,
                     onPressed: () {
                       Navigator.of(context).pop();
-                      // TODO: 결과 화면으로 이동
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => const ResultScreen(),
+                        ),
+                      );
                     },
                   ),
                 ),
