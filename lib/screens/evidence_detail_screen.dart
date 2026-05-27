@@ -97,8 +97,8 @@ class EvidenceDetailScreen extends StatelessWidget {
                   alignment: WrapAlignment.center,
                   children: [
                     if (evidence.isLocked)
-                      const MSPill('잠김', tone: MSPillTone.mute),
-                    if (evidence.isAnalyzed)
+                      const MSPill('잠김', tone: MSPillTone.mute)
+                    else if (evidence.isAnalyzed)
                       const MSPill('분석완료', tone: MSPillTone.success)
                     else if (evidence.isNew)
                       const MSPill('NEW', tone: MSPillTone.primary)
