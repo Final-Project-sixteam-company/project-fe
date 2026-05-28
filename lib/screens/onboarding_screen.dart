@@ -1,3 +1,4 @@
+// lib/screens/onboarding_screen.dart
 import 'package:flutter/material.dart';
 import '../components/ms_button.dart';
 import '../theme/app_colors.dart';
@@ -5,6 +6,7 @@ import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'app_shell.dart';
+import 'splash_screen.dart' show OnboardingFlag;
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -51,7 +53,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  void _goHome() {
+  Future<void> _goHome() async {
+    await OnboardingFlag.markComplete();
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const AppShell()),
     );
@@ -64,7 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         curve: AppMotion.easeOut,
       );
     } else {
-      _goHome();
+      _goHome(); // unawaited intentionally — navigation is fire-and-forget
     }
   }
 
@@ -122,7 +126,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         decoration: BoxDecoration(
                           color: _page == i ? c.primary : c.line,
                           borderRadius:
-                              BorderRadius.circular(AppTokens.rPill),
+                          BorderRadius.circular(AppTokens.rPill),
                         ),
                       );
                     }),

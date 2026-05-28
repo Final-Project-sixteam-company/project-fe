@@ -1,11 +1,29 @@
-// lib/screens/splash_screen.dart
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
+import 'app_shell.dart';
 import 'onboarding_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// 온보딩 완료 여부를 앱 문서 디렉터리의 플래그 파일로 저장한다.
+/// shared_preferences가 현재 의존성에 없으므로 path_provider(transitive)를 사용한다.
+class OnboardingFlag {
+  OnboardingFlag._();
+
+  static const String _key = 'onboarding_complete';
+
+  static Future<bool> isComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_key) ?? false;
+  }
+
+  static Future<void> markComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_key, true);
+  }
+}
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,7 +36,6 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _opacity;
-  Timer? _timer;
 
   @override
   void initState() {
@@ -26,18 +43,28 @@ class _SplashScreenState extends State<SplashScreen>
     _ctrl = AnimationController(vsync: this, duration: AppMotion.dur3);
     _opacity = CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut);
     _ctrl.forward();
+    _resolveDestination();
+  }
 
-    _timer = Timer(const Duration(milliseconds: 2200), () {
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-      );
-    });
+  Future<void> _resolveDestination() async {
+    // 최소 스플래시 노출 시간과 플래그 확인을 병렬로 실행
+    final results = await Future.wait([
+      Future.delayed(const Duration(milliseconds: 2200)),
+      OnboardingFlag.isComplete(),
+    ]);
+
+    if (!mounted) return;
+
+    final bool seen = results[1] as bool;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => seen ? const AppShell() : const OnboardingScreen(),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
@@ -74,10 +101,8 @@ class _SplashScreenState extends State<SplashScreen>
               child: Column(
                 children: [
                   const Spacer(),
-                  // 로고
                   _LogoBadge(),
                   const SizedBox(height: AppTokens.sp6),
-                  // 앱 이름
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -114,10 +139,8 @@ class _SplashScreenState extends State<SplashScreen>
                     ],
                   ),
                   const SizedBox(height: AppTokens.sp3),
-                  // 상태 텍스트
                   _PulsingLabel(),
                   const Spacer(),
-                  // 하단 버전
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppTokens.sp8),
                     child: Text(
@@ -163,7 +186,6 @@ class _LogoBadge extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // 십자선
           Positioned.fill(
             child: CustomPaint(painter: _CrosshairPainter(color: c.line)),
           ),
