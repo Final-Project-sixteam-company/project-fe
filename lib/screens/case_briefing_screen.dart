@@ -1,6 +1,9 @@
+// lib/screens/case_briefing_screen.dart
 import 'package:flutter/material.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
+import '../models/scenario.dart';
+import '../models/sample_scenarios.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
@@ -8,7 +11,10 @@ import '../theme/app_theme.dart';
 import 'case_screen.dart';
 
 class CaseBriefingScreen extends StatefulWidget {
-  const CaseBriefingScreen({super.key});
+  /// [scenario]를 생략하면 CL-001(데모데이 전야)을 기본값으로 사용한다.
+  const CaseBriefingScreen({this.scenario, super.key});
+
+  final Scenario? scenario;
 
   @override
   State<CaseBriefingScreen> createState() => _CaseBriefingScreenState();
@@ -16,6 +22,8 @@ class CaseBriefingScreen extends StatefulWidget {
 
 class _CaseBriefingScreenState extends State<CaseBriefingScreen>
     with TickerProviderStateMixin {
+  late final Scenario _scenario;
+
   final List<AnimationController> _ctrls = [];
   final List<Animation<double>> _opacities = [];
   final List<Animation<Offset>> _slides = [];
@@ -25,6 +33,9 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
   @override
   void initState() {
     super.initState();
+    // scenario가 전달되지 않으면 CL-001을 fallback으로 사용
+    _scenario = widget.scenario ??
+        sampleScenarios.firstWhere((s) => s.id == 'demoday-eve');
 
     for (int i = 0; i < _sectionCount; i++) {
       final ctrl = AnimationController(
@@ -98,7 +109,7 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
                       _animated(
                         0,
                         Text(
-                          '데모데이 전야\n살인사건',
+                          _scenario.title,
                           style: AppText.display.copyWith(
                             color: c.text,
                             height: 1.15,
@@ -115,11 +126,7 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
                             const MSKicker('사건 개요'),
                             const SizedBox(height: AppTokens.sp3),
                             Text(
-                              'AI 스타트업 대표 강도현이 데모데이 전날 밤 사망했다. '
-                                  '시신은 6층 데모룸에서 발견됐으며, 외부 침입 흔적은 없었다. '
-                                  '당일 밤 건물에 남아 있던 관계자는 총 4명. '
-                                  '모두 알리바이를 주장하고 있지만, '
-                                  '타임라인에는 설명되지 않는 공백이 존재한다.',
+                              _scenario.synopsis,
                               style: AppText.body.copyWith(
                                 color: c.text,
                                 height: 1.6,
@@ -137,7 +144,7 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
                           children: [
                             const MSKicker('피해자 정보'),
                             const SizedBox(height: AppTokens.sp3),
-                            _VictimRow(),
+                            _VictimRow(scenario: _scenario),
                           ],
                         ),
                       ),
@@ -216,9 +223,20 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
 // ── 피해자 요약 행 ────────────────────────────────────────────────────────────
 
 class _VictimRow extends StatelessWidget {
+  const _VictimRow({required this.scenario});
+
+  final Scenario scenario;
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+
+    // CL-001 전용 피해자 정보. 추후 Scenario 모델에 victim 필드 추가 시 교체.
+    final bool isDemoDay = scenario.id == 'demoday-eve';
+    final String victimInitial = isDemoDay ? '강' : '?';
+    final String victimName = isDemoDay ? '강도현' : '미상';
+    final String victimRole = isDemoDay ? 'CEO · AI 스타트업 대표' : '피해자 정보 준비 중';
+    final String locationLabel = isDemoDay ? '데모룸' : scenario.tags.firstOrNull ?? '현장';
 
     return Row(
       children: [
@@ -236,7 +254,7 @@ class _VictimRow extends StatelessWidget {
           ),
           alignment: Alignment.center,
           child: Text(
-            '강',
+            victimInitial,
             style: AppText.titleM.copyWith(
               fontSize: 16,
               color: AppColors.ink50,
@@ -251,7 +269,7 @@ class _VictimRow extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '강도현',
+                victimName,
                 style: AppText.body.copyWith(
                   fontWeight: FontWeight.w600,
                   color: c.text,
@@ -259,7 +277,7 @@ class _VictimRow extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'CEO · AI 스타트업 대표',
+                victimRole,
                 style: AppText.bodySm.copyWith(color: c.textSub),
               ),
             ],
@@ -276,7 +294,7 @@ class _VictimRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppTokens.r2),
           ),
           child: Text(
-            '데모룸',
+            locationLabel,
             style: AppText.monoLabel.copyWith(
               color: c.danger,
               height: 1.0,
