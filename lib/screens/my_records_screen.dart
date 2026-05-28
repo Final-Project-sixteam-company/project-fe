@@ -31,9 +31,26 @@ class MyRecordsScreen extends StatefulWidget {
 class _MyRecordsScreenState extends State<MyRecordsScreen> {
   _RecordsFilter _filter = _RecordsFilter.all;
 
+  // ── 통계 (세션 데이터에서 직접 파생) ───────────────────────────────────────
+
+  List<PlaySession> get _completedSessions =>
+      samplePlaySessions.where((s) => s.state == PlayState.completed).toList();
+
+  int get _solvedCount => _completedSessions.length;
+
+  /// 완료 세션 중 score가 있는 항목의 평균. 없으면 '--'.
+  String get _avgAccuracy {
+    final scores = _completedSessions
+        .map((s) => s.score)
+        .whereType<int>()
+        .toList();
+    if (scores.isEmpty) return '--';
+    final avg = scores.reduce((a, b) => a + b) / scores.length;
+    return '${avg.round()}%';
+  }
+
   List<PlaySession> get _filtered => switch (_filter) {
-    _RecordsFilter.completed =>
-        samplePlaySessions.where((s) => s.state == PlayState.completed).toList(),
+    _RecordsFilter.completed => _completedSessions,
     _RecordsFilter.inProgress =>
         samplePlaySessions.where((s) => s.state == PlayState.inProgress).toList(),
   // 현재 유저가 제작한 시나리오 세션이 없으므로 빈 목록 반환.
@@ -71,10 +88,10 @@ class _MyRecordsScreenState extends State<MyRecordsScreen> {
               _DetectiveGradeCard(),
               const SizedBox(height: AppTokens.sp4),
               // ── 통계 ────────────────────────────────────────────
-              const MSStatRow([
-                StatCell('해결 사건', '3건', tone: StatTone.good),
-                StatCell('평균 정답률', '91%', tone: StatTone.good),
-                StatCell('제작 수', '0개'),
+              MSStatRow([
+                StatCell('해결 사건', '$_solvedCount건', tone: StatTone.good),
+                StatCell('평균 정답률', _avgAccuracy, tone: StatTone.good),
+                const StatCell('제작 수', '0개'),
               ]),
               const SizedBox(height: AppTokens.sp6),
               // ── 탭 필터 ─────────────────────────────────────────
