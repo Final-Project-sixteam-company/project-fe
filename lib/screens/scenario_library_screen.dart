@@ -51,9 +51,9 @@ class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
 
     if (_query.isNotEmpty) {
       list = list.where((s) =>
-        s.title.contains(_query) ||
-        s.tags.any((t) => t.contains(_query)) ||
-        (s.author?.contains(_query) ?? false)
+      s.title.contains(_query) ||
+          s.tags.any((t) => t.contains(_query)) ||
+          (s.author?.contains(_query) ?? false)
       ).toList();
     }
 
@@ -61,10 +61,13 @@ class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
       _LibraryFilter.official => list.where((s) => s.type == ScenarioType.official).toList(),
       _LibraryFilter.custom => list.where((s) => s.type == ScenarioType.custom).toList(),
       _LibraryFilter.popular => list..sort((a, b) => b.plays.compareTo(a.plays)),
+    // code 내림차순(예: CL-006 → CL-001)으로 최신 등록 순 정렬.
+    // 추후 createdAt 필드 추가 시 해당 필드로 교체 예정.
+      _LibraryFilter.newest => list..sort((a, b) => b.code.compareTo(a.code)),
       _LibraryFilter.easy => list.where((s) => s.difficulty == Difficulty.easy).toList(),
       _LibraryFilter.medium => list.where((s) => s.difficulty == Difficulty.medium).toList(),
       _LibraryFilter.hard => list.where((s) => s.difficulty == Difficulty.hard).toList(),
-      _ => list,
+      _LibraryFilter.all => list,
     };
 
     return list;
@@ -83,7 +86,7 @@ class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                AppTokens.sp4, AppTokens.sp4, AppTokens.sp4, 0),
+                  AppTokens.sp4, AppTokens.sp4, AppTokens.sp4, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -133,26 +136,26 @@ class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
             Expanded(
               child: results.isEmpty
                   ? const MSEmpty(
-                      icon: Icons.search_off,
-                      title: '일치하는 사건이 없습니다',
-                    )
+                icon: Icons.search_off,
+                title: '일치하는 사건이 없습니다',
+              )
                   : ListView.separated(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(
-                        AppTokens.sp4, 0, AppTokens.sp4, AppTokens.sp10),
-                      itemCount: results.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: AppTokens.sp3),
-                      itemBuilder: (_, i) => _ScenarioRow(
-                        scenario: results[i],
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ScenarioDetailScreen(scenario: results[i]),
-                          ),
-                        ),
-                      ),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                    AppTokens.sp4, 0, AppTokens.sp4, AppTokens.sp10),
+                itemCount: results.length,
+                separatorBuilder: (_, __) =>
+                const SizedBox(height: AppTokens.sp3),
+                itemBuilder: (_, i) => _ScenarioRow(
+                  scenario: results[i],
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ScenarioDetailScreen(scenario: results[i]),
                     ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),

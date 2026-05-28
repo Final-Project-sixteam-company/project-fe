@@ -1,3 +1,4 @@
+// lib/screens/my_records_screen.dart
 import 'package:flutter/material.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_stat_row.dart';
@@ -13,11 +14,11 @@ enum _RecordsFilter { all, completed, inProgress, mine }
 
 extension _RecordsFilterLabel on _RecordsFilter {
   String get label => switch (this) {
-        _RecordsFilter.all => '전체',
-        _RecordsFilter.completed => '완료',
-        _RecordsFilter.inProgress => '진행 중',
-        _RecordsFilter.mine => '내 시나리오',
-      };
+    _RecordsFilter.all => '전체',
+    _RecordsFilter.completed => '완료',
+    _RecordsFilter.inProgress => '진행 중',
+    _RecordsFilter.mine => '내 시나리오',
+  };
 }
 
 class MyRecordsScreen extends StatefulWidget {
@@ -31,12 +32,15 @@ class _MyRecordsScreenState extends State<MyRecordsScreen> {
   _RecordsFilter _filter = _RecordsFilter.all;
 
   List<PlaySession> get _filtered => switch (_filter) {
-        _RecordsFilter.completed =>
-          samplePlaySessions.where((s) => s.state == PlayState.completed).toList(),
-        _RecordsFilter.inProgress =>
-          samplePlaySessions.where((s) => s.state == PlayState.inProgress).toList(),
-        _ => samplePlaySessions,
-      };
+    _RecordsFilter.completed =>
+        samplePlaySessions.where((s) => s.state == PlayState.completed).toList(),
+    _RecordsFilter.inProgress =>
+        samplePlaySessions.where((s) => s.state == PlayState.inProgress).toList(),
+  // 현재 유저가 제작한 시나리오 세션이 없으므로 빈 목록 반환.
+  // 추후 authored scenario IDs와 교차 필터링으로 교체 예정.
+    _RecordsFilter.mine => const [],
+    _RecordsFilter.all => samplePlaySessions,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -108,9 +112,9 @@ class _MyRecordsScreenState extends State<MyRecordsScreen> {
                 )
               else
                 ...sessions.map((s) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppTokens.sp3),
-                      child: _SessionCard(session: s),
-                    )),
+                  padding: const EdgeInsets.only(bottom: AppTokens.sp3),
+                  child: _SessionCard(session: s),
+                )),
               const SizedBox(height: AppTokens.sp10),
             ],
           ),

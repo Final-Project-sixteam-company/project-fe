@@ -10,6 +10,10 @@ import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'case_briefing_screen.dart';
 
+/// CaseScreen에 하드코딩된 케이스 데이터가 존재하는 시나리오 ID 목록.
+/// 새 시나리오에 실제 데이터를 붙이면 이 set에 추가한다.
+const _kPlayableIds = {'demoday-eve'};
+
 class ScenarioDetailScreen extends StatefulWidget {
   const ScenarioDetailScreen({required this.scenario, super.key});
 
@@ -21,6 +25,8 @@ class ScenarioDetailScreen extends StatefulWidget {
 
 class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
   bool _bookmarked = false;
+
+  bool get _isPlayable => _kPlayableIds.contains(widget.scenario.id);
 
   @override
   Widget build(BuildContext context) {
@@ -53,10 +59,16 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
       ),
       bottomNavigationBar: _BottomCta(
         bookmarked: _bookmarked,
+        scenario: s,
+        isPlayable: _isPlayable,
         onBookmark: () => setState(() => _bookmarked = !_bookmarked),
-        onStart: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const CaseBriefingScreen()),
-        ),
+        onStart: _isPlayable
+            ? () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CaseBriefingScreen(scenario: s),
+          ),
+        )
+            : null,
       ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -119,11 +131,11 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
                     children: s.tags.map((tag) {
                       return Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
+                            horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
                           border: Border.all(color: c.line),
                           borderRadius:
-                              BorderRadius.circular(AppTokens.rPill),
+                          BorderRadius.circular(AppTokens.rPill),
                         ),
                         child: Text(
                           '#$tag',
@@ -309,10 +321,10 @@ class _RatingSection extends StatelessWidget {
                 final ratio = star == 5
                     ? 0.68
                     : star == 4
-                        ? 0.22
-                        : star == 3
-                            ? 0.07
-                            : 0.02;
+                    ? 0.22
+                    : star == 3
+                    ? 0.07
+                    : 0.02;
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
@@ -374,14 +386,18 @@ class _RatingSection extends StatelessWidget {
 
 class _BottomCta extends StatelessWidget {
   const _BottomCta({
+    required this.scenario,
     required this.bookmarked,
+    required this.isPlayable,
     required this.onBookmark,
     required this.onStart,
   });
 
+  final Scenario scenario;
   final bool bookmarked;
+  final bool isPlayable;
   final VoidCallback onBookmark;
-  final VoidCallback onStart;
+  final VoidCallback? onStart;
 
   @override
   Widget build(BuildContext context) {
@@ -394,25 +410,70 @@ class _BottomCta extends StatelessWidget {
           horizontal: AppTokens.sp4,
           vertical: AppTokens.sp3,
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            MSButton(
-              label: '',
-              variant: bookmarked
-                  ? MSButtonVariant.primary
-                  : MSButtonVariant.secondary,
-              icon: bookmarked ? Icons.bookmark : Icons.bookmark_outline,
-              onPressed: onBookmark,
-            ),
-            const SizedBox(width: AppTokens.sp3),
-            Expanded(
-              child: MSButton(
-                label: '조사 시작',
-                variant: MSButtonVariant.primary,
-                expanded: true,
-                icon: Icons.play_arrow,
-                onPressed: onStart,
+            if (!isPlayable) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: AppTokens.sp2,
+                  horizontal: AppTokens.sp3,
+                ),
+                decoration: BoxDecoration(
+                  color: c.bgHover,
+                  border: Border.all(color: c.line),
+                  borderRadius: BorderRadius.circular(AppTokens.r3),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.construction_outlined,
+                      size: 14,
+                      color: c.textMute,
+                    ),
+                    const SizedBox(width: AppTokens.sp2),
+                    Expanded(
+                      child: Text(
+                        '${scenario.code} 시나리오 데이터가 준비 중입니다. '
+                            'CL-001만 현재 플레이 가능합니다.',
+                        style: AppText.bodySm.copyWith(
+                          fontSize: 12,
+                          color: c.textMute,
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(height: AppTokens.sp2),
+            ],
+            Row(
+              children: [
+                MSButton(
+                  label: '',
+                  variant: bookmarked
+                      ? MSButtonVariant.primary
+                      : MSButtonVariant.secondary,
+                  icon: bookmarked
+                      ? Icons.bookmark
+                      : Icons.bookmark_outline,
+                  onPressed: onBookmark,
+                ),
+                const SizedBox(width: AppTokens.sp3),
+                Expanded(
+                  child: MSButton(
+                    label: isPlayable ? '조사 시작' : '준비 중',
+                    variant: MSButtonVariant.primary,
+                    expanded: true,
+                    icon: isPlayable
+                        ? Icons.play_arrow
+                        : Icons.lock_clock_outlined,
+                    onPressed: onStart,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
