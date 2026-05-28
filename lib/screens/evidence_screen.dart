@@ -1,9 +1,13 @@
+// lib/screens/evidence_screen.dart
 import 'package:flutter/material.dart';
 import '../components/ms_kicker.dart';
+import '../components/ms_pill.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
+import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
+import '../screens/evidence_detail_screen.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
@@ -37,9 +41,13 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
     super.dispose();
   }
 
-  List<Evidence> get _filtered {
+  List<Evidence> _filtered(Set<String> unlockedIds) {
     final sorted = List<Evidence>.from(sampleCase.evidences)
       ..sort((a, b) {
+        // 잠금 해제된 신규 증거를 최상단으로
+        final aUnlocked = unlockedIds.contains(a.id);
+        final bUnlocked = unlockedIds.contains(b.id);
+        if (aUnlocked != bUnlocked) return aUnlocked ? -1 : 1;
         if (a.isLocked != b.isLocked) return a.isLocked ? 1 : -1;
         if (a.isNew != b.isNew) return a.isNew ? -1 : 1;
         return 0;
@@ -50,10 +58,12 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
           e.name.contains(_query) ||
           e.location.contains(_query);
 
+      final isTimeLocked = e.isLocked && !unlockedIds.contains(e.id);
+
       final matchesFilter = switch (_filter) {
         _Filter.all => true,
-        _Filter.acquired => e.isNew && !e.isLocked,
-        _Filter.locked => e.isLocked,
+        _Filter.acquired => !isTimeLocked,
+        _Filter.locked => isTimeLocked,
         _Filter.key => e.isAnalyzed,
       };
 
@@ -64,90 +74,104 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final results = _filtered;
 
-    return Scaffold(
-      backgroundColor: c.bg,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: AppTokens.sp4),
-              // ── 1. 검색창 ───────────────────────────────────────────
-              MSTextField(
-                controller: _searchCtrl,
-                hintText: '증거 이름 · 장소 검색…',
-                suffixIcon: Icons.search,
-                onChanged: (v) => setState(() => _query = v.trim()),
-              ),
-              const SizedBox(height: AppTokens.sp3),
-              // ── 2. 필터 칩 ──────────────────────────────────────────
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _Filter.values.map((f) {
-                    final bool active = _filter == f;
-                    return Padding(
-                      padding: EdgeInsets.only(
-                        right: f != _Filter.values.last
-                            ? AppTokens.sp2
-                            : 0,
-                      ),
-                      child: _FilterChip(
-                        label: f.label,
-                        active: active,
-                        onTap: () => setState(() => _filter = f),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: AppTokens.sp4),
-              // ── 3. 섹션 타이틀 ──────────────────────────────────────
-              const MSKicker('사건 증거 보드'),
-              const SizedBox(height: AppTokens.sp3),
-              // ── 4. 리스트 ───────────────────────────────────────────
-              Expanded(
-                child: results.isEmpty
-                    ? const MSEmpty(
-                  icon: Icons.search_off,
-                  title: '일치하는 증거가 없습니다',
-                )
-                    : ListView.separated(
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: results.length,
-                  separatorBuilder: (_, __) =>
-                  const SizedBox(height: AppTokens.sp2),
-                  itemBuilder: (_, i) => _EvidenceRow(
-                    evidence: results[i],
+    return AnimatedBuilder(
+      animation: context.session,
+      builder: (context, _) {
+        final unlockedIds = context.sessionRead.unlockedEvidenceIds;
+        final results = _filtered(unlockedIds);
+
+        return Scaffold(
+          backgroundColor: c.bg,
+          body: SafeArea(
+            child: Padding(
+              padding:
+              const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: AppTokens.sp4),
+                  MSTextField(
+                    controller: _searchCtrl,
+                    hintText: '증거 이름 · 장소 검색…',
+                    suffixIcon: Icons.search,
+                    onChanged: (v) => setState(() => _query = v.trim()),
                   ),
-                  padding: const EdgeInsets.only(
-                    bottom: AppTokens.sp10,
+                  const SizedBox(height: AppTokens.sp3),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _Filter.values.map((f) {
+                        final bool active = _filter == f;
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            right:
+                            f != _Filter.values.last ? AppTokens.sp2 : 0,
+                          ),
+                          child: _FilterChip(
+                            label: f.label,
+                            active: active,
+                            onTap: () => setState(() => _filter = f),
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: AppTokens.sp4),
+                  const MSKicker('사건 증거 보드'),
+                  const SizedBox(height: AppTokens.sp3),
+                  Expanded(
+                    child: results.isEmpty
+                        ? const MSEmpty(
+                      icon: Icons.search_off,
+                      title: '일치하는 증거가 없습니다',
+                    )
+                        : ListView.separated(
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: results.length,
+                      separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppTokens.sp2),
+                      itemBuilder: (_, i) => _EvidenceRow(
+                        evidence: results[i],
+                        isTimeLocked: results[i].isLocked &&
+                            !unlockedIds.contains(results[i].id),
+                        isNewlyUnlocked:
+                        unlockedIds.contains(results[i].id) &&
+                            results[i].isLocked,
+                      ),
+                      padding: const EdgeInsets.only(
+                        bottom: AppTokens.sp10,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-// ── 증거 행 (잠금 처리 포함) ──────────────────────────────────────────────────
+// ── 증거 행 ───────────────────────────────────────────────────────────────────
 
 class _EvidenceRow extends StatelessWidget {
-  const _EvidenceRow({required this.evidence});
+  const _EvidenceRow({
+    required this.evidence,
+    required this.isTimeLocked,
+    required this.isNewlyUnlocked,
+  });
 
   final Evidence evidence;
+  final bool isTimeLocked;
+  final bool isNewlyUnlocked;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
 
-    if (evidence.isLocked) {
+    if (isTimeLocked) {
       return Opacity(
         opacity: 0.5,
         child: Stack(
@@ -156,11 +180,7 @@ class _EvidenceRow extends StatelessWidget {
             _EvidenceTile(evidence: evidence),
             Padding(
               padding: const EdgeInsets.only(right: AppTokens.sp4),
-              child: Icon(
-                Icons.lock_outline,
-                size: 16,
-                color: c.textMute,
-              ),
+              child: Icon(Icons.lock_outline, size: 16, color: c.textMute),
             ),
           ],
         ),
@@ -169,18 +189,28 @@ class _EvidenceRow extends StatelessWidget {
 
     return _EvidenceTile(
       evidence: evidence,
-      onTap: () {},
+      isNewlyUnlocked: isNewlyUnlocked,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EvidenceDetailScreen(evidence: evidence),
+        ),
+      ),
     );
   }
 }
 
-// ── 증거 타일 (EvidenceItem 인라인 구현) ──────────────────────────────────────
+// ── 증거 타일 ─────────────────────────────────────────────────────────────────
 
 class _EvidenceTile extends StatelessWidget {
-  const _EvidenceTile({required this.evidence, this.onTap});
+  const _EvidenceTile({
+    required this.evidence,
+    this.onTap,
+    this.isNewlyUnlocked = false,
+  });
 
   final Evidence evidence;
   final VoidCallback? onTap;
+  final bool isNewlyUnlocked;
 
   @override
   Widget build(BuildContext context) {
@@ -201,15 +231,20 @@ class _EvidenceTile extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: c.bg,
-            border: Border.all(color: c.line),
+            border: Border.all(
+              color: isNewlyUnlocked ? c.success : c.line,
+              width: isNewlyUnlocked ? 1.5 : 1.0,
+            ),
             borderRadius: BorderRadius.circular(AppTokens.r4),
-            boxShadow: evidence.isNew
+            boxShadow: (evidence.isNew || isNewlyUnlocked)
                 ? [
               BoxShadow(
-                color: c.primarySoft,
+                color: isNewlyUnlocked
+                    ? c.successSoft
+                    : c.primarySoft,
                 spreadRadius: 2,
                 blurRadius: 0,
-              ),
+              )
             ]
                 : null,
           ),
@@ -227,7 +262,9 @@ class _EvidenceTile extends StatelessWidget {
                 child: Icon(
                   evidence.icon,
                   size: 17,
-                  color: evidence.isAnalyzed ? c.success : c.primary,
+                  color: isNewlyUnlocked
+                      ? c.success
+                      : (evidence.isAnalyzed ? c.success : c.primary),
                 ),
               ),
               const SizedBox(width: AppTokens.sp3),
@@ -258,6 +295,12 @@ class _EvidenceTile extends StatelessWidget {
                   ],
                 ),
               ),
+              if (isNewlyUnlocked)
+                MSPill('해금', tone: MSPillTone.success)
+              else if (evidence.isAnalyzed)
+                const MSPill('분석완료', tone: MSPillTone.success)
+              else if (evidence.isNew)
+                  const MSPill('NEW', tone: MSPillTone.primary),
             ],
           ),
         ),
