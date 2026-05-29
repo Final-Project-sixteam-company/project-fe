@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../components/ms_bottom_nav.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_stat_row.dart';
 import '../components/ms_text_field.dart';
@@ -8,7 +7,6 @@ import '../components/suspect_card.dart';
 import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
-import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'suspect_detail_screen.dart';

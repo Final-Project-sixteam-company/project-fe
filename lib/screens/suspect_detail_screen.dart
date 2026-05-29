@@ -293,7 +293,6 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
 
     return SafeArea(
       top: false,
