@@ -12,13 +12,12 @@ import '../theme/app_theme.dart';
 
 // ── 힌트 모달 ─────────────────────────────────────────────────────────────────
 
-Future<void> showHintModal(BuildContext context) {
-  return showModalBottomSheet(
+Future<HintLevel?> showHintModal(BuildContext context) {
+  return showModalBottomSheet<HintLevel>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     builder: (_) => _HintSheet(
-      // 세션 컨트롤러를 미리 읽어서 넘김 (sheet는 새 context)
       onUseHint: (level) {
         GameSessionProvider.read(context).useHint(level);
       },
@@ -26,7 +25,6 @@ Future<void> showHintModal(BuildContext context) {
     ),
   );
 }
-
 class _HintSheet extends StatelessWidget {
   const _HintSheet({
     required this.onUseHint,
@@ -111,8 +109,8 @@ class _HintSheet extends StatelessWidget {
                     onPressed: _isUsed(level)
                         ? null
                         : () {
-                      onUseHint(level);
-                      Navigator.of(context).pop();
+                      onUseHint(level); // 1. 컨트롤러에 감점 기록
+                      Navigator.of(context).pop(level); // 2. 선택한 레벨을 들고 모달 닫기
                     },
                   ),
                 ),

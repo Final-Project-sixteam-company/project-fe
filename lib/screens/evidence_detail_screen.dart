@@ -24,15 +24,16 @@ class EvidenceDetailScreen extends StatelessWidget {
   /// 실제 잠금 여부 — 정적 플래그와 세션 해금 상태를 합산한 단일 진실
   bool get _effectiveLocked => evidence.isLocked && !isUnlocked;
 
+  String get _statusLabel {
+    if (isUnlocked && evidence.isLocked) return 'UNLOCKED';
+    if (_effectiveLocked) return 'LOCKED';
+    if (evidence.isAnalyzed) return 'ANALYZED';
+    return evidence.isNew ? 'NEW' : 'PENDING';
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
-    final statusLabel = _effectiveLocked
-        ? 'LOCKED'
-        : evidence.isAnalyzed
-        ? 'ANALYZED'
-        : (evidence.isNew ? 'NEW' : 'PENDING');
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -88,7 +89,7 @@ class EvidenceDetailScreen extends StatelessWidget {
                 // ── 이름 ────────────────────────────────────────────
                 Center(
                   child: Text(
-                    evidence.name,
+                    _effectiveLocked ? '잠긴 증거' : evidence.name,
                     style: AppText.titleL.copyWith(color: c.text),
                     textAlign: TextAlign.center,
                   ),
@@ -113,7 +114,7 @@ class EvidenceDetailScreen extends StatelessWidget {
                 // ── 상태 필 ──────────────────────────────────────────
                 Center(
                   child: _StatusPill(
-                    statusLabel: statusLabel,
+                    statusLabel: _statusLabel,
                     effectiveLocked: _effectiveLocked,
                     isAnalyzed: evidence.isAnalyzed,
                     isNew: evidence.isNew,
@@ -125,7 +126,7 @@ class EvidenceDetailScreen extends StatelessWidget {
                 _ObservationCard(
                   evidence: evidence,
                   effectiveLocked: _effectiveLocked,
-                  statusLabel: statusLabel,
+                  statusLabel: _statusLabel,
                 ),
                 const SizedBox(height: AppTokens.sp10),
               ],
@@ -156,19 +157,15 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (isNewlyUnlocked) {
-      return const MSPill('해금됨', tone: MSPillTone.success);
-    }
-    if (effectiveLocked) {
-      return const MSPill('잠김', tone: MSPillTone.mute);
-    }
-    if (isAnalyzed) {
-      return const MSPill('분석완료', tone: MSPillTone.success);
-    }
-    if (isNew) {
-      return const MSPill('NEW', tone: MSPillTone.primary);
-    }
-    return const MSPill('대기', tone: MSPillTone.mute);
+    final tone = switch (statusLabel) {
+      'UNLOCKED' => MSPillTone.success,
+      'LOCKED' => MSPillTone.mute,
+      'ANALYZED' => MSPillTone.success,
+      'NEW' => MSPillTone.primary,
+      _ => MSPillTone.mute,
+    };
+
+    return MSPill(statusLabel, tone: tone);
   }
 }
 
