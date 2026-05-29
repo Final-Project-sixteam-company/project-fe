@@ -31,8 +31,6 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
   // 정답 데이터 (백엔드에서 내려올 값 — 현재는 하드코딩)
   static const String _correctSuspectId = 's1';
-  static const String _correctMotive = '회사 자금 유용 은폐';
-  static const String _correctMethod = '알레르기 유발 음료 제공 후 에피펜 은닉';
   static const List<String> _correctEvidenceIds = ['e3', 'e1', 'e5'];
 
   @override

@@ -424,7 +424,7 @@ class _ReviewWriteSheetState extends State<_ReviewWriteSheet> {
                   children: [
                     Switch(
                       value: _isSpoiler,
-                      activeColor: c.danger,
+                      activeThumbColor: c.danger,
                       onChanged: (v) =>
                           setState(() => _isSpoiler = v),
                     ),
