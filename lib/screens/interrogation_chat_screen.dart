@@ -6,6 +6,7 @@ import '../components/ms_text_field.dart';
 import '../components/states.dart';
 import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
+import '../models/sample_case.dart';
 import '../models/session_models.dart';
 import '../repositories/interrogation_repository.dart';
 import '../theme/app_colors.dart';
@@ -77,7 +78,14 @@ class _InterrogationChatScreenState
     if (trimmed.isEmpty || _isWaiting) return;
 
     final session = context.sessionRead;
-    final unlockedIds = session.unlockedEvidenceIds.toList();
+
+    final baseEvidenceIds = sampleCase.evidences
+        .where((e) => !e.isLocked)
+        .map((e) => e.id);
+    final unlockedIds = [
+      ...baseEvidenceIds,
+      ...session.unlockedEvidenceIds,
+    ];
 
     setState(() {
       _messages.add(_Message(
