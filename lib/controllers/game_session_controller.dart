@@ -1,7 +1,6 @@
 // lib/controllers/game_session_controller.dart
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../models/case.dart';
 import '../models/session_models.dart';
 
 class GameSessionController extends ChangeNotifier {
