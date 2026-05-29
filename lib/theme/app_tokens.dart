@@ -14,6 +14,14 @@ class AppTokens {
   static const double sp12 = 48;
   static const double sp16 = 64;
 
+  // ── 컴포넌트 고정 치수 ─────────────────────────────────────────────────────
+  /// MSButton 기본 높이
+  static const double btnH = 36;
+  /// MSButton 로딩 스피너 크기
+  static const double btnSpinnerSize = 14;
+  /// MSButton 아이콘↔텍스트 간격
+  static const double btnIconGap = 6;
+
   // ── 카드 내부 패딩 (기존 컴포넌트에서 반복 사용되는 값) ─────────────────
   /// 증거 아이템, 심문 말풍선 등 조밀한 카드 가로 패딩
   static const double cardPadH = 13;
