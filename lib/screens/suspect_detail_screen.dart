@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../components/evidence_item.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
+import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
 import '../theme/app_colors.dart';
@@ -292,7 +293,6 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
 
     return SafeArea(
       top: false,
@@ -318,11 +318,17 @@ class _BottomBar extends StatelessWidget {
                 label: '심문하기',
                 variant: MSButtonVariant.primary,
                 expanded: true,
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => InterrogationChatScreen(suspect: suspect),
-                  ),
-                ),
+                onPressed: () {
+                  final ctrl = context.sessionRead;
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => GameSessionProvider(
+                        controller: ctrl,
+                        child: InterrogationChatScreen(suspect: suspect),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(width: AppTokens.sp3),

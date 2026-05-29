@@ -3,32 +3,37 @@ import '../components/game_modals.dart';
 import '../components/ms_button.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
+import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
+import '../models/sample_case.dart';
+import '../models/session_models.dart';
+import '../repositories/interrogation_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 
-// ── 메시지 모델 ───────────────────────────────────────────────────────────────
-
 enum _Sender { detective, suspect }
 
 class _Message {
+  const _Message({
+    required this.text,
+    required this.sender,
+    this.presentedEvidenceId,
+  });
+
   final String text;
   final _Sender sender;
-
-  const _Message({required this.text, required this.sender});
+  final String? presentedEvidenceId;
 }
 
 const _suggestedQuestions = [
   '어젯밤 10시에 어디 있었나요?',
   '피해자와의 관계는?',
   '마지막으로 피해자를 본 건 언제인가요?',
-  'USB 드라이브에 대해 알고 있나요?',
   '알리바이를 증명할 수 있나요?',
+  '그날 밤 데모룸에 다시 들어간 적 있나요?',
 ];
-
-// ── 화면 ──────────────────────────────────────────────────────────────────────
 
 class InterrogationChatScreen extends StatefulWidget {
   const InterrogationChatScreen({required this.suspect, super.key});
@@ -40,7 +45,9 @@ class InterrogationChatScreen extends StatefulWidget {
       _InterrogationChatScreenState();
 }
 
-class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
+class _InterrogationChatScreenState
+    extends State<InterrogationChatScreen> {
+  final InterrogationRepository _repo = buildInterrogationRepository();
   final TextEditingController _inputCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final List<_Message> _messages = [
@@ -58,56 +65,101 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
     super.dispose();
   }
 
-  Future<void> _sendMessage(String text) async {
+  Future<void> _sendMessage(
+      String text, {
+        String? evidenceId,
+      }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isWaiting) return;
 
+    final session = context.sessionRead;
+
+    final baseEvidenceIds = sampleCase.evidences
+        .where((e) => !e.isLocked)
+        .map((e) => e.id);
+    final unlockedIds = [
+      ...baseEvidenceIds,
+      ...session.unlockedEvidenceIds,
+    ];
+
+    final history = _buildConversationHistory();
+
     setState(() {
-      _messages.add(_Message(text: trimmed, sender: _Sender.detective));
+      _messages.add(_Message(
+        text: trimmed,
+        sender: _Sender.detective,
+        presentedEvidenceId: evidenceId,
+      ));
       _isWaiting = true;
       _inputCtrl.clear();
     });
 
     _scrollToBottom();
 
-    // AI 응답 시뮬레이션
-    await Future.delayed(const Duration(milliseconds: 1400));
-
-    if (!mounted) return;
-    setState(() {
-      _messages.add(
-        _Message(
-          text: _mockReply(trimmed),
-          sender: _Sender.suspect,
+    String answer = '...대답을 거부하고 있습니다. (네트워크 연결을 확인하세요)';
+    try {
+      answer = await _repo.ask(
+        InterrogationRequest(
+          sessionId: session.sessionId,
+          scenarioId: session.scenarioId,
+          suspectId: widget.suspect.id,
+          question: trimmed,
+          unlockedEvidenceIds: unlockedIds,
+          conversationHistory: history,
+          presentedEvidenceId: evidenceId,
         ),
       );
-      _isWaiting = false;
-    });
 
-    _scrollToBottom();
+      if (!mounted) return;
+
+      session.addInterrogationLog(
+        InterrogationLog(
+          suspectId: widget.suspect.id,
+          suspectName: widget.suspect.name,
+          question: trimmed,
+          answer: answer,
+          askedAt: session.elapsed,
+          presentedEvidenceId: evidenceId,
+        ),
+      );
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() {
+          _messages.add(_Message(text: answer, sender: _Sender.suspect));
+          _isWaiting = false;
+        });
+        _scrollToBottom();
+      }
+    }
   }
 
-  String _mockReply(String question) {
-    if (question.contains('10시') || question.contains('어디')) {
-      return '그 시간에 저는 이미 퇴근한 상태였습니다. CCTV를 확인해보시면 알 수 있을 겁니다.';
-    }
-    if (question.contains('관계') || question.contains('피해자')) {
-      return '강도현 대표와는 업무적인 관계입니다. 개인적인 감정은 없었어요.';
-    }
-    if (question.contains('USB')) {
-      return '무슨 USB 말씀하시는 건지 모르겠습니다.';
-    }
-    return '그 부분에 대해서는 드릴 말씀이 없습니다.';
+  List<Map<String, String>> _buildConversationHistory() {
+    final recent = _messages.length > 12
+        ? _messages.sublist(_messages.length - 12)
+        : _messages;
+    return recent
+        .map(
+          (msg) => {
+        'role': msg.sender == _Sender.detective ? 'user' : 'assistant',
+        'content': msg.text,
+        if (msg.presentedEvidenceId != null)
+          'presented_evidence_id': msg.presentedEvidenceId!,
+      },
+    )
+        .toList();
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollCtrl.hasClients) return;
-      _scrollCtrl.animateTo(
-        _scrollCtrl.position.maxScrollExtent,
-        duration: AppMotion.dur3,
-        curve: AppMotion.easeOut,
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollCtrl.hasClients) return;
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: AppMotion.dur3,
+          curve: AppMotion.easeOut,
+        );
+      });
     });
   }
 
@@ -120,7 +172,6 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
       appBar: _buildAppBar(context),
       body: Column(
         children: [
-          // ── 1. 채팅 리스트 ───────────────────────────────────────
           Expanded(
             child: ListView.separated(
               controller: _scrollCtrl,
@@ -142,16 +193,17 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
                   text: msg.text,
                   suspect: widget.suspect,
                 )
-                    : _DetectiveBubble(text: msg.text);
+                    : _DetectiveBubble(
+                  text: msg.text,
+                  evidenceId: msg.presentedEvidenceId,
+                );
               },
             ),
           ),
-          // ── 2. 추천 질문 ─────────────────────────────────────────
           _SuggestedQuestions(
             onSelect: _sendMessage,
             disabled: _isWaiting,
           ),
-          // ── 3. 입력창 ────────────────────────────────────────────
           _InputBar(
             controller: _inputCtrl,
             onSend: () => _sendMessage(_inputCtrl.text),
@@ -196,7 +248,10 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
             onPressed: () async {
               final evidence = await showEvidencePresentModal(context);
               if (evidence != null && mounted) {
-                _sendMessage('이 증거를 제시합니다: ${evidence.name}');
+                await _sendMessage(
+                  '이 증거를 제시합니다: ${evidence.name}',
+                  evidenceId: evidence.id,
+                );
               }
             },
           ),
@@ -205,8 +260,6 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
     );
   }
 }
-
-// ── 용의자 말풍선 ─────────────────────────────────────────────────────────────
 
 class _SuspectBubble extends StatelessWidget {
   const _SuspectBubble({
@@ -278,12 +331,14 @@ class _SuspectBubble extends StatelessWidget {
   }
 }
 
-// ── 탐정 말풍선 ───────────────────────────────────────────────────────────────
-
 class _DetectiveBubble extends StatelessWidget {
-  const _DetectiveBubble({required this.text});
+  const _DetectiveBubble({
+    required this.text,
+    this.evidenceId,
+  });
 
   final String text;
+  final String? evidenceId;
 
   @override
   Widget build(BuildContext context) {
@@ -301,7 +356,9 @@ class _DetectiveBubble extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: c.primarySoft,
-              border: Border.all(color: c.primary),
+              border: Border.all(
+                color: evidenceId != null ? c.success : c.primary,
+              ),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(AppTokens.r4),
                 topRight: Radius.circular(AppTokens.r1),
@@ -323,8 +380,6 @@ class _DetectiveBubble extends StatelessWidget {
     );
   }
 }
-
-// ── AI 대기 말풍선 ────────────────────────────────────────────────────────────
 
 class _WaitingBubble extends StatelessWidget {
   const _WaitingBubble();
@@ -368,8 +423,6 @@ class _WaitingBubble extends StatelessWidget {
   }
 }
 
-// ── 추천 질문 칩 ──────────────────────────────────────────────────────────────
-
 class _SuggestedQuestions extends StatelessWidget {
   const _SuggestedQuestions({
     required this.onSelect,
@@ -383,15 +436,12 @@ class _SuggestedQuestions extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
 
-    return Container(
+    return SizedBox(
       height: 40,
-      padding: const EdgeInsets.only(
-        left: AppTokens.sp4,
-        right: AppTokens.sp4,
-      ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
         itemCount: _suggestedQuestions.length,
         separatorBuilder: (_, __) => const SizedBox(width: AppTokens.sp2),
         itemBuilder: (_, i) {
@@ -422,8 +472,6 @@ class _SuggestedQuestions extends StatelessWidget {
     );
   }
 }
-
-// ── 입력창 ────────────────────────────────────────────────────────────────────
 
 class _InputBar extends StatelessWidget {
   const _InputBar({

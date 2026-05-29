@@ -1,5 +1,5 @@
+// lib/screens/evidence_detail_screen.dart
 import 'package:flutter/material.dart';
-
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../models/case.dart';
@@ -9,19 +9,31 @@ import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 
 class EvidenceDetailScreen extends StatelessWidget {
-  const EvidenceDetailScreen({required this.evidence, super.key});
+  const EvidenceDetailScreen({
+    required this.evidence,
+    /// 세션에서 시간 해금된 경우 true 를 전달한다.
+    /// Evidence.isLocked 는 정적 데이터이므로 이 값으로 재정의한다.
+    /// 전달하지 않으면 evidence.isLocked 를 그대로 따른다.
+    this.isUnlocked = false,
+    super.key,
+  });
 
   final Evidence evidence;
+  final bool isUnlocked;
+
+  /// 실제 잠금 여부 — 정적 플래그와 세션 해금 상태를 합산한 단일 진실
+  bool get _effectiveLocked => evidence.isLocked && !isUnlocked;
+
+  String get _statusLabel {
+    if (isUnlocked && evidence.isLocked) return 'UNLOCKED';
+    if (_effectiveLocked) return 'LOCKED';
+    if (evidence.isAnalyzed) return 'ANALYZED';
+    return evidence.isNew ? 'NEW' : 'PENDING';
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
-    final statusLabel = evidence.isLocked
-        ? 'LOCKED'
-        : evidence.isAnalyzed
-            ? 'ANALYZED'
-            : (evidence.isNew ? 'NEW' : 'PENDING');
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -49,7 +61,7 @@ class EvidenceDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: AppTokens.sp6),
-
+                // ── 아이콘 썸네일 ────────────────────────────────────
                 Center(
                   child: Container(
                     width: 86,
@@ -60,8 +72,10 @@ class EvidenceDetailScreen extends StatelessWidget {
                         end: Alignment.bottomRight,
                         colors: [AppColors.tealBase, AppColors.skyBase],
                       ),
-                      borderRadius: BorderRadius.circular(AppTokens.r6),
-                      border: Border.all(color: const Color(0x24FFFFFF)),
+                      borderRadius:
+                      BorderRadius.circular(AppTokens.r6),
+                      border: Border.all(
+                          color: AppColors.ink0.withValues(alpha: .14)),
                     ),
                     alignment: Alignment.center,
                     child: Icon(
@@ -72,91 +86,48 @@ class EvidenceDetailScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp4),
-
+                // ── 이름 ────────────────────────────────────────────
                 Center(
                   child: Text(
-                    evidence.name,
+                    _effectiveLocked ? '잠긴 증거' : evidence.name,
                     style: AppText.titleL.copyWith(color: c.text),
                     textAlign: TextAlign.center,
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp2),
-
+                // ── 발견 위치 ────────────────────────────────────────
                 Center(
                   child: Text(
-                    evidence.location,
-                    style: AppText.monoLabel.copyWith(color: c.textSub),
+                    // 잠금 상태면 위치 정보도 노출하지 않는다
+                    _effectiveLocked
+                        ? '해금 후 위치 정보가 공개됩니다'
+                        : evidence.location,
+                    style: AppText.monoLabel.copyWith(
+                      color: _effectiveLocked
+                          ? c.textMute
+                          : c.textSub,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp6),
-
-                Wrap(
-                  spacing: AppTokens.sp2,
-                  runSpacing: AppTokens.sp2,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    if (evidence.isLocked)
-                      const MSPill('잠김', tone: MSPillTone.mute)
-                    else if (evidence.isAnalyzed)
-                      const MSPill('분석완료', tone: MSPillTone.success)
-                    else if (evidence.isNew)
-                      const MSPill('NEW', tone: MSPillTone.primary)
-                    else
-                      const MSPill('대기', tone: MSPillTone.mute),
-                  ],
+                // ── 상태 필 ──────────────────────────────────────────
+                Center(
+                  child: _StatusPill(
+                    statusLabel: _statusLabel,
+                    effectiveLocked: _effectiveLocked,
+                    isAnalyzed: evidence.isAnalyzed,
+                    isNew: evidence.isNew,
+                    isNewlyUnlocked: isUnlocked && evidence.isLocked,
+                  ),
                 ),
-
                 const SizedBox(height: AppTokens.sp6),
-
-                Container(
-                  padding: const EdgeInsets.all(AppTokens.sp4),
-                  decoration: BoxDecoration(
-                    color: c.bgElev,
-                    border: Border.all(color: c.line),
-                    borderRadius: BorderRadius.circular(AppTokens.r4),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const MSKicker('관찰 정보'),
-                      const SizedBox(height: AppTokens.sp3),
-
-                      Text(
-                        evidence.isLocked
-                            ? '이 증거는 잠겨 있습니다. 잠금 해제 후에만 상세 정보를 확인할 수 있어요.'
-                            : evidence.isAnalyzed
-                                ? '분석이 완료되었습니다. 해당 정보로 사건을 추리하세요.'
-                                : '아직 분석되지 않았습니다. 관련 행동을 수행해 분석 상태를 진행하세요.',
-                        style: AppText.body.copyWith(
-                          color: c.text,
-                          height: 1.6,
-                        ),
-                      ),
-
-                      const SizedBox(height: AppTokens.sp4),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _MetaCell(
-                              label: 'EVIDENCE ID',
-                              value: evidence.id,
-                            ),
-                          ),
-                          const SizedBox(width: AppTokens.sp3),
-                          Expanded(
-                            child: _MetaCell(
-                              label: 'STATUS',
-                              value: statusLabel,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                // ── 관찰 정보 카드 ───────────────────────────────────
+                _ObservationCard(
+                  evidence: evidence,
+                  effectiveLocked: _effectiveLocked,
+                  statusLabel: _statusLabel,
                 ),
-
                 const SizedBox(height: AppTokens.sp10),
               ],
             ),
@@ -166,6 +137,106 @@ class EvidenceDetailScreen extends StatelessWidget {
     );
   }
 }
+
+// ── 상태 필 ───────────────────────────────────────────────────────────────────
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({
+    required this.statusLabel,
+    required this.effectiveLocked,
+    required this.isAnalyzed,
+    required this.isNew,
+    required this.isNewlyUnlocked,
+  });
+
+  final String statusLabel;
+  final bool effectiveLocked;
+  final bool isAnalyzed;
+  final bool isNew;
+  final bool isNewlyUnlocked;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = switch (statusLabel) {
+      'UNLOCKED' => MSPillTone.success,
+      'LOCKED' => MSPillTone.mute,
+      'ANALYZED' => MSPillTone.success,
+      'NEW' => MSPillTone.primary,
+      _ => MSPillTone.mute,
+    };
+
+    return MSPill(statusLabel, tone: tone);
+  }
+}
+
+// ── 관찰 정보 카드 ────────────────────────────────────────────────────────────
+
+class _ObservationCard extends StatelessWidget {
+  const _ObservationCard({
+    required this.evidence,
+    required this.effectiveLocked,
+    required this.statusLabel,
+  });
+
+  final Evidence evidence;
+  final bool effectiveLocked;
+  final String statusLabel;
+
+  String get _bodyText {
+    if (effectiveLocked) {
+      return '이 증거는 잠겨 있습니다. 수사가 진행되면 자동으로 공개됩니다.';
+    }
+    if (evidence.isAnalyzed) {
+      return '분석이 완료되었습니다. 해당 정보로 사건을 추리하세요.';
+    }
+    return '확보된 증거입니다. 용의자 심문 시 제시하거나 타임라인과 교차 검토하세요.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.sp4),
+      decoration: BoxDecoration(
+        color: c.bgElev,
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(AppTokens.r4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const MSKicker('관찰 정보'),
+          const SizedBox(height: AppTokens.sp3),
+          Text(
+            _bodyText,
+            style: AppText.body.copyWith(color: c.text, height: 1.6),
+          ),
+          const SizedBox(height: AppTokens.sp4),
+          Row(
+            children: [
+              Expanded(
+                child: _MetaCell(
+                  label: 'EVIDENCE ID',
+                  value: evidence.id.toUpperCase(),
+                ),
+              ),
+              const SizedBox(width: AppTokens.sp3),
+              Expanded(
+                child: _MetaCell(
+                  label: 'STATUS',
+                  value: statusLabel,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 메타 셀 ───────────────────────────────────────────────────────────────────
 
 class _MetaCell extends StatelessWidget {
   const _MetaCell({required this.label, required this.value});
@@ -207,4 +278,3 @@ class _MetaCell extends StatelessWidget {
     );
   }
 }
-
