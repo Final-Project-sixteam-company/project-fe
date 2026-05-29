@@ -93,8 +93,8 @@ class _InterrogationChatScreenState
 
     final answer = await _repo.ask(
       InterrogationRequest(
-        sessionId: context.sessionRead.scenarioId,
-        scenarioId: context.sessionRead.scenarioId,
+        sessionId: session.sessionId,
+        scenarioId: session.scenarioId,
         suspectId: widget.suspect.id,
         question: trimmed,
         unlockedEvidenceIds: unlockedIds,

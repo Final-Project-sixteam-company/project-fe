@@ -1,12 +1,22 @@
-// lib/controllers/game_session_controller.dart
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/session_models.dart';
 
 class GameSessionController extends ChangeNotifier {
-  GameSessionController({required this.scenarioId});
+  GameSessionController({required this.scenarioId})
+      : sessionId = _generateSessionId();
 
   final String scenarioId;
+
+  /// 플레이 세션마다 고유한 ID — 같은 시나리오를 여러 번 플레이해도 구분 가능
+  final String sessionId;
+
+  static String _generateSessionId() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final rand = Random().nextInt(0xFFFF).toRadixString(16).padLeft(4, '0');
+    return 'sess_${now}_$rand';
+  }
 
   // ── 타이머 ────────────────────────────────────────────────────────────────
   Timer? _timer;
