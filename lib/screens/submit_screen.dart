@@ -1,14 +1,16 @@
-import 'package:clueroom/screens/result_screen.dart';
+// lib/screens/submit_screen.dart
 import 'package:flutter/material.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../components/ms_text_field.dart';
+import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
+import 'result_screen.dart';
 
 class SubmitScreen extends StatefulWidget {
   const SubmitScreen({super.key});
@@ -27,6 +29,12 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
   static const int _maxEvidenceCount = 3;
 
+  // 정답 데이터 (백엔드에서 내려올 값 — 현재는 하드코딩)
+  static const String _correctSuspectId = 's1';
+  static const String _correctMotive = '회사 자금 유용 은폐';
+  static const String _correctMethod = '알레르기 유발 음료 제공 후 에피펜 은닉';
+  static const List<String> _correctEvidenceIds = ['e3', 'e1', 'e5'];
+
   @override
   void dispose() {
     _motiveCtrl.dispose();
@@ -38,11 +46,11 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
   bool get _canSubmit =>
       _selectedSuspect != null &&
-          _motiveCtrl.text.isNotEmpty &&
-          _methodCtrl.text.isNotEmpty &&
-          _concealCtrl.text.isNotEmpty &&
-          _summaryCtrl.text.isNotEmpty &&
-          _selectedEvidences.length == _maxEvidenceCount;
+      _motiveCtrl.text.isNotEmpty &&
+      _methodCtrl.text.isNotEmpty &&
+      _concealCtrl.text.isNotEmpty &&
+      _summaryCtrl.text.isNotEmpty &&
+      _selectedEvidences.length == _maxEvidenceCount;
 
   void _toggleEvidence(Evidence e) {
     setState(() {
@@ -54,6 +62,42 @@ class _SubmitScreenState extends State<SubmitScreen> {
     });
   }
 
+  // ── 점수 계산 (PRD Section 13) ────────────────────────────────────────────
+  int _calculateRawScore() {
+    int score = 0;
+
+    // 범인 (30점)
+    if (_selectedSuspect?.id == _correctSuspectId) score += 30;
+
+    // 범행 동기 키워드 포함 여부 (20점)
+    final motive = _motiveCtrl.text.toLowerCase();
+    if (motive.contains('자금') ||
+        motive.contains('횡령') ||
+        motive.contains('유용')) {
+      score += 20;
+    } else if (motive.length > 10) {
+      score += 8; // 부분 점수
+    }
+
+    // 범행 방법 키워드 (25점)
+    final method = _methodCtrl.text.toLowerCase();
+    if (method.contains('알레르기') || method.contains('에피펜')) {
+      score += 25;
+    } else if (method.length > 10) {
+      score += 10;
+    }
+
+    // 은폐 방법 (10점)
+    if (_concealCtrl.text.length > 10) score += 10;
+
+    // 결정적 증거 (각 5점, 총 15점)
+    for (final e in _selectedEvidences) {
+      if (_correctEvidenceIds.contains(e.id)) score += 5;
+    }
+
+    return score.clamp(0, 100);
+  }
+
   void _onSubmit() {
     if (!_canSubmit) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -61,9 +105,83 @@ class _SubmitScreenState extends State<SubmitScreen> {
       );
       return;
     }
+
+    final rawScore = _calculateRawScore();
+    // 세션 종료 + 힌트 감점 적용
+    context.sessionRead.completeSession(rawScore: rawScore);
+    final finalScore = context.sessionRead.finalScore ?? 0;
+    final hintPenalty = context.sessionRead.hintPenalty;
+
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ResultScreen()),
+      MaterialPageRoute(
+        builder: (_) => ResultScreen(
+          result: _buildResult(
+            rawScore: rawScore,
+            finalScore: finalScore,
+            hintPenalty: hintPenalty,
+          ),
+        ),
+      ),
     );
+  }
+
+  CaseResult _buildResult({
+    required int rawScore,
+    required int finalScore,
+    required int hintPenalty,
+  }) {
+    final correctSuspect = _selectedSuspect?.id == _correctSuspectId;
+    final grade = _gradeFromScore(finalScore);
+
+    return CaseResult(
+      grade: grade,
+      totalScore: finalScore,
+      maxScore: 100,
+      scoreItems: [
+        ScoreItem(
+          label: '진범 지목',
+          score: correctSuspect ? 30 : 0,
+          maxScore: 30,
+        ),
+        ScoreItem(
+          label: '범행 방법',
+          score: rawScore >= 55 ? 25 : (rawScore >= 40 ? 10 : 0),
+          maxScore: 25,
+        ),
+        ScoreItem(
+          label: '범행 동기',
+          score: rawScore >= 35 ? 20 : (rawScore >= 18 ? 8 : 0),
+          maxScore: 20,
+        ),
+        ScoreItem(label: '은폐 방법', score: 10, maxScore: 10),
+        ScoreItem(
+          label: '결정적 증거',
+          score: _selectedEvidences
+                  .where((e) => _correctEvidenceIds.contains(e.id))
+                  .length *
+              5,
+          maxScore: 15,
+        ),
+        if (hintPenalty > 0)
+          ScoreItem(
+            label: '힌트 감점',
+            score: -hintPenalty,
+            maxScore: 0,
+          ),
+      ],
+      culpritName: '박재민',
+      revelation: '박재민 CFO는 회사 자금 유용 사실이 데모데이에서 공개될 위기에 놓이자, '
+          '피해자의 견과류 알레르기를 이용해 아몬드라떼를 마시게 하고 에피펜을 숨겼다. '
+          '이후 피해자의 휴대폰으로 메시지를 보내 사망 시간을 조작했다.',
+    );
+  }
+
+  String _gradeFromScore(int score) {
+    if (score >= 90) return 'S';
+    if (score >= 80) return 'A';
+    if (score >= 70) return 'B';
+    if (score >= 60) return 'C';
+    return 'D';
   }
 
   @override
@@ -75,12 +193,13 @@ class _SubmitScreenState extends State<SubmitScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.sp4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: AppTokens.sp6),
-              // ── 1. 경고 헤더 ────────────────────────────────────────
+              // ── 경고 헤더 ───────────────────────────────────────
               Column(
                 children: [
                   Icon(
@@ -103,15 +222,16 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 ],
               ),
               const SizedBox(height: AppTokens.sp8),
-              // ── 2. 진범 지목 ────────────────────────────────────────
+              // ── 1. 진범 지목 ────────────────────────────────────
               const MSKicker('1. FINAL SUSPECT · 진범 지목'),
               const SizedBox(height: AppTokens.sp3),
               _SuspectDropdown(
                 selected: _selectedSuspect,
-                onSelect: (s) => setState(() => _selectedSuspect = s),
+                onSelect: (s) =>
+                    setState(() => _selectedSuspect = s),
               ),
               const SizedBox(height: AppTokens.sp6),
-              // ── 3. 범행 동기 및 방법 ────────────────────────────────
+              // ── 2. 범행 동기 및 방법 ────────────────────────────
               const MSKicker('2. 범행 동기 및 방법'),
               const SizedBox(height: AppTokens.sp3),
               MSTextField(
@@ -135,7 +255,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: AppTokens.sp6),
-              // ── 4. 결정적 증거 선택 ─────────────────────────────────
+              // ── 3. 결정적 증거 선택 ─────────────────────────────
               MSKicker(
                 '3. 결정적 증거 · ${_selectedEvidences.length}/$_maxEvidenceCount 선택',
               ),
@@ -146,7 +266,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 maxCount: _maxEvidenceCount,
               ),
               const SizedBox(height: AppTokens.sp6),
-              // ── 5. 종합 추리 설명 ────────────────────────────────────
+              // ── 4. 종합 추리 설명 ───────────────────────────────
               const MSKicker('4. 종합 추리 설명'),
               const SizedBox(height: AppTokens.sp3),
               MSTextField(
@@ -156,7 +276,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: AppTokens.sp8),
-              // ── 6. 제출 버튼 ────────────────────────────────────────
+              // ── 5. 제출 버튼 ────────────────────────────────────
               MSButton(
                 label: '최종 추리 제출',
                 variant: MSButtonVariant.danger,
@@ -202,7 +322,11 @@ class _SuspectDropdown extends StatelessWidget {
           value: selected,
           isExpanded: true,
           dropdownColor: c.bgElev,
-          icon: Icon(Icons.keyboard_arrow_down, color: c.textSub, size: 20),
+          icon: Icon(
+            Icons.keyboard_arrow_down,
+            color: c.textSub,
+            size: 20,
+          ),
           hint: Text(
             '범인 선택',
             style: AppText.body.copyWith(color: c.textMute),
@@ -238,7 +362,7 @@ class _EvidenceSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final unlocked =
-    sampleCase.evidences.where((e) => !e.isLocked).toList();
+        sampleCase.evidences.where((e) => !e.isLocked).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -250,16 +374,16 @@ class _EvidenceSelector extends StatelessWidget {
             children: selected
                 .map(
                   (e) => GestureDetector(
-                onTap: () => onToggle(e),
-                child: MSPill(e.name, tone: MSPillTone.primary),
-              ),
-            )
+                    onTap: () => onToggle(e),
+                    child: MSPill(e.name, tone: MSPillTone.primary),
+                  ),
+                )
                 .toList(),
           ),
           const SizedBox(height: AppTokens.sp3),
         ],
         ...unlocked.map(
-              (e) {
+          (e) {
             final bool isSelected = selected.contains(e);
             final bool isDisabled =
                 !isSelected && selected.length >= maxCount;
@@ -276,7 +400,8 @@ class _EvidenceSelector extends StatelessWidget {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: isSelected ? c.primarySoft : Colors.transparent,
+                    color:
+                        isSelected ? c.primarySoft : Colors.transparent,
                     border: Border.all(
                       color: isSelected ? c.primary : c.line,
                     ),
@@ -292,8 +417,8 @@ class _EvidenceSelector extends StatelessWidget {
                         color: isSelected
                             ? c.primary
                             : isDisabled
-                            ? c.textMute
-                            : c.textSub,
+                                ? c.textMute
+                                : c.textSub,
                       ),
                       const SizedBox(width: AppTokens.sp3),
                       Expanded(

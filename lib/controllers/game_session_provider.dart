@@ -16,9 +16,9 @@ class GameSessionProvider
     final provider = context
         .dependOnInheritedWidgetOfExactType<GameSessionProvider>();
     assert(
-    provider != null,
-    'GameSessionProvider를 찾을 수 없습니다. '
-        'CaseScreen 위에 GameSessionProvider가 있는지 확인하세요.',
+      provider != null,
+      'GameSessionProvider를 찾을 수 없습니다. '
+      'CaseScreen 위에 GameSessionProvider가 있는지 확인하세요.',
     );
     return provider!.notifier!;
   }

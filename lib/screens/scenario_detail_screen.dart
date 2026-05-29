@@ -89,10 +89,10 @@ class _ScenarioDetailScreenState
         onBookmark: _toggleBookmark,
         onStart: _isPlayable
             ? () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => CaseBriefingScreen(scenario: s),
-          ),
-        )
+                  MaterialPageRoute(
+                    builder: (_) => CaseBriefingScreen(scenario: s),
+                  ),
+                )
             : null,
       ),
       body: SingleChildScrollView(
@@ -157,7 +157,7 @@ class _ScenarioDetailScreenState
                         decoration: BoxDecoration(
                           border: Border.all(color: c.line),
                           borderRadius:
-                          BorderRadius.circular(AppTokens.rPill),
+                              BorderRadius.circular(AppTokens.rPill),
                         ),
                         child: Text(
                           '#$tag',
@@ -177,9 +177,9 @@ class _ScenarioDetailScreenState
                   // ── 리뷰 목록 ──────────────────────────────────
                   if (reviews.isNotEmpty) ...[
                     ...reviews.map(
-                          (r) => Padding(
+                      (r) => Padding(
                         padding:
-                        const EdgeInsets.only(bottom: AppTokens.sp3),
+                            const EdgeInsets.only(bottom: AppTokens.sp3),
                         child: _ReviewCard(review: r),
                       ),
                     ),
@@ -356,11 +356,11 @@ class _ReviewWriteSheetState extends State<_ReviewWriteSheet> {
                     width: 36,
                     height: 4,
                     margin:
-                    const EdgeInsets.only(bottom: AppTokens.sp4),
+                        const EdgeInsets.only(bottom: AppTokens.sp4),
                     decoration: BoxDecoration(
                       color: c.line,
                       borderRadius:
-                      BorderRadius.circular(AppTokens.rPill),
+                          BorderRadius.circular(AppTokens.rPill),
                     ),
                   ),
                 ),
@@ -414,7 +414,7 @@ class _ReviewWriteSheetState extends State<_ReviewWriteSheet> {
                       hintStyle: AppText.body.copyWith(color: c.textMute),
                       border: InputBorder.none,
                       contentPadding:
-                      const EdgeInsets.all(AppTokens.sp3),
+                          const EdgeInsets.all(AppTokens.sp3),
                     ),
                   ),
                 ),
@@ -617,12 +617,14 @@ class _RatingSection extends StatelessWidget {
                 final ratio = star == 5
                     ? 0.68
                     : star == 4
-                    ? 0.22
-                    : star == 3
-                    ? 0.07
-                    : 0.02;
+                        ? 0.22
+                        : star == 3
+                            ? 0.07
+                            : 0.02;
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: AppTokens.sp1,
+                  ),
                   child: Row(
                     children: [
                       Text(
@@ -636,7 +638,7 @@ class _RatingSection extends StatelessWidget {
                       Expanded(
                         child: ClipRRect(
                           borderRadius:
-                          BorderRadius.circular(AppTokens.r1),
+                              BorderRadius.circular(AppTokens.r1),
                           child: SizedBox(
                             height: 6,
                             child: LayoutBuilder(
@@ -644,14 +646,14 @@ class _RatingSection extends StatelessWidget {
                                 children: [
                                   Positioned.fill(
                                     child:
-                                    ColoredBox(color: c.bgHover),
+                                        ColoredBox(color: c.bgHover),
                                   ),
                                   Positioned(
                                     left: 0,
                                     top: 0,
                                     bottom: 0,
                                     width:
-                                    constraints.maxWidth * ratio,
+                                        constraints.maxWidth * ratio,
                                     child: DecoratedBox(
                                       decoration: BoxDecoration(
                                         color: c.primary,
@@ -730,7 +732,7 @@ class _BottomCta extends StatelessWidget {
                     Expanded(
                       child: Text(
                         '${scenario.code} 시나리오 데이터가 준비 중입니다. '
-                            'CL-001만 현재 플레이 가능합니다.',
+                        'CL-001만 현재 플레이 가능합니다.',
                         style: AppText.bodySm.copyWith(
                           fontSize: 12,
                           color: c.textMute,

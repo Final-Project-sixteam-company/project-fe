@@ -1,14 +1,13 @@
 // lib/screens/evidence_screen.dart
 import 'package:flutter/material.dart';
+import '../components/evidence_tile.dart';
+import '../components/filter_chip_widget.dart';
 import '../components/ms_kicker.dart';
-import '../components/ms_pill.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
 import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
-import '../screens/evidence_detail_screen.dart';
-import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 
@@ -16,11 +15,11 @@ enum _Filter { all, acquired, locked, key }
 
 extension _FilterLabel on _Filter {
   String get label => switch (this) {
-    _Filter.all => '전체',
-    _Filter.acquired => '확보됨',
-    _Filter.locked => '잠긴 증거',
-    _Filter.key => '핵심 증거',
-  };
+        _Filter.all => '전체',
+        _Filter.acquired => '확보됨',
+        _Filter.locked => '잠긴 증거',
+        _Filter.key => '핵심 증거',
+      };
 }
 
 class EvidenceScreen extends StatefulWidget {
@@ -44,10 +43,9 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
   List<Evidence> _filtered(Set<String> unlockedIds) {
     final sorted = List<Evidence>.from(sampleCase.evidences)
       ..sort((a, b) {
-        // 잠금 해제된 신규 증거를 최상단으로
-        final aUnlocked = unlockedIds.contains(a.id);
-        final bUnlocked = unlockedIds.contains(b.id);
-        if (aUnlocked != bUnlocked) return aUnlocked ? -1 : 1;
+        final aU = unlockedIds.contains(a.id);
+        final bU = unlockedIds.contains(b.id);
+        if (aU != bU) return aU ? -1 : 1;
         if (a.isLocked != b.isLocked) return a.isLocked ? 1 : -1;
         if (a.isNew != b.isNew) return a.isNew ? -1 : 1;
         return 0;
@@ -57,16 +55,13 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
       final matchesQuery = _query.isEmpty ||
           e.name.contains(_query) ||
           e.location.contains(_query);
-
       final isTimeLocked = e.isLocked && !unlockedIds.contains(e.id);
-
       final matchesFilter = switch (_filter) {
         _Filter.all => true,
         _Filter.acquired => !isTimeLocked,
         _Filter.locked => isTimeLocked,
         _Filter.key => e.isAnalyzed,
       };
-
       return matchesQuery && matchesFilter;
     }).toList();
   }
@@ -85,8 +80,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
           backgroundColor: c.bg,
           body: SafeArea(
             child: Padding(
-              padding:
-              const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
+              padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -102,15 +96,15 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: _Filter.values.map((f) {
-                        final bool active = _filter == f;
                         return Padding(
                           padding: EdgeInsets.only(
-                            right:
-                            f != _Filter.values.last ? AppTokens.sp2 : 0,
+                            right: f != _Filter.values.last
+                                ? AppTokens.sp2
+                                : 0,
                           ),
-                          child: _FilterChip(
+                          child: MSFilterChip(
                             label: f.label,
-                            active: active,
+                            active: _filter == f,
                             onTap: () => setState(() => _filter = f),
                           ),
                         );
@@ -123,26 +117,29 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
                   Expanded(
                     child: results.isEmpty
                         ? const MSEmpty(
-                      icon: Icons.search_off,
-                      title: '일치하는 증거가 없습니다',
-                    )
+                            icon: Icons.search_off,
+                            title: '일치하는 증거가 없습니다',
+                          )
                         : ListView.separated(
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: results.length,
-                      separatorBuilder: (_, __) =>
-                      const SizedBox(height: AppTokens.sp2),
-                      itemBuilder: (_, i) => _EvidenceRow(
-                        evidence: results[i],
-                        isTimeLocked: results[i].isLocked &&
-                            !unlockedIds.contains(results[i].id),
-                        isNewlyUnlocked:
-                        unlockedIds.contains(results[i].id) &&
-                            results[i].isLocked,
-                      ),
-                      padding: const EdgeInsets.only(
-                        bottom: AppTokens.sp10,
-                      ),
-                    ),
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: results.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: AppTokens.sp2),
+                            itemBuilder: (_, i) {
+                              final e = results[i];
+                              final isTimeLocked =
+                                  e.isLocked && !unlockedIds.contains(e.id);
+                              return EvidenceTile(
+                                evidence: e,
+                                isTimeLocked: isTimeLocked,
+                                isNewlyUnlocked:
+                                    unlockedIds.contains(e.id) && e.isLocked,
+                              );
+                            },
+                            padding: const EdgeInsets.only(
+                              bottom: AppTokens.sp10,
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -150,201 +147,6 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
           ),
         );
       },
-    );
-  }
-}
-
-// ── 증거 행 ───────────────────────────────────────────────────────────────────
-
-class _EvidenceRow extends StatelessWidget {
-  const _EvidenceRow({
-    required this.evidence,
-    required this.isTimeLocked,
-    required this.isNewlyUnlocked,
-  });
-
-  final Evidence evidence;
-  final bool isTimeLocked;
-  final bool isNewlyUnlocked;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-
-    if (isTimeLocked) {
-      return Opacity(
-        opacity: 0.5,
-        child: Stack(
-          alignment: Alignment.centerRight,
-          children: [
-            _EvidenceTile(evidence: evidence),
-            Padding(
-              padding: const EdgeInsets.only(right: AppTokens.sp4),
-              child: Icon(Icons.lock_outline, size: 16, color: c.textMute),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return _EvidenceTile(
-      evidence: evidence,
-      isNewlyUnlocked: isNewlyUnlocked,
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => EvidenceDetailScreen(evidence: evidence),
-        ),
-      ),
-    );
-  }
-}
-
-// ── 증거 타일 ─────────────────────────────────────────────────────────────────
-
-class _EvidenceTile extends StatelessWidget {
-  const _EvidenceTile({
-    required this.evidence,
-    this.onTap,
-    this.isNewlyUnlocked = false,
-  });
-
-  final Evidence evidence;
-  final VoidCallback? onTap;
-  final bool isNewlyUnlocked;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-
-    return Material(
-      color: c.bg,
-      borderRadius: BorderRadius.circular(AppTokens.r4),
-      child: InkWell(
-        onTap: onTap,
-        splashColor: c.primary.withValues(alpha: .08),
-        highlightColor: c.primary.withValues(alpha: .04),
-        borderRadius: BorderRadius.circular(AppTokens.r4),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 13,
-            vertical: 11,
-          ),
-          decoration: BoxDecoration(
-            color: c.bg,
-            border: Border.all(
-              color: isNewlyUnlocked ? c.success : c.line,
-              width: isNewlyUnlocked ? 1.5 : 1.0,
-            ),
-            borderRadius: BorderRadius.circular(AppTokens.r4),
-            boxShadow: (evidence.isNew || isNewlyUnlocked)
-                ? [
-              BoxShadow(
-                color: isNewlyUnlocked
-                    ? c.successSoft
-                    : c.primarySoft,
-                spreadRadius: 2,
-                blurRadius: 0,
-              )
-            ]
-                : null,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: c.bgHover,
-                  border: Border.all(color: c.line),
-                  borderRadius: BorderRadius.circular(AppTokens.r2),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  evidence.icon,
-                  size: 17,
-                  color: isNewlyUnlocked
-                      ? c.success
-                      : (evidence.isAnalyzed ? c.success : c.primary),
-                ),
-              ),
-              const SizedBox(width: AppTokens.sp3),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      evidence.name,
-                      style: AppText.body.copyWith(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        height: 1.25,
-                        color: c.text,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      evidence.location,
-                      style: AppText.monoLabel.copyWith(
-                        fontSize: 9.5,
-                        letterSpacing: 9.5 * 0.06,
-                        color: c.textMute,
-                        height: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isNewlyUnlocked)
-                MSPill('해금', tone: MSPillTone.success)
-              else if (evidence.isAnalyzed)
-                const MSPill('분석완료', tone: MSPillTone.success)
-              else if (evidence.isNew)
-                  const MSPill('NEW', tone: MSPillTone.primary),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── 필터 칩 ───────────────────────────────────────────────────────────────────
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppMotion.dur2,
-        curve: AppMotion.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? c.primarySoft : Colors.transparent,
-          border: Border.all(color: active ? c.primary : c.line),
-          borderRadius: BorderRadius.circular(AppTokens.rPill),
-        ),
-        child: Text(
-          label,
-          style: AppText.monoLabel.copyWith(
-            color: active ? c.primary : c.textSub,
-            height: 1.0,
-          ),
-        ),
-      ),
     );
   }
 }

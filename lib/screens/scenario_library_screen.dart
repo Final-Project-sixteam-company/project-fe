@@ -5,40 +5,89 @@ import '../components/ms_pill.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
 import '../models/scenario.dart';
-import '../models/sample_scenarios.dart';
+import '../repositories/scenario_repository.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'scenario_detail_screen.dart';
 
-enum _LibraryFilter {
-  all, official, custom, popular, newest, easy, medium, hard
+// ── 필터 탭 정의 ──────────────────────────────────────────────────────────────
+
+enum _LibraryTab {
+  all,
+  official,
+  custom,
+  popular,
+  newest,
+  easy,
+  medium,
+  hard,
 }
 
-extension _LibraryFilterLabel on _LibraryFilter {
+extension _LibraryTabX on _LibraryTab {
   String get label => switch (this) {
-    _LibraryFilter.all => '전체',
-    _LibraryFilter.official => '공식',
-    _LibraryFilter.custom => '커스텀',
-    _LibraryFilter.popular => '인기',
-    _LibraryFilter.newest => '최신',
-    _LibraryFilter.easy => '쉬움',
-    _LibraryFilter.medium => '보통',
-    _LibraryFilter.hard => '어려움',
-  };
+        _LibraryTab.all => '전체',
+        _LibraryTab.official => '공식',
+        _LibraryTab.custom => '커스텀',
+        _LibraryTab.popular => '인기',
+        _LibraryTab.newest => '최신',
+        _LibraryTab.easy => '쉬움',
+        _LibraryTab.medium => '보통',
+        _LibraryTab.hard => '어려움',
+      };
+
+  /// 탭을 ScenarioFilter로 변환
+  ScenarioFilter toFilter(String query) => switch (this) {
+        _LibraryTab.all => ScenarioFilter(query: query),
+        _LibraryTab.official => ScenarioFilter(
+            type: ScenarioType.official,
+            query: query,
+          ),
+        _LibraryTab.custom => ScenarioFilter(
+            type: ScenarioType.custom,
+            query: query,
+          ),
+        _LibraryTab.popular => ScenarioFilter(
+            sort: ScenarioSort.popular,
+            query: query,
+          ),
+        _LibraryTab.newest => ScenarioFilter(
+            sort: ScenarioSort.newest,
+            query: query,
+          ),
+        _LibraryTab.easy => ScenarioFilter(
+            difficulty: Difficulty.easy,
+            query: query,
+          ),
+        _LibraryTab.medium => ScenarioFilter(
+            difficulty: Difficulty.medium,
+            query: query,
+          ),
+        _LibraryTab.hard => ScenarioFilter(
+            difficulty: Difficulty.hard,
+            query: query,
+          ),
+      };
 }
+
+// ── 화면 ──────────────────────────────────────────────────────────────────────
 
 class ScenarioLibraryScreen extends StatefulWidget {
   const ScenarioLibraryScreen({super.key});
 
   @override
-  State<ScenarioLibraryScreen> createState() => _ScenarioLibraryScreenState();
+  State<ScenarioLibraryScreen> createState() =>
+      _ScenarioLibraryScreenState();
 }
 
-class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
+class _ScenarioLibraryScreenState
+    extends State<ScenarioLibraryScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
-  _LibraryFilter _filter = _LibraryFilter.all;
+  _LibraryTab _tab = _LibraryTab.all;
   String _query = '';
+
+  List<Scenario> get _results =>
+      scenarioRepo.query(_tab.toFilter(_query));
 
   @override
   void dispose() {
@@ -46,37 +95,10 @@ class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
     super.dispose();
   }
 
-  List<Scenario> get _filtered {
-    var list = List<Scenario>.from(sampleScenarios);
-
-    if (_query.isNotEmpty) {
-      list = list.where((s) =>
-      s.title.contains(_query) ||
-          s.tags.any((t) => t.contains(_query)) ||
-          (s.author?.contains(_query) ?? false)
-      ).toList();
-    }
-
-    list = switch (_filter) {
-      _LibraryFilter.official => list.where((s) => s.type == ScenarioType.official).toList(),
-      _LibraryFilter.custom => list.where((s) => s.type == ScenarioType.custom).toList(),
-      _LibraryFilter.popular => list..sort((a, b) => b.plays.compareTo(a.plays)),
-    // code 내림차순(예: CL-006 → CL-001)으로 최신 등록 순 정렬.
-    // 추후 createdAt 필드 추가 시 해당 필드로 교체 예정.
-      _LibraryFilter.newest => list..sort((a, b) => b.code.compareTo(a.code)),
-      _LibraryFilter.easy => list.where((s) => s.difficulty == Difficulty.easy).toList(),
-      _LibraryFilter.medium => list.where((s) => s.difficulty == Difficulty.medium).toList(),
-      _LibraryFilter.hard => list.where((s) => s.difficulty == Difficulty.hard).toList(),
-      _LibraryFilter.all => list,
-    };
-
-    return list;
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final results = _filtered;
+    final results = _results;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -86,7 +108,11 @@ class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                  AppTokens.sp4, AppTokens.sp4, AppTokens.sp4, 0),
+                AppTokens.sp4,
+                AppTokens.sp4,
+                AppTokens.sp4,
+                0,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -104,31 +130,44 @@ class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
                     controller: _searchCtrl,
                     hintText: '사건명, 태그, 제작자 검색…',
                     suffixIcon: Icons.search,
-                    onChanged: (v) => setState(() => _query = v.trim()),
+                    onChanged: (v) =>
+                        setState(() => _query = v.trim()),
                   ),
                   const SizedBox(height: AppTokens.sp3),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: _LibraryFilter.values.map((f) {
-                        final bool active = _filter == f;
+                      children: _LibraryTab.values.map((tab) {
+                        final active = _tab == tab;
                         return Padding(
                           padding: EdgeInsets.only(
-                            right: f != _LibraryFilter.values.last
+                            right: tab != _LibraryTab.values.last
                                 ? AppTokens.sp2
                                 : 0,
                           ),
                           child: _FilterChip(
-                            label: f.label,
+                            label: tab.label,
                             active: active,
-                            onTap: () => setState(() => _filter = f),
+                            onTap: () =>
+                                setState(() => _tab = tab),
                           ),
                         );
                       }).toList(),
                     ),
                   ),
                   const SizedBox(height: AppTokens.sp4),
-                  const MSKicker('사건 목록'),
+                  Row(
+                    children: [
+                      const MSKicker('사건 목록'),
+                      const SizedBox(width: AppTokens.sp2),
+                      Text(
+                        '${results.length}건',
+                        style: AppText.monoLabel.copyWith(
+                          color: c.textMute,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: AppTokens.sp3),
                 ],
               ),
@@ -136,26 +175,31 @@ class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
             Expanded(
               child: results.isEmpty
                   ? const MSEmpty(
-                icon: Icons.search_off,
-                title: '일치하는 사건이 없습니다',
-              )
+                      icon: Icons.search_off,
+                      title: '일치하는 사건이 없습니다',
+                    )
                   : ListView.separated(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
-                    AppTokens.sp4, 0, AppTokens.sp4, AppTokens.sp10),
-                itemCount: results.length,
-                separatorBuilder: (_, __) =>
-                const SizedBox(height: AppTokens.sp3),
-                itemBuilder: (_, i) => _ScenarioRow(
-                  scenario: results[i],
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ScenarioDetailScreen(scenario: results[i]),
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppTokens.sp4,
+                        0,
+                        AppTokens.sp4,
+                        AppTokens.sp10,
+                      ),
+                      itemCount: results.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppTokens.sp3),
+                      itemBuilder: (_, i) => _ScenarioRow(
+                        scenario: results[i],
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ScenarioDetailScreen(
+                              scenario: results[i],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
             ),
           ],
         ),
@@ -167,7 +211,10 @@ class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
 // ── 시나리오 카드 ─────────────────────────────────────────────────────────────
 
 class _ScenarioRow extends StatelessWidget {
-  const _ScenarioRow({required this.scenario, required this.onTap});
+  const _ScenarioRow({
+    required this.scenario,
+    required this.onTap,
+  });
 
   final Scenario scenario;
   final VoidCallback onTap;
@@ -207,6 +254,7 @@ class _ScenarioRow extends StatelessWidget {
 
 class _CodeThumb extends StatelessWidget {
   const _CodeThumb({required this.scenario});
+
   final Scenario scenario;
 
   @override
@@ -243,6 +291,7 @@ class _CodeThumb extends StatelessWidget {
 
 class _ScenarioMeta extends StatelessWidget {
   const _ScenarioMeta({required this.scenario});
+
   final Scenario scenario;
 
   @override
@@ -290,7 +339,10 @@ class _ScenarioMeta extends StatelessWidget {
           runSpacing: AppTokens.sp1,
           children: scenario.tags.take(3).map((tag) {
             return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 2,
+              ),
               decoration: BoxDecoration(
                 color: c.bgHover,
                 borderRadius: BorderRadius.circular(AppTokens.r1),
@@ -313,7 +365,13 @@ class _ScenarioMeta extends StatelessWidget {
 
 class _ScenarioStats extends StatelessWidget {
   const _ScenarioStats({required this.scenario});
+
   final Scenario scenario;
+
+  String _formatPlays(int p) {
+    if (p >= 1000) return '${(p / 1000).toStringAsFixed(1)}k';
+    return p.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -342,11 +400,6 @@ class _ScenarioStats extends StatelessWidget {
       ],
     );
   }
-
-  String _formatPlays(int p) {
-    if (p >= 1000) return '${(p / 1000).toStringAsFixed(1)}k';
-    return p.toString();
-  }
 }
 
 // ── 필터 칩 ───────────────────────────────────────────────────────────────────
@@ -371,7 +424,10 @@ class _FilterChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: AppMotion.dur2,
         curve: AppMotion.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.chipPadH,
+          vertical: AppTokens.chipPadV,
+        ),
         decoration: BoxDecoration(
           color: active ? c.primarySoft : Colors.transparent,
           border: Border.all(color: active ? c.primary : c.line),

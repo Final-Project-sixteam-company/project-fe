@@ -103,7 +103,7 @@ class _HintSheet extends StatelessWidget {
               const SizedBox(height: AppTokens.sp6),
               // ── 힌트 버튼들 ──────────────────────────────────────
               ...HintLevel.values.map(
-                    (level) => Padding(
+                (level) => Padding(
                   padding: const EdgeInsets.only(bottom: AppTokens.sp3),
                   child: _HintButton(
                     level: level,
@@ -111,9 +111,9 @@ class _HintSheet extends StatelessWidget {
                     onPressed: _isUsed(level)
                         ? null
                         : () {
-                      onUseHint(level);
-                      Navigator.of(context).pop();
-                    },
+                            onUseHint(level);
+                            Navigator.of(context).pop();
+                          },
                   ),
                 ),
               ),
@@ -192,8 +192,8 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
     return unlocked
         .where(
           (e) =>
-      e.name.contains(_query) || e.location.contains(_query),
-    )
+              e.name.contains(_query) || e.location.contains(_query),
+        )
         .toList();
   }
 
@@ -220,7 +220,7 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
             top: false,
             child: Padding(
               padding:
-              const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
+                  const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -234,7 +234,7 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                       decoration: BoxDecoration(
                         color: c.line,
                         borderRadius:
-                        BorderRadius.circular(AppTokens.rPill),
+                            BorderRadius.circular(AppTokens.rPill),
                       ),
                     ),
                   ),
@@ -265,27 +265,27 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                   Expanded(
                     child: results.isEmpty
                         ? Center(
-                      child: Text(
-                        '일치하는 증거가 없습니다',
-                        style: AppText.bodySm
-                            .copyWith(color: c.textSub),
-                      ),
-                    )
+                            child: Text(
+                              '일치하는 증거가 없습니다',
+                              style: AppText.bodySm
+                                  .copyWith(color: c.textSub),
+                            ),
+                          )
                         : ListView.separated(
-                      controller: scrollController,
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: results.length,
-                      separatorBuilder: (_, __) =>
-                      const SizedBox(height: AppTokens.sp2),
-                      itemBuilder: (_, i) => _EvidencePickItem(
-                        evidence: results[i],
-                        onTap: () =>
-                            Navigator.of(context).pop(results[i]),
-                      ),
-                      padding: const EdgeInsets.only(
-                        bottom: AppTokens.sp6,
-                      ),
-                    ),
+                            controller: scrollController,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: results.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: AppTokens.sp2),
+                            itemBuilder: (_, i) => _EvidencePickItem(
+                              evidence: results[i],
+                              onTap: () =>
+                                  Navigator.of(context).pop(results[i]),
+                            ),
+                            padding: const EdgeInsets.only(
+                              bottom: AppTokens.sp6,
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -321,7 +321,10 @@ class _EvidencePickItem extends StatelessWidget {
         highlightColor: c.primary.withValues(alpha: .04),
         borderRadius: BorderRadius.circular(AppTokens.r4),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.cardPadH,
+            vertical: AppTokens.cardPadV,
+          ),
           decoration: BoxDecoration(
             color: c.bg,
             border: Border.all(color: c.line),
