@@ -1,4 +1,3 @@
-// lib/screens/interrogation_chat_screen.dart
 import 'package:flutter/material.dart';
 import '../components/game_modals.dart';
 import '../components/ms_button.dart';
@@ -13,8 +12,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
-
-// ── 메시지 모델 ───────────────────────────────────────────────────────────────
 
 enum _Sender { detective, suspect }
 
@@ -37,8 +34,6 @@ const _suggestedQuestions = [
   '알리바이를 증명할 수 있나요?',
   '그날 밤 데모룸에 다시 들어간 적 있나요?',
 ];
-
-// ── 화면 ──────────────────────────────────────────────────────────────────────
 
 class InterrogationChatScreen extends StatefulWidget {
   const InterrogationChatScreen({required this.suspect, super.key});
@@ -87,6 +82,8 @@ class _InterrogationChatScreenState
       ...session.unlockedEvidenceIds,
     ];
 
+    final history = _buildConversationHistory();
+
     setState(() {
       _messages.add(_Message(
         text: trimmed,
@@ -99,41 +96,44 @@ class _InterrogationChatScreenState
 
     _scrollToBottom();
 
-    final answer = await _repo.ask(
-      InterrogationRequest(
-        sessionId: session.sessionId,
-        scenarioId: session.scenarioId,
-        suspectId: widget.suspect.id,
-        question: trimmed,
-        unlockedEvidenceIds: unlockedIds,
-        conversationHistory: _buildConversationHistory(),
-        presentedEvidenceId: evidenceId,
-      ),
-    );
+    String answer = '...대답을 거부하고 있습니다. (네트워크 연결을 확인하세요)';
+    try {
+      answer = await _repo.ask(
+        InterrogationRequest(
+          sessionId: session.sessionId,
+          scenarioId: session.scenarioId,
+          suspectId: widget.suspect.id,
+          question: trimmed,
+          unlockedEvidenceIds: unlockedIds,
+          conversationHistory: history,
+          presentedEvidenceId: evidenceId,
+        ),
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    // 심문 로그 세션에 저장
-    session.addInterrogationLog(
-      InterrogationLog(
-        suspectId: widget.suspect.id,
-        suspectName: widget.suspect.name,
-        question: trimmed,
-        answer: answer,
-        askedAt: session.elapsed,
-        presentedEvidenceId: evidenceId,
-      ),
-    );
-
-    setState(() {
-      _messages.add(_Message(text: answer, sender: _Sender.suspect));
-      _isWaiting = false;
-    });
-
-    _scrollToBottom();
+      session.addInterrogationLog(
+        InterrogationLog(
+          suspectId: widget.suspect.id,
+          suspectName: widget.suspect.name,
+          question: trimmed,
+          answer: answer,
+          askedAt: session.elapsed,
+          presentedEvidenceId: evidenceId,
+        ),
+      );
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() {
+          _messages.add(_Message(text: answer, sender: _Sender.suspect));
+          _isWaiting = false;
+        });
+        _scrollToBottom();
+      }
+    }
   }
 
-  /// 최근 12개 메시지를 백엔드 전달용 history 형식으로 변환
   List<Map<String, String>> _buildConversationHistory() {
     final recent = _messages.length > 12
         ? _messages.sublist(_messages.length - 12)
@@ -141,9 +141,10 @@ class _InterrogationChatScreenState
     return recent
         .map(
           (msg) => {
-        'role':
-        msg.sender == _Sender.detective ? 'user' : 'assistant',
+        'role': msg.sender == _Sender.detective ? 'user' : 'assistant',
         'content': msg.text,
+        if (msg.presentedEvidenceId != null)
+          'presented_evidence_id': msg.presentedEvidenceId!,
       },
     )
         .toList();
@@ -151,12 +152,14 @@ class _InterrogationChatScreenState
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollCtrl.hasClients) return;
-      _scrollCtrl.animateTo(
-        _scrollCtrl.position.maxScrollExtent,
-        duration: AppMotion.dur3,
-        curve: AppMotion.easeOut,
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollCtrl.hasClients) return;
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: AppMotion.dur3,
+          curve: AppMotion.easeOut,
+        );
+      });
     });
   }
 
@@ -243,8 +246,7 @@ class _InterrogationChatScreenState
             variant: MSButtonVariant.ghost,
             icon: Icons.description_outlined,
             onPressed: () async {
-              final evidence =
-              await showEvidencePresentModal(context);
+              final evidence = await showEvidencePresentModal(context);
               if (evidence != null && mounted) {
                 await _sendMessage(
                   '이 증거를 제시합니다: ${evidence.name}',
@@ -258,8 +260,6 @@ class _InterrogationChatScreenState
     );
   }
 }
-
-// ── 말풍선 위젯들 ─────────────────────────────────────────────────────────────
 
 class _SuspectBubble extends StatelessWidget {
   const _SuspectBubble({
@@ -423,8 +423,6 @@ class _WaitingBubble extends StatelessWidget {
   }
 }
 
-// ── 추천 질문 칩 ──────────────────────────────────────────────────────────────
-
 class _SuggestedQuestions extends StatelessWidget {
   const _SuggestedQuestions({
     required this.onSelect,
@@ -474,8 +472,6 @@ class _SuggestedQuestions extends StatelessWidget {
     );
   }
 }
-
-// ── 입력창 ────────────────────────────────────────────────────────────────────
 
 class _InputBar extends StatelessWidget {
   const _InputBar({
