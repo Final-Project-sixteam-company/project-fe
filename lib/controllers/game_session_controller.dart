@@ -1,6 +1,7 @@
 // lib/controllers/game_session_controller.dart
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../models/case.dart';
 import '../models/session_models.dart';
 
 class GameSessionController extends ChangeNotifier {
@@ -48,7 +49,7 @@ class GameSessionController extends ChangeNotifier {
   // ── 진행률 ────────────────────────────────────────────────────────────────
   // 총 unlock 가능한 증거 수 대비 해금 비율로 산정
   // 최종 제출 완료 시 100으로 고정
-  int progressPercent({int totalUnlockable = 5}) {
+  int progressPercent({int totalUnlockable = totalUnlockableCount}) {
     if (_isCompleted) return 100;
     if (!_isStarted) return 0;
     final unlocked = _unlockedEvidenceIds.length;
@@ -84,18 +85,34 @@ class GameSessionController extends ChangeNotifier {
     }
   }
 
-  // 시나리오별 해금 규칙 (현재 CL-001 기준)
+  // ── CL-001 시간 해금 규칙 ────────────────────────────────────────────────────
+  // evidenceId 는 sample_case.dart 의 Evidence.id 와 반드시 1:1 대응해야 한다.
+  // PRD 8.8 기준 시간값. 개발 중 빠른 확인이 필요하면 Duration(seconds: N) 으로 변경.
   static const timeUnlockRules = <_TimeUnlockRule>[
-    _TimeUnlockRule(evidenceId: 'e_cafe_payer', after: Duration(minutes: 2)),
     _TimeUnlockRule(
-        evidenceId: 'e_access_log', after: Duration(minutes: 4)),
+      evidenceId: 'e6', // 카페 결제자 정보
+      after: Duration(minutes: 2),
+    ),
     _TimeUnlockRule(
-        evidenceId: 'e_phone_location', after: Duration(minutes: 6)),
+      evidenceId: 'e7', // 휴대폰 위치 기록
+      after: Duration(minutes: 4),
+    ),
     _TimeUnlockRule(
-        evidenceId: 'e_accounting', after: Duration(minutes: 8)),
+      evidenceId: 'e8', // 회계 파일
+      after: Duration(minutes: 6),
+    ),
     _TimeUnlockRule(
-        evidenceId: 'e_epipen', after: Duration(minutes: 10)),
+      evidenceId: 'e9', // 에피펜 발견 위치
+      after: Duration(minutes: 8),
+    ),
+    _TimeUnlockRule(
+      evidenceId: 'e10', // 사망 후 발신 메시지 원본
+      after: Duration(minutes: 10),
+    ),
   ];
+
+  // 해금 가능한 총 증거 수 — progressPercent 계산에 사용
+  static const int totalUnlockableCount = 5;
 
   bool isEvidenceUnlocked(String evidenceId) =>
       _unlockedEvidenceIds.contains(evidenceId);

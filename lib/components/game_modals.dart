@@ -103,7 +103,7 @@ class _HintSheet extends StatelessWidget {
               const SizedBox(height: AppTokens.sp6),
               // ── 힌트 버튼들 ──────────────────────────────────────
               ...HintLevel.values.map(
-                (level) => Padding(
+                    (level) => Padding(
                   padding: const EdgeInsets.only(bottom: AppTokens.sp3),
                   child: _HintButton(
                     level: level,
@@ -111,9 +111,9 @@ class _HintSheet extends StatelessWidget {
                     onPressed: _isUsed(level)
                         ? null
                         : () {
-                            onUseHint(level);
-                            Navigator.of(context).pop();
-                          },
+                      onUseHint(level);
+                      Navigator.of(context).pop();
+                    },
                   ),
                 ),
               ),
@@ -160,16 +160,31 @@ class _HintButton extends StatelessWidget {
 // ── 증거 제시 모달 ────────────────────────────────────────────────────────────
 
 Future<Evidence?> showEvidencePresentModal(BuildContext context) {
+  // 세션 해금 상태를 미리 읽어서 Sheet에 전달한다.
+  // showModalBottomSheet는 새 루트 컨텍스트를 만들기 때문에
+  // Sheet 내부에서 GameSessionProvider를 찾을 수 없다.
+  Set<String> unlockedIds;
+  try {
+    unlockedIds = GameSessionProvider.read(context).unlockedEvidenceIds;
+  } catch (_) {
+    // GameSessionProvider가 없는 컨텍스트(미리보기 등)에서는 빈 세트로 폴백
+    unlockedIds = const {};
+  }
+
   return showModalBottomSheet<Evidence>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => const _EvidencePresentSheet(),
+    builder: (_) => _EvidencePresentSheet(unlockedIds: unlockedIds),
   );
 }
 
 class _EvidencePresentSheet extends StatefulWidget {
-  const _EvidencePresentSheet();
+  const _EvidencePresentSheet({required this.unlockedIds});
+
+  /// 세션에서 시간 해금된 evidence ID 집합.
+  /// isLocked == true 라도 이 집합에 포함되면 제시 가능하다.
+  final Set<String> unlockedIds;
 
   @override
   State<_EvidencePresentSheet> createState() =>
@@ -186,14 +201,18 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
     super.dispose();
   }
 
+  /// 접근 가능한 증거:
+  ///   - 원래부터 잠기지 않은 증거 (isLocked == false)
+  ///   - isLocked == true 지만 세션에서 해금된 증거 (id ∈ unlockedIds)
   List<Evidence> get _filtered {
-    final unlocked = sampleCase.evidences.where((e) => !e.isLocked).toList();
-    if (_query.isEmpty) return unlocked;
-    return unlocked
+    final accessible = sampleCase.evidences
+        .where((e) => !e.isLocked || widget.unlockedIds.contains(e.id))
+        .toList();
+    if (_query.isEmpty) return accessible;
+    return accessible
         .where(
-          (e) =>
-              e.name.contains(_query) || e.location.contains(_query),
-        )
+          (e) => e.name.contains(_query) || e.location.contains(_query),
+    )
         .toList();
   }
 
@@ -220,7 +239,7 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
             top: false,
             child: Padding(
               padding:
-                  const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
+              const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -234,7 +253,7 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                       decoration: BoxDecoration(
                         color: c.line,
                         borderRadius:
-                            BorderRadius.circular(AppTokens.rPill),
+                        BorderRadius.circular(AppTokens.rPill),
                       ),
                     ),
                   ),
@@ -265,27 +284,27 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                   Expanded(
                     child: results.isEmpty
                         ? Center(
-                            child: Text(
-                              '일치하는 증거가 없습니다',
-                              style: AppText.bodySm
-                                  .copyWith(color: c.textSub),
-                            ),
-                          )
+                      child: Text(
+                        '일치하는 증거가 없습니다',
+                        style: AppText.bodySm
+                            .copyWith(color: c.textSub),
+                      ),
+                    )
                         : ListView.separated(
-                            controller: scrollController,
-                            physics: const BouncingScrollPhysics(),
-                            itemCount: results.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: AppTokens.sp2),
-                            itemBuilder: (_, i) => _EvidencePickItem(
-                              evidence: results[i],
-                              onTap: () =>
-                                  Navigator.of(context).pop(results[i]),
-                            ),
-                            padding: const EdgeInsets.only(
-                              bottom: AppTokens.sp6,
-                            ),
-                          ),
+                      controller: scrollController,
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: results.length,
+                      separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppTokens.sp2),
+                      itemBuilder: (_, i) => _EvidencePickItem(
+                        evidence: results[i],
+                        onTap: () =>
+                            Navigator.of(context).pop(results[i]),
+                      ),
+                      padding: const EdgeInsets.only(
+                        bottom: AppTokens.sp6,
+                      ),
+                    ),
                   ),
                 ],
               ),

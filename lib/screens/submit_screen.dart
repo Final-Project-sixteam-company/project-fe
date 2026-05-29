@@ -31,6 +31,8 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
   // 정답 데이터 (백엔드에서 내려올 값 — 현재는 하드코딩)
   static const String _correctSuspectId = 's1';
+  static const String _correctMotive = '회사 자금 유용 은폐';
+  static const String _correctMethod = '알레르기 유발 음료 제공 후 에피펜 은닉';
   static const List<String> _correctEvidenceIds = ['e3', 'e1', 'e5'];
 
   @override
@@ -44,11 +46,11 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
   bool get _canSubmit =>
       _selectedSuspect != null &&
-      _motiveCtrl.text.isNotEmpty &&
-      _methodCtrl.text.isNotEmpty &&
-      _concealCtrl.text.isNotEmpty &&
-      _summaryCtrl.text.isNotEmpty &&
-      _selectedEvidences.length == _maxEvidenceCount;
+          _motiveCtrl.text.isNotEmpty &&
+          _methodCtrl.text.isNotEmpty &&
+          _concealCtrl.text.isNotEmpty &&
+          _summaryCtrl.text.isNotEmpty &&
+          _selectedEvidences.length == _maxEvidenceCount;
 
   void _toggleEvidence(Evidence e) {
     setState(() {
@@ -61,40 +63,53 @@ class _SubmitScreenState extends State<SubmitScreen> {
   }
 
   // ── 점수 계산 (PRD Section 13) ────────────────────────────────────────────
-  int _calculateRawScore() {
-    int score = 0;
+  //
+  // [설계 원칙]
+  // _ScoreBreakdown 이 per-section 점수를 모두 보유한다.
+  // _calculateRawScore() 와 _buildResult() 는 둘 다 이 객체를 사용하기 때문에
+  // 표시된 항목 점수 합계 = totalScore 가 항상 보장된다.
 
+  _ScoreBreakdown _evaluate() {
     // 범인 (30점)
-    if (_selectedSuspect?.id == _correctSuspectId) score += 30;
+    final suspectScore =
+    _selectedSuspect?.id == _correctSuspectId ? 30 : 0;
 
-    // 범행 동기 키워드 포함 여부 (20점)
+    // 범행 동기 키워드 (20점 / 부분 8점)
     final motive = _motiveCtrl.text.toLowerCase();
-    if (motive.contains('자금') ||
+    final motiveScore =
+    (motive.contains('자금') ||
         motive.contains('횡령') ||
-        motive.contains('유용')) {
-      score += 20;
-    } else if (motive.length > 10) {
-      score += 8; // 부분 점수
-    }
+        motive.contains('유용'))
+        ? 20
+        : (motive.length > 10 ? 8 : 0);
 
-    // 범행 방법 키워드 (25점)
+    // 범행 방법 키워드 (25점 / 부분 10점)
     final method = _methodCtrl.text.toLowerCase();
-    if (method.contains('알레르기') || method.contains('에피펜')) {
-      score += 25;
-    } else if (method.length > 10) {
-      score += 10;
-    }
+    final methodScore =
+    (method.contains('알레르기') || method.contains('에피펜'))
+        ? 25
+        : (method.length > 10 ? 10 : 0);
 
     // 은폐 방법 (10점)
-    if (_concealCtrl.text.length > 10) score += 10;
+    final concealScore = _concealCtrl.text.length > 10 ? 10 : 0;
 
-    // 결정적 증거 (각 5점, 총 15점)
-    for (final e in _selectedEvidences) {
-      if (_correctEvidenceIds.contains(e.id)) score += 5;
-    }
+    // 결정적 증거 (각 5점, 최대 15점)
+    final evidenceScore = _selectedEvidences
+        .where((e) => _correctEvidenceIds.contains(e.id))
+        .length
+        .clamp(0, 3) *
+        5;
 
-    return score.clamp(0, 100);
+    return _ScoreBreakdown(
+      suspectScore: suspectScore,
+      motiveScore: motiveScore,
+      methodScore: methodScore,
+      concealScore: concealScore,
+      evidenceScore: evidenceScore,
+    );
   }
+
+  int _calculateRawScore() => _evaluate().total;
 
   void _onSubmit() {
     if (!_canSubmit) {
@@ -104,9 +119,9 @@ class _SubmitScreenState extends State<SubmitScreen> {
       return;
     }
 
-    final rawScore = _calculateRawScore();
+    final breakdown = _evaluate();
     // 세션 종료 + 힌트 감점 적용
-    context.sessionRead.completeSession(rawScore: rawScore);
+    context.sessionRead.completeSession(rawScore: breakdown.total);
     final finalScore = context.sessionRead.finalScore ?? 0;
     final hintPenalty = context.sessionRead.hintPenalty;
 
@@ -114,7 +129,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
       MaterialPageRoute(
         builder: (_) => ResultScreen(
           result: _buildResult(
-            rawScore: rawScore,
+            breakdown: breakdown,
             finalScore: finalScore,
             hintPenalty: hintPenalty,
           ),
@@ -124,11 +139,12 @@ class _SubmitScreenState extends State<SubmitScreen> {
   }
 
   CaseResult _buildResult({
-    required int rawScore,
+    required _ScoreBreakdown breakdown,
     required int finalScore,
     required int hintPenalty,
   }) {
-    final correctSuspect = _selectedSuspect?.id == _correctSuspectId;
+    // breakdown 의 per-section 값을 그대로 ScoreItem 에 사용하기 때문에
+    // scoreItems 합계 == finalScore 가 항상 보장된다.
     final grade = _gradeFromScore(finalScore);
 
     return CaseResult(
@@ -138,26 +154,27 @@ class _SubmitScreenState extends State<SubmitScreen> {
       scoreItems: [
         ScoreItem(
           label: '진범 지목',
-          score: correctSuspect ? 30 : 0,
+          score: breakdown.suspectScore,
           maxScore: 30,
         ),
         ScoreItem(
           label: '범행 방법',
-          score: rawScore >= 55 ? 25 : (rawScore >= 40 ? 10 : 0),
+          score: breakdown.methodScore,
           maxScore: 25,
         ),
         ScoreItem(
           label: '범행 동기',
-          score: rawScore >= 35 ? 20 : (rawScore >= 18 ? 8 : 0),
+          score: breakdown.motiveScore,
           maxScore: 20,
         ),
-        ScoreItem(label: '은폐 방법', score: 10, maxScore: 10),
+        ScoreItem(
+          label: '은폐 방법',
+          score: breakdown.concealScore,
+          maxScore: 10,
+        ),
         ScoreItem(
           label: '결정적 증거',
-          score: _selectedEvidences
-                  .where((e) => _correctEvidenceIds.contains(e.id))
-                  .length *
-              5,
+          score: breakdown.evidenceScore,
           maxScore: 15,
         ),
         if (hintPenalty > 0)
@@ -360,7 +377,7 @@ class _EvidenceSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final unlocked =
-        sampleCase.evidences.where((e) => !e.isLocked).toList();
+    sampleCase.evidences.where((e) => !e.isLocked).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -372,16 +389,16 @@ class _EvidenceSelector extends StatelessWidget {
             children: selected
                 .map(
                   (e) => GestureDetector(
-                    onTap: () => onToggle(e),
-                    child: MSPill(e.name, tone: MSPillTone.primary),
-                  ),
-                )
+                onTap: () => onToggle(e),
+                child: MSPill(e.name, tone: MSPillTone.primary),
+              ),
+            )
                 .toList(),
           ),
           const SizedBox(height: AppTokens.sp3),
         ],
         ...unlocked.map(
-          (e) {
+              (e) {
             final bool isSelected = selected.contains(e);
             final bool isDisabled =
                 !isSelected && selected.length >= maxCount;
@@ -399,7 +416,7 @@ class _EvidenceSelector extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color:
-                        isSelected ? c.primarySoft : Colors.transparent,
+                    isSelected ? c.primarySoft : Colors.transparent,
                     border: Border.all(
                       color: isSelected ? c.primary : c.line,
                     ),
@@ -415,8 +432,8 @@ class _EvidenceSelector extends StatelessWidget {
                         color: isSelected
                             ? c.primary
                             : isDisabled
-                                ? c.textMute
-                                : c.textSub,
+                            ? c.textMute
+                            : c.textSub,
                       ),
                       const SizedBox(width: AppTokens.sp3),
                       Expanded(
@@ -445,4 +462,30 @@ class _EvidenceSelector extends StatelessWidget {
       ],
     );
   }
+}
+
+// ── 채점 분해 값 객체 ─────────────────────────────────────────────────────────
+//
+// _evaluate() 의 반환값.
+// _calculateRawScore() 와 _buildResult() 가 동일한 출처에서 파생되므로
+// 결과 화면에 표시되는 항목 점수 합계가 최종 점수와 항상 일치한다.
+
+class _ScoreBreakdown {
+  const _ScoreBreakdown({
+    required this.suspectScore,
+    required this.motiveScore,
+    required this.methodScore,
+    required this.concealScore,
+    required this.evidenceScore,
+  });
+
+  final int suspectScore;
+  final int motiveScore;
+  final int methodScore;
+  final int concealScore;
+  final int evidenceScore;
+
+  int get total =>
+      (suspectScore + motiveScore + methodScore + concealScore + evidenceScore)
+          .clamp(0, 100);
 }
