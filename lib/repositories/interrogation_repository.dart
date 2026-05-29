@@ -18,6 +18,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../services/auth_service.dart';
+
 // ── 요청/응답 모델 ─────────────────────────────────────────────────────────────
 
 class InterrogationRequest {
@@ -175,8 +177,7 @@ InterrogationRepository buildInterrogationRepository() {
   return ApiInterrogationRepository(
     baseUrl: 'https://api.clueroom.xyz',
     getAuthToken: () async {
-      // TODO: AuthService.instance.token 연결
-      return null;
+      return AuthService.instance.token;
     },
   );
 }
