@@ -5,6 +5,7 @@ import '../components/ms_stat_row.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
 import '../components/suspect_card.dart';
+import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
 import '../theme/app_text.dart';
@@ -95,13 +96,19 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
                   const SizedBox(height: AppTokens.sp3),
                   itemBuilder: (_, i) => SuspectCard(
                     results[i],
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => SuspectDetailScreen(
-                          suspect: results[i],
+                    onTap: () {
+                      final ctrl = context.sessionRead;
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => GameSessionProvider(
+                            controller: ctrl,
+                            child: SuspectDetailScreen(
+                              suspect: results[i],
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                   padding: const EdgeInsets.only(
                     bottom: AppTokens.sp10,

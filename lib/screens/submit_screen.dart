@@ -176,7 +176,8 @@ class _SubmitScreenState extends State<SubmitScreen> {
         if (hintPenalty > 0)
           ScoreItem(
             label: '힌트 감점',
-            score: -hintPenalty,
+            // 실제 차감된 양만 표시 (rawScore 미만으로 클램프)
+            score: -(hintPenalty.clamp(0, breakdown.total)),
             maxScore: 0,
           ),
       ],

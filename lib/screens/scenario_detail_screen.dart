@@ -202,13 +202,16 @@ class _ScenarioDetailScreenState
     );
   }
 
-  void _showReviewSheet(BuildContext context) {
-    showModalBottomSheet(
+  Future<void> _showReviewSheet(BuildContext context) async {
+    final review = await showModalBottomSheet<ScenarioReview>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _ReviewWriteSheet(scenarioId: widget.scenario.id),
     );
+    if (review != null && mounted) {
+      setState(() => sampleReviews.insert(0, review));
+    }
   }
 }
 
@@ -442,7 +445,20 @@ class _ReviewWriteSheetState extends State<_ReviewWriteSheet> {
                   label: '리뷰 등록',
                   variant: MSButtonVariant.primary,
                   expanded: true,
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () {
+                    final body = _bodyCtrl.text.trim();
+                    if (body.isEmpty) return;
+                    final review = ScenarioReview(
+                      id: 'r_${DateTime.now().millisecondsSinceEpoch}',
+                      scenarioId: widget.scenarioId,
+                      authorName: '나',
+                      rating: _rating,
+                      body: body,
+                      createdAt: DateTime.now(),
+                      isSpoiler: _isSpoiler,
+                    );
+                    Navigator.of(context).pop(review);
+                  },
                 ),
               ],
             ),
