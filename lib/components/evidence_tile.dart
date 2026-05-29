@@ -49,12 +49,16 @@ class EvidenceTile extends StatelessWidget {
       evidence: evidence,
       isNewlyUnlocked: isNewlyUnlocked,
       onTap: onTap ??
-          () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      EvidenceDetailScreen(evidence: evidence),
-                ),
+              () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EvidenceDetailScreen(
+                evidence: evidence,
+                // isTimeLocked == false 이면서 evidence.isLocked == true
+                // 인 경우가 시간 해금 상태다.
+                isUnlocked: isNewlyUnlocked,
               ),
+            ),
+          ),
     );
   }
 }
@@ -96,14 +100,14 @@ class _Tile extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppTokens.r4),
             boxShadow: (evidence.isNew || isNewlyUnlocked)
                 ? [
-                    BoxShadow(
-                      color: isNewlyUnlocked
-                          ? c.successSoft
-                          : c.primarySoft,
-                      spreadRadius: 2,
-                      blurRadius: 0,
-                    ),
-                  ]
+              BoxShadow(
+                color: isNewlyUnlocked
+                    ? c.successSoft
+                    : c.primarySoft,
+                spreadRadius: 2,
+                blurRadius: 0,
+              ),
+            ]
                 : null,
           ),
           child: Row(
@@ -148,7 +152,7 @@ class _Tile extends StatelessWidget {
               else if (evidence.isAnalyzed)
                 const MSPill('분석완료', tone: MSPillTone.success)
               else if (evidence.isNew)
-                const MSPill('NEW', tone: MSPillTone.primary),
+                  const MSPill('NEW', tone: MSPillTone.primary),
             ],
           ),
         ),
