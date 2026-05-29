@@ -155,7 +155,7 @@ class GameSessionController extends ChangeNotifier {
   void completeSession({required int rawScore}) {
     _isCompleted = true;
     _timer?.cancel();
-    _finalScore = (rawScore - hintPenalty).clamp(0, 100);
+    _finalScore = (rawScore - hintPenalty).clamp(0, 100).toInt();
     notifyListeners();
   }
 
