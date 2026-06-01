@@ -1,3 +1,4 @@
+# pubspec.yaml
 name: clueroom
 description: "A new Flutter project."
 publish_to: 'none'
@@ -15,7 +16,7 @@ dependencies:
   firebase_core: ^4.9.0
   firebase_messaging: ^16.2.2
   google_fonts: ^8.1.0
-  http: ^1.6.0
+  dio: ^5.8.0+1
   shared_preferences: ^2.3.0
 
 dev_dependencies:
