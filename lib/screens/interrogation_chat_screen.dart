@@ -100,7 +100,7 @@ class _InterrogationChatScreenState
     try {
       answer = await _repo.ask(
         InterrogationRequest(
-          sessionId: session.sessionId,
+          sessionId: session.serverSessionId?.toString() ?? session.sessionId,
           scenarioId: session.scenarioId,
           suspectId: widget.suspect.id,
           question: trimmed,
