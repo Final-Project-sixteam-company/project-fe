@@ -1,4 +1,6 @@
+// lib/main.dart
 import 'package:clueroom/screens/splash_screen.dart';
+import 'package:clueroom/services/auth_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +15,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  // AuthService 초기화 — 저장된 토큰 로드
+  await AuthService.instance.init();
+
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await _configureFirebaseMessaging();
 
@@ -24,7 +30,7 @@ Future<void> _configureFirebaseMessaging() async {
 
   final settings = await messaging.requestPermission();
   debugPrint(
-    'FCM notification permission: ${settings.authorizationStatus.name}',
+    'FCM 알림 권한: ${settings.authorizationStatus.name}',
   );
 
   final token = await messaging.getToken();
@@ -34,32 +40,33 @@ Future<void> _configureFirebaseMessaging() async {
   }
 
   messaging.onTokenRefresh.listen((newToken) async {
-    debugPrint('FCM token refreshed: $newToken');
+    debugPrint('FCM token 갱신: $newToken');
     await _registerFcmTokenWithBackend(newToken);
   });
 
   FirebaseMessaging.onMessage.listen((message) {
     debugPrint(
-      'FCM foreground message: ${message.messageId}, data: ${message.data}',
+      'FCM 포그라운드 수신: ${message.messageId}, data: ${message.data}',
     );
   });
 
   FirebaseMessaging.onMessageOpenedApp.listen((message) {
     debugPrint(
-      'FCM notification opened: ${message.messageId}, data: ${message.data}',
+      'FCM 알림 탭: ${message.messageId}, data: ${message.data}',
     );
   });
 
   final initialMessage = await messaging.getInitialMessage();
   if (initialMessage != null) {
     debugPrint(
-      'FCM initial notification: ${initialMessage.messageId}, data: ${initialMessage.data}',
+      'FCM 초기 메시지: ${initialMessage.messageId}',
     );
   }
 }
 
 Future<void> _registerFcmTokenWithBackend(String token) async {
-  debugPrint('Register this FCM token with backend: $token');
+  debugPrint('백엔드에 FCM 토큰 등록 예정: $token');
+  // TODO: AuthService 로그인 후 PATCH /api/users/me 로 fcmToken 전송
 }
 
 class MyApp extends StatelessWidget {

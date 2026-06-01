@@ -1,5 +1,7 @@
 // lib/screens/scenario_library_screen.dart
 import 'package:flutter/material.dart';
+import '../components/filter_chip_widget.dart';
+import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../components/ms_text_field.dart';
@@ -10,8 +12,6 @@ import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'scenario_detail_screen.dart';
-
-// ── 필터 탭 정의 ──────────────────────────────────────────────────────────────
 
 enum _LibraryTab {
   all,
@@ -26,68 +26,58 @@ enum _LibraryTab {
 
 extension _LibraryTabX on _LibraryTab {
   String get label => switch (this) {
-        _LibraryTab.all => '전체',
-        _LibraryTab.official => '공식',
-        _LibraryTab.custom => '커스텀',
-        _LibraryTab.popular => '인기',
-        _LibraryTab.newest => '최신',
-        _LibraryTab.easy => '쉬움',
-        _LibraryTab.medium => '보통',
-        _LibraryTab.hard => '어려움',
-      };
+    _LibraryTab.all => '전체',
+    _LibraryTab.official => '공식',
+    _LibraryTab.custom => '커스텀',
+    _LibraryTab.popular => '인기',
+    _LibraryTab.newest => '최신',
+    _LibraryTab.easy => '쉬움',
+    _LibraryTab.medium => '보통',
+    _LibraryTab.hard => '어려움',
+  };
 
-  /// 탭을 ScenarioFilter로 변환
   ScenarioFilter toFilter(String query) => switch (this) {
-        _LibraryTab.all => ScenarioFilter(query: query),
-        _LibraryTab.official => ScenarioFilter(
-            type: ScenarioType.official,
-            query: query,
-          ),
-        _LibraryTab.custom => ScenarioFilter(
-            type: ScenarioType.custom,
-            query: query,
-          ),
-        _LibraryTab.popular => ScenarioFilter(
-            sort: ScenarioSort.popular,
-            query: query,
-          ),
-        _LibraryTab.newest => ScenarioFilter(
-            sort: ScenarioSort.newest,
-            query: query,
-          ),
-        _LibraryTab.easy => ScenarioFilter(
-            difficulty: Difficulty.easy,
-            query: query,
-          ),
-        _LibraryTab.medium => ScenarioFilter(
-            difficulty: Difficulty.medium,
-            query: query,
-          ),
-        _LibraryTab.hard => ScenarioFilter(
-            difficulty: Difficulty.hard,
-            query: query,
-          ),
-      };
+    _LibraryTab.all => ScenarioFilter(query: query),
+    _LibraryTab.official =>
+        ScenarioFilter(type: ScenarioType.official, query: query),
+    _LibraryTab.custom =>
+        ScenarioFilter(type: ScenarioType.custom, query: query),
+    _LibraryTab.popular =>
+        ScenarioFilter(sort: ScenarioSort.popular, query: query),
+    _LibraryTab.newest =>
+        ScenarioFilter(sort: ScenarioSort.newest, query: query),
+    _LibraryTab.easy =>
+        ScenarioFilter(difficulty: Difficulty.easy, query: query),
+    _LibraryTab.medium =>
+        ScenarioFilter(difficulty: Difficulty.medium, query: query),
+    _LibraryTab.hard =>
+        ScenarioFilter(difficulty: Difficulty.hard, query: query),
+  };
 }
-
-// ── 화면 ──────────────────────────────────────────────────────────────────────
 
 class ScenarioLibraryScreen extends StatefulWidget {
   const ScenarioLibraryScreen({super.key});
 
   @override
-  State<ScenarioLibraryScreen> createState() =>
-      _ScenarioLibraryScreenState();
+  State<ScenarioLibraryScreen> createState() => _ScenarioLibraryScreenState();
 }
 
-class _ScenarioLibraryScreenState
-    extends State<ScenarioLibraryScreen> {
+class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
+
   _LibraryTab _tab = _LibraryTab.all;
   String _query = '';
 
-  List<Scenario> get _results =>
-      scenarioRepo.query(_tab.toFilter(_query));
+  // ── 비동기 상태 ──────────────────────────────────────────────────────────
+  List<Scenario> _results = const [];
+  bool _isLoading = false;
+  String? _errorMsg;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
@@ -95,10 +85,36 @@ class _ScenarioLibraryScreenState
     super.dispose();
   }
 
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _errorMsg = null;
+    });
+    try {
+      final data = await scenarioRepo.query(_tab.toFilter(_query));
+      if (!mounted) return;
+      setState(() => _results = data);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMsg = '목록을 불러오지 못했습니다.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _onTabChanged(_LibraryTab tab) {
+    setState(() => _tab = tab);
+    _load();
+  }
+
+  void _onQueryChanged(String v) {
+    setState(() => _query = v.trim());
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final results = _results;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -106,6 +122,7 @@ class _ScenarioLibraryScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ── 헤더 + 검색 + 필터 ────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppTokens.sp4,
@@ -130,78 +147,100 @@ class _ScenarioLibraryScreenState
                     controller: _searchCtrl,
                     hintText: '사건명, 태그, 제작자 검색…',
                     suffixIcon: Icons.search,
-                    onChanged: (v) =>
-                        setState(() => _query = v.trim()),
+                    onChanged: _onQueryChanged,
                   ),
                   const SizedBox(height: AppTokens.sp3),
+                  // ── 필터 칩 ────────────────────────────────────────────
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: _LibraryTab.values.map((tab) {
-                        final active = _tab == tab;
                         return Padding(
                           padding: EdgeInsets.only(
                             right: tab != _LibraryTab.values.last
                                 ? AppTokens.sp2
                                 : 0,
                           ),
-                          child: _FilterChip(
+                          child: MSFilterChip(
                             label: tab.label,
-                            active: active,
-                            onTap: () =>
-                                setState(() => _tab = tab),
+                            active: _tab == tab,
+                            onTap: () => _onTabChanged(tab),
                           ),
                         );
                       }).toList(),
                     ),
                   ),
                   const SizedBox(height: AppTokens.sp4),
+                  // ── 카운트 행 ──────────────────────────────────────────
                   Row(
                     children: [
                       const MSKicker('사건 목록'),
                       const SizedBox(width: AppTokens.sp2),
-                      Text(
-                        '${results.length}건',
-                        style: AppText.monoLabel.copyWith(
-                          color: c.textMute,
+                      if (!_isLoading)
+                        Text(
+                          '${_results.length}건',
+                          style: AppText.monoLabel.copyWith(
+                            color: c.textMute,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: AppTokens.sp3),
                 ],
               ),
             ),
-            Expanded(
-              child: results.isEmpty
-                  ? const MSEmpty(
-                      icon: Icons.search_off,
-                      title: '일치하는 사건이 없습니다',
-                    )
-                  : ListView.separated(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(
-                        AppTokens.sp4,
-                        0,
-                        AppTokens.sp4,
-                        AppTokens.sp10,
-                      ),
-                      itemCount: results.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: AppTokens.sp3),
-                      itemBuilder: (_, i) => _ScenarioRow(
-                        scenario: results[i],
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ScenarioDetailScreen(
-                              scenario: results[i],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-            ),
+            // ── 본문 ─────────────────────────────────────────────────────
+            Expanded(child: _buildBody(context)),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    // 로딩 중
+    if (_isLoading) {
+      return const Center(child: MSSpinner(size: 24));
+    }
+
+    // 에러
+    if (_errorMsg != null) {
+      return MSEmpty(
+        icon: Icons.wifi_off_outlined,
+        title: _errorMsg!,
+        action: MSButton(
+          label: '다시 시도',
+          variant: MSButtonVariant.secondary,
+          onPressed: _load,
+        ),
+      );
+    }
+
+    // 결과 없음
+    if (_results.isEmpty) {
+      return const MSEmpty(
+        icon: Icons.search_off,
+        title: '일치하는 사건이 없습니다',
+      );
+    }
+
+    // 목록
+    return ListView.separated(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        AppTokens.sp4,
+        0,
+        AppTokens.sp4,
+        AppTokens.sp10,
+      ),
+      itemCount: _results.length,
+      separatorBuilder: (_, __) => const SizedBox(height: AppTokens.sp3),
+      itemBuilder: (_, i) => _ScenarioRow(
+        scenario: _results[i],
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ScenarioDetailScreen(scenario: _results[i]),
+          ),
         ),
       ),
     );
@@ -211,10 +250,7 @@ class _ScenarioLibraryScreenState
 // ── 시나리오 카드 ─────────────────────────────────────────────────────────────
 
 class _ScenarioRow extends StatelessWidget {
-  const _ScenarioRow({
-    required this.scenario,
-    required this.onTap,
-  });
+  const _ScenarioRow({required this.scenario, required this.onTap});
 
   final Scenario scenario;
   final VoidCallback onTap;
@@ -383,12 +419,9 @@ class _ScenarioStats extends StatelessWidget {
       children: [
         Text(
           '★ ${scenario.rating}',
-          style: AppText.monoLabel.copyWith(
-            color: c.primary,
-            height: 1.0,
-          ),
+          style: AppText.monoLabel.copyWith(color: c.primary, height: 1.0),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppTokens.sp1),
         Text(
           _formatPlays(scenario.plays),
           style: AppText.monoLabel.copyWith(
@@ -398,49 +431,6 @@ class _ScenarioStats extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ── 필터 칩 ───────────────────────────────────────────────────────────────────
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppMotion.dur2,
-        curve: AppMotion.easeOut,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.chipPadH,
-          vertical: AppTokens.chipPadV,
-        ),
-        decoration: BoxDecoration(
-          color: active ? c.primarySoft : Colors.transparent,
-          border: Border.all(color: active ? c.primary : c.line),
-          borderRadius: BorderRadius.circular(AppTokens.rPill),
-        ),
-        child: Text(
-          label,
-          style: AppText.monoLabel.copyWith(
-            color: active ? c.primary : c.textSub,
-            height: 1.0,
-          ),
-        ),
-      ),
     );
   }
 }
