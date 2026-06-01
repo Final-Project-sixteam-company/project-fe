@@ -1,17 +1,20 @@
 // lib/screens/suspect_detail_screen.dart
-import 'package:clueroom/screens/result_screen.dart';
 import 'package:flutter/material.dart';
 import '../components/evidence_item.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
+import '../controllers/game_session_controller.dart';
 import '../controllers/game_session_provider.dart';
+import '../core/api/api_exception.dart';
 import '../models/case.dart';
-import '../models/sample_case.dart';
+import '../models/play_models.dart';
+import '../repositories/play_session_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'interrogation_chat_screen.dart';
+import 'submit_screen.dart';
 
 class SuspectDetailScreen extends StatefulWidget {
   const SuspectDetailScreen({required this.suspect, super.key});
@@ -27,6 +30,9 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
   late final AnimationController _ctrl;
   late final Animation<double> _opacity;
   late final Animation<Offset> _slide;
+
+  bool _logsLoaded = false;
+  List<InterrogationResult> _logs = const [];
 
   @override
   void initState() {
@@ -44,6 +50,30 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_logsLoaded) return;
+    _logsLoaded = true;
+    _loadLogs();
+  }
+
+  Future<void> _loadLogs() async {
+    final controller = context.sessionRead;
+    final sessionId = controller.backendSessionId;
+    final suspectId = int.tryParse(widget.suspect.id);
+    if (sessionId == null || suspectId == null) return;
+    try {
+      final logs = await playSessionRepo.interrogationLogs(
+        sessionId,
+        suspectId: suspectId,
+      );
+      if (mounted) setState(() => _logs = logs);
+    } on ApiException catch (_) {
+      // 로그 조회 실패는 조용히 무시(프로필은 계속 표시)
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
@@ -52,6 +82,8 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final raw = context.session.rawSuspect(widget.suspect.id);
+    final related = _relatedEvidences(context);
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -79,7 +111,7 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    widget.suspect.role,
+                    raw?.role ?? widget.suspect.role,
                     style: AppText.bodySm.copyWith(color: c.textSub),
                   ),
                 ],
@@ -95,32 +127,63 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
                   offset: _slide.value,
                   child: child,
                 ),
-                child: _SuspicionPanel(suspicion: widget.suspect.suspicion),
-              ),
-            ),
-            const SizedBox(height: AppTokens.sp6),
-            // ── 관련 증거 ────────────────────────────────────────────
-            const MSKicker('관련 증거'),
-            const SizedBox(height: AppTokens.sp3),
-            ...sampleCase.evidences.take(2).map(
-                  (e) => Padding(
-                padding: const EdgeInsets.only(bottom: AppTokens.sp3),
-                child: EvidenceItem(
-                  e,
-                  onTap: () {},
+                child: _SuspicionPanel(
+                  suspicion: raw?.suspicionLevel ?? widget.suspect.suspicion,
                 ),
               ),
             ),
-            const SizedBox(height: AppTokens.sp3),
+            // ── 피해자와의 관계 ──────────────────────────────────────
+            if (raw?.relationToVictim != null &&
+                raw!.relationToVictim!.isNotEmpty) ...[
+              const SizedBox(height: AppTokens.sp6),
+              const MSKicker('피해자와의 관계'),
+              const SizedBox(height: AppTokens.sp3),
+              _InfoCard(text: raw.relationToVictim!),
+            ],
+            // ── 관련 증거 ────────────────────────────────────────────
+            if (related.isNotEmpty) ...[
+              const SizedBox(height: AppTokens.sp6),
+              const MSKicker('관련 증거'),
+              const SizedBox(height: AppTokens.sp3),
+              ...related.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppTokens.sp3),
+                  child: EvidenceItem(e, onTap: () {}),
+                ),
+              ),
+            ],
+            const SizedBox(height: AppTokens.sp6),
             // ── 진술 ────────────────────────────────────────────────
             const MSKicker('진술'),
             const SizedBox(height: AppTokens.sp3),
-            _StatementCard(suspect: widget.suspect),
+            _StatementCard(
+              statement: raw?.publicStatement,
+              alibi: raw?.alibi,
+            ),
+            // ── 이전 심문 기록 ───────────────────────────────────────
+            if (_logs.isNotEmpty) ...[
+              const SizedBox(height: AppTokens.sp6),
+              MSKicker('이전 심문 · ${_logs.length}건'),
+              const SizedBox(height: AppTokens.sp3),
+              ..._logs.map((log) => _LogCard(log: log)),
+            ],
             const SizedBox(height: AppTokens.sp10),
           ],
         ),
       ),
     );
+  }
+
+  /// 이 용의자와 연관된(관련 용의자에 포함된) 증거 목록.
+  List<Evidence> _relatedEvidences(BuildContext context) {
+    final controller = context.session;
+    final suspectId = int.tryParse(widget.suspect.id);
+    if (suspectId == null) return const [];
+    return controller.evidences.where((e) {
+      final raw = controller.rawEvidence(e.id);
+      return raw != null &&
+          raw.relatedSuspects.any((rs) => rs.suspectId == suspectId);
+    }).toList();
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
@@ -247,12 +310,12 @@ class _SuspicionPanel extends StatelessWidget {
   }
 }
 
-// ── 진술 카드 ─────────────────────────────────────────────────────────────────
+// ── 단순 정보 카드 ────────────────────────────────────────────────────────────
 
-class _StatementCard extends StatelessWidget {
-  const _StatementCard({required this.suspect});
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({required this.text});
 
-  final Suspect suspect;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
@@ -265,18 +328,95 @@ class _StatementCard extends StatelessWidget {
         border: Border.all(color: c.line),
         borderRadius: BorderRadius.circular(AppTokens.r6),
       ),
+      child: Text(
+        text,
+        style: AppText.body.copyWith(color: c.text, height: 1.6),
+      ),
+    );
+  }
+}
+
+// ── 진술 카드 ─────────────────────────────────────────────────────────────────
+
+class _StatementCard extends StatelessWidget {
+  const _StatementCard({this.statement, this.alibi});
+
+  final String? statement;
+  final String? alibi;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final text = (statement != null && statement!.isNotEmpty)
+        ? '"$statement"'
+        : '아직 확보된 진술이 없습니다.';
+
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.sp4),
+      decoration: BoxDecoration(
+        color: c.bgElev,
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(AppTokens.r6),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '"그날 밤 저는 22시 이전에 이미 퇴근했습니다. '
-                'CCTV 기록을 확인하시면 알 수 있을 겁니다."',
+            text,
             style: AppText.body.copyWith(color: c.text, height: 1.6),
           ),
-          const SizedBox(height: AppTokens.sp3),
+          if (alibi != null && alibi!.isNotEmpty) ...[
+            const SizedBox(height: AppTokens.sp3),
+            Text(
+              '알리바이',
+              style: AppText.monoLabel.copyWith(color: c.textMute),
+            ),
+            const SizedBox(height: AppTokens.sp1),
+            Text(
+              alibi!,
+              style: AppText.bodySm.copyWith(color: c.textSub, height: 1.5),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── 심문 기록 카드 ────────────────────────────────────────────────────────────
+
+class _LogCard extends StatelessWidget {
+  const _LogCard({required this.log});
+
+  final InterrogationResult log;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppTokens.sp2),
+      padding: const EdgeInsets.all(AppTokens.sp3),
+      decoration: BoxDecoration(
+        color: c.bgElev,
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(AppTokens.r4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            '22:35 · 1차 조사실',
-            style: AppText.monoLabel.copyWith(color: c.textMute),
+            'Q. ${log.question}',
+            style: AppText.bodySm.copyWith(
+              color: c.primary,
+              fontWeight: FontWeight.w600,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: AppTokens.sp1),
+          Text(
+            'A. ${log.answer}',
+            style: AppText.bodySm.copyWith(color: c.textSub, height: 1.5),
           ),
         ],
       ),
@@ -348,11 +488,19 @@ class _BottomBar extends StatelessWidget {
 
   void _showConfirmDialog(BuildContext context) {
     final c = context.c;
+    // showDialog의 context는 GameSessionProvider 하위가 아니므로
+    // 컨트롤러를 여기서(provider 하위에서) 미리 읽어 전달한다.
+    final controller = context.sessionRead;
+    final navigator = Navigator.of(context);
 
     showDialog(
       context: context,
       barrierColor: c.scrim,
-      builder: (context) => _ConfirmDialog(suspect: suspect),
+      builder: (_) => _ConfirmDialog(
+        suspect: suspect,
+        controller: controller,
+        navigator: navigator,
+      ),
     );
   }
 }
@@ -360,9 +508,15 @@ class _BottomBar extends StatelessWidget {
 // ── 범인 지목 확인 다이얼로그 ─────────────────────────────────────────────────
 
 class _ConfirmDialog extends StatelessWidget {
-  const _ConfirmDialog({required this.suspect});
+  const _ConfirmDialog({
+    required this.suspect,
+    required this.controller,
+    required this.navigator,
+  });
 
   final Suspect suspect;
+  final GameSessionController controller;
+  final NavigatorState navigator;
 
   @override
   Widget build(BuildContext context) {
@@ -386,8 +540,8 @@ class _ConfirmDialog extends StatelessWidget {
             ),
             const SizedBox(height: AppTokens.sp3),
             Text(
-              '${suspect.name}을(를) 범인으로 지목합니다.\n'
-                  '이 결정은 되돌릴 수 없습니다. 계속하시겠습니까?',
+              '${suspect.name}을(를) 범인으로 지목하고 최종 추리를 작성합니다.\n'
+                  '범행 동기·방법·결정적 증거를 입력해야 제출할 수 있습니다.',
               style: AppText.body.copyWith(color: c.textSub, height: 1.6),
             ),
             const SizedBox(height: AppTokens.sp6),
@@ -404,14 +558,17 @@ class _ConfirmDialog extends StatelessWidget {
                 const SizedBox(width: AppTokens.sp3),
                 Expanded(
                   child: MSButton(
-                    label: '지목 확정',
+                    label: '추리 작성',
                     variant: MSButtonVariant.danger,
                     expanded: true,
                     onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pushReplacement(
+                      navigator.pop();
+                      navigator.push(
                         MaterialPageRoute(
-                          builder: (_) => const ResultScreen(),
+                          builder: (_) => GameSessionProvider(
+                            controller: controller,
+                            child: SubmitScreen(initialSuspect: suspect),
+                          ),
                         ),
                       );
                     },

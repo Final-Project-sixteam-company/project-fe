@@ -4,16 +4,21 @@ import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../components/ms_text_field.dart';
+import '../controllers/game_session_controller.dart';
 import '../controllers/game_session_provider.dart';
+import '../core/api/api_exception.dart';
 import '../models/case.dart';
-import '../models/sample_case.dart';
+import '../repositories/play_session_repository.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'result_screen.dart';
 
 class SubmitScreen extends StatefulWidget {
-  const SubmitScreen({super.key});
+  const SubmitScreen({this.initialSuspect, super.key});
+
+  /// 용의자 상세에서 '범인 지목'으로 진입할 때 미리 선택될 용의자.
+  final Suspect? initialSuspect;
 
   @override
   State<SubmitScreen> createState() => _SubmitScreenState();
@@ -29,9 +34,13 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
   static const int _maxEvidenceCount = 3;
 
-  // 정답 데이터 (백엔드에서 내려올 값 — 현재는 하드코딩)
-  static const String _correctSuspectId = 's1';
-  static const List<String> _correctEvidenceIds = ['e3', 'e1', 'e5'];
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedSuspect = widget.initialSuspect;
+  }
 
   @override
   void dispose() {
@@ -43,7 +52,8 @@ class _SubmitScreenState extends State<SubmitScreen> {
   }
 
   bool get _canSubmit =>
-      _selectedSuspect != null &&
+      !_submitting &&
+          _selectedSuspect != null &&
           _motiveCtrl.text.isNotEmpty &&
           _methodCtrl.text.isNotEmpty &&
           _concealCtrl.text.isNotEmpty &&
@@ -60,144 +70,70 @@ class _SubmitScreenState extends State<SubmitScreen> {
     });
   }
 
-  // ── 점수 계산 (PRD Section 13) ────────────────────────────────────────────
-  //
-  // [설계 원칙]
-  // _ScoreBreakdown 이 per-section 점수를 모두 보유한다.
-  // _calculateRawScore() 와 _buildResult() 는 둘 다 이 객체를 사용하기 때문에
-  // 표시된 항목 점수 합계 = totalScore 가 항상 보장된다.
+  Future<void> _onSubmit() async {
+    final controller = context.sessionRead;
+    final sessionId = controller.backendSessionId;
+    final culpritId = int.tryParse(_selectedSuspect?.id ?? '');
 
-  _ScoreBreakdown _evaluate() {
-    // 범인 (30점)
-    final suspectScore =
-    _selectedSuspect?.id == _correctSuspectId ? 30 : 0;
-
-    // 범행 동기 키워드 (20점 / 부분 8점)
-    final motive = _motiveCtrl.text.toLowerCase();
-    final motiveScore =
-    (motive.contains('자금') ||
-        motive.contains('횡령') ||
-        motive.contains('유용'))
-        ? 20
-        : (motive.length > 10 ? 8 : 0);
-
-    // 범행 방법 키워드 (25점 / 부분 10점)
-    final method = _methodCtrl.text.toLowerCase();
-    final methodScore =
-    (method.contains('알레르기') || method.contains('에피펜'))
-        ? 25
-        : (method.length > 10 ? 10 : 0);
-
-    // 은폐 방법 (10점)
-    final concealScore = _concealCtrl.text.length > 10 ? 10 : 0;
-
-    // 결정적 증거 (각 5점, 최대 15점)
-    final evidenceScore = _selectedEvidences
-        .where((e) => _correctEvidenceIds.contains(e.id))
-        .length
-        .clamp(0, 3) *
-        5;
-
-    return _ScoreBreakdown(
-      suspectScore: suspectScore,
-      motiveScore: motiveScore,
-      methodScore: methodScore,
-      concealScore: concealScore,
-      evidenceScore: evidenceScore,
-    );
-  }
-
-  void _onSubmit() {
-    if (!_canSubmit) {
+    if (!_canSubmit || sessionId == null || culpritId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('모든 항목을 입력해주세요.')),
+        SnackBar(
+          content: Text(
+            sessionId == null
+                ? '세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.'
+                : '모든 항목을 입력해주세요.',
+          ),
+        ),
       );
       return;
     }
 
-    final breakdown = _evaluate();
-    // 세션 종료 + 힌트 감점 적용
-    context.sessionRead.completeSession(rawScore: breakdown.total);
-    final finalScore = context.sessionRead.finalScore ?? 0;
-    final hintPenalty = context.sessionRead.hintPenalty;
+    final evidenceIds = _selectedEvidences
+        .map((e) => int.tryParse(e.id))
+        .whereType<int>()
+        .toList();
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ResultScreen(
-          result: _buildResult(
-            breakdown: breakdown,
-            finalScore: finalScore,
-            hintPenalty: hintPenalty,
-          ),
-        ),
-      ),
-    );
-  }
+    setState(() => _submitting = true);
+    try {
+      await playSessionRepo.submitFinalDeduction(
+        sessionId,
+        selectedCulpritId: culpritId,
+        motiveText: _motiveCtrl.text.trim(),
+        methodText: _methodCtrl.text.trim(),
+        coverUpText: _concealCtrl.text.trim(),
+        selectedEvidenceIds: evidenceIds,
+      );
 
-  CaseResult _buildResult({
-    required _ScoreBreakdown breakdown,
-    required int finalScore,
-    required int hintPenalty,
-  }) {
-    // breakdown 의 per-section 값을 그대로 ScoreItem 에 사용하기 때문에
-    // scoreItems 합계 == finalScore 가 항상 보장된다.
-    final grade = _gradeFromScore(finalScore);
+      if (!mounted) return;
+      // 타이머 정지 + 세션 완료 표시(점수는 결과 화면에서 서버 값으로 표시).
+      controller.completeSession(rawScore: 0);
 
-    return CaseResult(
-      grade: grade,
-      totalScore: finalScore,
-      maxScore: 100,
-      scoreItems: [
-        ScoreItem(
-          label: '진범 지목',
-          score: breakdown.suspectScore,
-          maxScore: 30,
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ResultScreen(sessionId: sessionId),
         ),
-        ScoreItem(
-          label: '범행 방법',
-          score: breakdown.methodScore,
-          maxScore: 25,
-        ),
-        ScoreItem(
-          label: '범행 동기',
-          score: breakdown.motiveScore,
-          maxScore: 20,
-        ),
-        ScoreItem(
-          label: '은폐 방법',
-          score: breakdown.concealScore,
-          maxScore: 10,
-        ),
-        ScoreItem(
-          label: '결정적 증거',
-          score: breakdown.evidenceScore,
-          maxScore: 15,
-        ),
-        if (hintPenalty > 0)
-          ScoreItem(
-            label: '힌트 감점',
-            score: -(hintPenalty.clamp(0, breakdown.total).toInt()),
-            maxScore: 0,
-          ),
-      ],
-      culpritName: '박재민',
-      revelation: '박재민 CFO는 회사 자금 유용 사실이 데모데이에서 공개될 위기에 놓이자, '
-          '피해자의 견과류 알레르기를 이용해 아몬드라떼를 마시게 하고 에피펜을 숨겼다. '
-          '이후 피해자의 휴대폰으로 메시지를 보내 사망 시간을 조작했다.',
-    );
-  }
-
-  String _gradeFromScore(int score) {
-    if (score >= 90) return 'S';
-    if (score >= 80) return 'A';
-    if (score >= 70) return 'B';
-    if (score >= 60) return 'C';
-    return 'D';
+      );
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('제출 실패: ${e.message}')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('제출 중 오류가 발생했습니다.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final controller = context.session;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -237,6 +173,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
               const MSKicker('1. FINAL SUSPECT · 진범 지목'),
               const SizedBox(height: AppTokens.sp3),
               _SuspectDropdown(
+                suspects: controller.suspects,
                 selected: _selectedSuspect,
                 onSelect: (s) =>
                     setState(() => _selectedSuspect = s),
@@ -272,6 +209,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
               ),
               const SizedBox(height: AppTokens.sp3),
               _EvidenceSelector(
+                evidences: _unlockedEvidences(controller),
                 selected: _selectedEvidences,
                 onToggle: _toggleEvidence,
                 maxCount: _maxEvidenceCount,
@@ -289,7 +227,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
               const SizedBox(height: AppTokens.sp8),
               // ── 5. 제출 버튼 ────────────────────────────────────
               MSButton(
-                label: '최종 추리 제출',
+                label: _submitting ? '제출 중...' : '최종 추리 제출',
                 variant: MSButtonVariant.danger,
                 expanded: true,
                 onPressed: _canSubmit ? _onSubmit : null,
@@ -301,16 +239,22 @@ class _SubmitScreenState extends State<SubmitScreen> {
       ),
     );
   }
+
+  /// 제시 가능한(해금된) 증거. 서버 연동 시 백엔드 정수 ID를 가진다.
+  List<Evidence> _unlockedEvidences(GameSessionController controller) =>
+      controller.evidences.where((e) => !e.isLocked).toList();
 }
 
 // ── 용의자 드롭다운 ───────────────────────────────────────────────────────────
 
 class _SuspectDropdown extends StatelessWidget {
   const _SuspectDropdown({
+    required this.suspects,
     required this.selected,
     required this.onSelect,
   });
 
+  final List<Suspect> suspects;
   final Suspect? selected;
   final ValueChanged<Suspect?> onSelect;
 
@@ -343,7 +287,7 @@ class _SuspectDropdown extends StatelessWidget {
             style: AppText.body.copyWith(color: c.textMute),
           ),
           style: AppText.body.copyWith(color: c.text),
-          items: sampleCase.suspects.map((s) {
+          items: suspects.map((s) {
             return DropdownMenuItem<Suspect>(
               value: s,
               child: Text('${s.name} · ${s.role}'),
@@ -360,11 +304,13 @@ class _SuspectDropdown extends StatelessWidget {
 
 class _EvidenceSelector extends StatelessWidget {
   const _EvidenceSelector({
+    required this.evidences,
     required this.selected,
     required this.onToggle,
     required this.maxCount,
   });
 
+  final List<Evidence> evidences;
   final List<Evidence> selected;
   final ValueChanged<Evidence> onToggle;
   final int maxCount;
@@ -372,8 +318,13 @@ class _EvidenceSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final unlocked =
-    sampleCase.evidences.where((e) => !e.isLocked).toList();
+
+    if (evidences.isEmpty) {
+      return Text(
+        '제출할 수 있는 증거가 아직 없습니다.',
+        style: AppText.bodySm.copyWith(color: c.textSub),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -393,7 +344,7 @@ class _EvidenceSelector extends StatelessWidget {
           ),
           const SizedBox(height: AppTokens.sp3),
         ],
-        ...unlocked.map(
+        ...evidences.map(
               (e) {
             final bool isSelected = selected.contains(e);
             final bool isDisabled =
@@ -458,30 +409,4 @@ class _EvidenceSelector extends StatelessWidget {
       ],
     );
   }
-}
-
-// ── 채점 분해 값 객체 ─────────────────────────────────────────────────────────
-//
-// _evaluate() 의 반환값.
-// _calculateRawScore() 와 _buildResult() 가 동일한 출처에서 파생되므로
-// 결과 화면에 표시되는 항목 점수 합계가 최종 점수와 항상 일치한다.
-
-class _ScoreBreakdown {
-  const _ScoreBreakdown({
-    required this.suspectScore,
-    required this.motiveScore,
-    required this.methodScore,
-    required this.concealScore,
-    required this.evidenceScore,
-  });
-
-  final int suspectScore;
-  final int motiveScore;
-  final int methodScore;
-  final int concealScore;
-  final int evidenceScore;
-
-  int get total =>
-      (suspectScore + motiveScore + methodScore + concealScore + evidenceScore)
-          .clamp(0, 100).toInt();
 }
