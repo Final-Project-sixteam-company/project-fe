@@ -63,7 +63,13 @@ class _CaseScreenState extends State<CaseScreen> {
         appBar: _buildHud(context),
         bottomNavigationBar: MSBottomNav(
           currentIndex: _navIndex,
-          onTap: (i) => setState(() => _navIndex = i),
+          onTap: (i) {
+            setState(() => _navIndex = i);
+            // 증거 탭(1) 진입 시 서버에서 증거/대시보드 재조회.
+            // 시간 기반 해금(unlock_type=TIME)은 심문 응답에 실리지 않아
+            // 탭 진입 시점에 다시 불러와야 새로 풀린 증거가 노출된다.
+            if (i == 1) _session.refreshEvidences();
+          },
         ),
         body: IndexedStack(
           index: _navIndex,
