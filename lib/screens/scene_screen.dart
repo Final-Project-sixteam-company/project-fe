@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../components/game_modals.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
-import '../components/ms_stat_row.dart';
 import '../controllers/game_session_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
@@ -89,16 +88,12 @@ class _SceneScreenState extends State<SceneScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: AppTokens.sp4),
-            // ── 1. 통계 헤더 ───────────────────────────────────────
-            const MSStatRow([
-              StatCell('조사 진행 시간', '14:22'),
-              StatCell('단서 발견', '8/12', tone: StatTone.good),
-            ]),
-            const SizedBox(height: AppTokens.sp4),
-            // ── 2. 현장 맵 ────────────────────────────────────────
+            // ── 1. 현장 맵 ────────────────────────────────────────
+            // 경과 시간/해금 증거 수는 상단 HUD(CaseScreen)가 라이브로
+            // 표시하므로 여기서 중복 통계 헤더를 두지 않는다.
             _SceneMap(selectedIndex: _selectedIndex),
             const SizedBox(height: AppTokens.sp6),
-            // ── 3. 주요 현장 정보 ─────────────────────────────────
+            // ── 2. 주요 현장 정보 ─────────────────────────────────
             const MSKicker('주요 현장 정보'),
             const SizedBox(height: AppTokens.sp3),
             _LocationList(
