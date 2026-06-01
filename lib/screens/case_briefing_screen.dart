@@ -192,7 +192,9 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
                   variant: MSButtonVariant.primary,
                   expanded: true,
                   onPressed: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const CaseScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => CaseScreen(scenarioId: _scenario.id),
+                    ),
                   ),
                 ),
               ),

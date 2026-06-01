@@ -118,20 +118,20 @@ class _CaseScreenState extends State<CaseScreen> {
                   ),
                 ),
                 const SizedBox(width: AppTokens.sp4),
-                // 해금 증거 수
+                // 해금 증거 수 (서버 기준)
                 Icon(
                   Icons.description_outlined,
                   size: 14,
-                  color: _session.unlockedEvidenceIds.isEmpty
+                  color: _session.unlockedCount == 0
                       ? c.textMute
                       : c.success,
                 ),
                 const SizedBox(width: AppTokens.sp1),
                 Text(
-                  '${_session.unlockedEvidenceIds.length}/5',
+                  '${_session.unlockedCount}/${_session.totalEvidenceCount}',
                   style: AppText.monoNum.copyWith(
                     fontSize: 13,
-                    color: _session.unlockedEvidenceIds.isEmpty
+                    color: _session.unlockedCount == 0
                         ? c.textMute
                         : c.success,
                     height: 1.0,

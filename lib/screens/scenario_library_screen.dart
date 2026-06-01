@@ -1,9 +1,12 @@
 // lib/screens/scenario_library_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
+import '../core/api/api_exception.dart';
 import '../models/scenario.dart';
 import '../repositories/scenario_repository.dart';
 import '../theme/app_text.dart';
@@ -86,13 +89,66 @@ class _ScenarioLibraryScreenState
   _LibraryTab _tab = _LibraryTab.all;
   String _query = '';
 
-  List<Scenario> get _results =>
-      scenarioRepo.query(_tab.toFilter(_query));
+  List<Scenario> _results = const [];
+  bool _loading = true;
+  String? _error;
+
+  /// 검색어 입력 디바운스
+  Timer? _debounce;
+
+  /// 마지막 요청 식별자 — 늦게 도착한 응답이 최신 결과를 덮어쓰지 않도록 한다.
+  int _requestSeq = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _load() async {
+    final seq = ++_requestSeq;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final results = await scenarioRepo.query(_tab.toFilter(_query));
+      if (!mounted || seq != _requestSeq) return;
+      setState(() {
+        _results = results;
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted || seq != _requestSeq) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted || seq != _requestSeq) return;
+      setState(() {
+        _error = '시나리오를 불러오지 못했습니다.';
+        _loading = false;
+      });
+    }
+  }
+
+  void _onTabChanged(_LibraryTab tab) {
+    setState(() => _tab = tab);
+    _load();
+  }
+
+  void _onQueryChanged(String v) {
+    _query = v.trim();
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _load);
   }
 
   @override
@@ -130,8 +186,7 @@ class _ScenarioLibraryScreenState
                     controller: _searchCtrl,
                     hintText: '사건명, 태그, 제작자 검색…',
                     suffixIcon: Icons.search,
-                    onChanged: (v) =>
-                        setState(() => _query = v.trim()),
+                    onChanged: _onQueryChanged,
                   ),
                   const SizedBox(height: AppTokens.sp3),
                   SingleChildScrollView(
@@ -148,8 +203,7 @@ class _ScenarioLibraryScreenState
                           child: _FilterChip(
                             label: tab.label,
                             active: active,
-                            onTap: () =>
-                                setState(() => _tab = tab),
+                            onTap: () => _onTabChanged(tab),
                           ),
                         );
                       }).toList(),
@@ -173,7 +227,20 @@ class _ScenarioLibraryScreenState
               ),
             ),
             Expanded(
-              child: results.isEmpty
+              child: _loading
+                  ? const Center(child: MSSpinner(size: 24))
+                  : _error != null
+                      ? MSEmpty(
+                          icon: Icons.cloud_off,
+                          title: '불러오지 못했습니다',
+                          subtitle: _error,
+                          action: MSButton(
+                            label: '다시 시도',
+                            variant: MSButtonVariant.secondary,
+                            onPressed: _load,
+                          ),
+                        )
+                      : results.isEmpty
                   ? const MSEmpty(
                       icon: Icons.search_off,
                       title: '일치하는 사건이 없습니다',
