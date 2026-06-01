@@ -3,8 +3,7 @@ import '../components/game_modals.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../components/ms_stat_row.dart';
-import '../models/sample_case.dart';
-import '../models/session_models.dart';
+import '../controllers/game_session_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
@@ -132,35 +131,16 @@ class _SceneScreenState extends State<SceneScreen> {
         Padding(
           padding: const EdgeInsets.only(right: AppTokens.sp4),
           child: IconButton(
-            onPressed: () async {
-              final selectedLevel = await showHintModal(context);
-
-              if (selectedLevel == null) return;
-
-              String hintContent = '';
-              if (selectedLevel == HintLevel.direction) {
-                hintContent = sampleCase.clue1HintText;      // 방향 힌트 매핑
-              } else if (selectedLevel == HintLevel.connection) {
-                hintContent = sampleCase.clue2HintText;      // 증거 연결 힌트 매핑
-              } else if (selectedLevel == HintLevel.decisive) {
-                hintContent = sampleCase.decisiveHintText;  // 결정적 힌트 매핑
+            onPressed: () {
+              // 힌트는 서버 세션 기반. 세션 미생성 시 안내.
+              final sessionId = context.sessionRead.backendSessionId;
+              if (sessionId == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('세션이 아직 준비되지 않았습니다.')),
+                );
+                return;
               }
-              if (!context.mounted) return;
-
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (dialogContext) => AlertDialog(
-                  title: Text('🔍 힌트 확인 (${selectedLevel.label})'),
-                  content: Text(hintContent),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text('확인'),
-                    ),
-                  ],
-                ),
-              );
+              showHintModal(context, sessionId: sessionId);
             },
             icon: Icon(Icons.lightbulb_outline, color: c.primary),
             padding: EdgeInsets.zero,
