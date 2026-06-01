@@ -86,19 +86,23 @@ class _ScenarioLibraryScreenState extends State<ScenarioLibraryScreen> {
   }
 
   Future<void> _load() async {
+    final capturedTab = _tab;
+    final capturedQuery = _query;
     setState(() {
       _isLoading = true;
       _errorMsg = null;
     });
     try {
-      final data = await scenarioRepo.query(_tab.toFilter(_query));
-      if (!mounted) return;
+      final data = await scenarioRepo.query(capturedTab.toFilter(capturedQuery));
+      if (!mounted || _tab != capturedTab || _query != capturedQuery) return;
       setState(() => _results = data);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || _tab != capturedTab || _query != capturedQuery) return;
       setState(() => _errorMsg = '목록을 불러오지 못했습니다.');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && _tab == capturedTab && _query == capturedQuery) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

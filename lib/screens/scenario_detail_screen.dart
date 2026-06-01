@@ -28,9 +28,7 @@ class ScenarioDetailScreen extends StatefulWidget {
 class _ScenarioDetailScreenState
     extends State<ScenarioDetailScreen> {
   bool _bookmarked = false;
-  bool get _isPlayable =>
-      _kPlayableIds.contains(widget.scenario.id) ||
-      int.tryParse(widget.scenario.id) != null;
+  bool get _isPlayable => _kPlayableIds.contains(widget.scenario.id);
 
   @override
   void initState() {
