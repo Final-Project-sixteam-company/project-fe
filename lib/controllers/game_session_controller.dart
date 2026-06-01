@@ -127,15 +127,17 @@ class GameSessionController extends ChangeNotifier {
     }
   }
 
-  void _notifyServerUnlock(String localEvidenceId) {
+  void _notifyServerUnlock(String localEvidenceId) async { // async 추가
     if (serverSessionId == null) return;
-    final evidenceNumId = int.tryParse(
-      localEvidenceId.replaceFirst('e', ''),
-    );
+    final evidenceNumId = int.tryParse(localEvidenceId.replaceFirst('e', ''));
     if (evidenceNumId == null) return;
-    playSessionRepo
-        .unlockEvidence(serverSessionId!, evidenceNumId, 'TIME_UNLOCK')
-        .catchError((_) {}); // 실패해도 로컬 상태는 이미 업데이트됨
+
+    try {
+      await playSessionRepo.unlockEvidence(serverSessionId!, evidenceNumId, 'TIME_UNLOCK');
+    } catch (e) {
+      // 실패해도 로컬 상태는 이미 업데이트됨
+      debugPrint('[GameSession] 서버 해금 알림 실패: $e');
+    }
   }
 
   // ── CL-001 시간 해금 규칙 ─────────────────────────────────────────────────
