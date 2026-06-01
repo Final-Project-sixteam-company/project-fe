@@ -158,31 +158,36 @@ class _HintButton extends StatelessWidget {
 // ── 증거 제시 모달 ────────────────────────────────────────────────────────────
 
 Future<Evidence?> showEvidencePresentModal(BuildContext context) {
-  // 세션 해금 상태를 미리 읽어서 Sheet에 전달한다.
+  // 제시 가능한(해금된) 증거를 미리 읽어서 Sheet에 전달한다.
   // showModalBottomSheet는 새 루트 컨텍스트를 만들기 때문에
   // Sheet 내부에서 GameSessionProvider를 찾을 수 없다.
-  Set<String> unlockedIds;
+  //
+  // 서버 연동 세션의 evidence는 백엔드 정수 ID를 가지므로(증거 제시 API에 필요)
+  // controller.evidences 를 우선 사용하고, 비어 있거나 없으면 sampleCase로 폴백한다.
+  List<Evidence> accessible;
   try {
-    unlockedIds = GameSessionProvider.read(context).unlockedEvidenceIds;
+    final serverEvidences = GameSessionProvider.read(context).evidences;
+    accessible = serverEvidences.isNotEmpty
+        ? serverEvidences.where((e) => !e.isLocked).toList()
+        : sampleCase.evidences.where((e) => !e.isLocked).toList();
   } catch (_) {
-    // GameSessionProvider가 없는 컨텍스트(미리보기 등)에서는 빈 세트로 폴백
-    unlockedIds = const {};
+    // GameSessionProvider가 없는 컨텍스트(미리보기 등)에서는 샘플로 폴백
+    accessible = sampleCase.evidences.where((e) => !e.isLocked).toList();
   }
 
   return showModalBottomSheet<Evidence>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => _EvidencePresentSheet(unlockedIds: unlockedIds),
+    builder: (_) => _EvidencePresentSheet(evidences: accessible),
   );
 }
 
 class _EvidencePresentSheet extends StatefulWidget {
-  const _EvidencePresentSheet({required this.unlockedIds});
+  const _EvidencePresentSheet({required this.evidences});
 
-  /// 세션에서 시간 해금된 evidence ID 집합.
-  /// isLocked == true 라도 이 집합에 포함되면 제시 가능하다.
-  final Set<String> unlockedIds;
+  /// 제시 가능한(해금된) 증거 목록. 서버 연동 시 백엔드 정수 ID를 가진다.
+  final List<Evidence> evidences;
 
   @override
   State<_EvidencePresentSheet> createState() =>
@@ -199,15 +204,10 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
     super.dispose();
   }
 
-  /// 접근 가능한 증거:
-  ///   - 원래부터 잠기지 않은 증거 (isLocked == false)
-  ///   - isLocked == true 지만 세션에서 해금된 증거 (id ∈ unlockedIds)
+  /// 제시 가능한 증거(이미 해금된 것)에서 검색어로 필터링한다.
   List<Evidence> get _filtered {
-    final accessible = sampleCase.evidences
-        .where((e) => !e.isLocked || widget.unlockedIds.contains(e.id))
-        .toList();
-    if (_query.isEmpty) return accessible;
-    return accessible
+    if (_query.isEmpty) return widget.evidences;
+    return widget.evidences
         .where(
           (e) => e.name.contains(_query) || e.location.contains(_query),
     )
