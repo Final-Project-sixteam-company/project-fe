@@ -54,6 +54,15 @@ class GameSessionController extends ChangeNotifier {
 
   bool get isServerBacked => _backendScenarioId != null;
 
+  /// timeline/scene 화면의 하드코딩 CL-001 샘플 데이터(`sampleCase.timeline`,
+  /// scene_screen 의 `_locations`)는 CL-001 케이스에서만 유효하다.
+  /// 백엔드 `GET .../timeline` · `.../locations` 가 아직 404(미구현)라, 그 외
+  /// 시나리오(4·5 등)에서 이 샘플을 그대로 띄우면 스포일러/서사 모순이 된다.
+  /// 따라서 CL-001(샘플 id 'demoday-eve' 또는 백엔드 시드 '1')에서만 표시한다.
+  /// 엔드포인트 구현 시 이 게이트를 제거하고 실데이터로 교체할 것.
+  bool get usesCl001SampleCaseData =>
+      scenarioId == 'demoday-eve' || scenarioId == '1';
+
   // ── 진행 중 세션 영속화(재진입 시 재개용) ─────────────────────────────────
   // 백엔드에 '내 활성 세션 조회' 엔드포인트가 없고, 409 응답도 기존 세션 ID를
   // 돌려주지 않는다. 그래서 세션 생성 시 ID를 기기에 저장해 두고, 재진입/콜드

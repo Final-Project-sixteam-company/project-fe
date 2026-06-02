@@ -381,7 +381,11 @@ class _ScenarioMeta extends StatelessWidget {
             ),
             const SizedBox(width: AppTokens.sp2),
             Text(
-              '${scenario.estimatedMinutes}분 · 용의자 ${scenario.suspectsCount}명',
+              // 백엔드가 suspectCount 를 0(미집계)으로 주는 경우 "용의자 0명"이
+              // 오인되므로 그 구절을 숨긴다(상세화면 _MetaGrid 의 "—" 처리와 일관).
+              scenario.suspectsCount > 0
+                  ? '${scenario.estimatedMinutes}분 · 용의자 ${scenario.suspectsCount}명'
+                  : '${scenario.estimatedMinutes}분',
               style: AppText.monoLabel.copyWith(
                 fontSize: 9.5,
                 color: c.textMute,

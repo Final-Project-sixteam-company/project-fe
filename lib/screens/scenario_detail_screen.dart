@@ -521,11 +521,13 @@ class _MetaGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
 
+    // 백엔드가 suspectCount/evidenceCount 를 0으로 주는 경우(미집계)가 있어,
+    // "0명·0개"로 오인되지 않도록 0이면 "—"로 표시한다.
     final cells = [
       ('난이도', scenario.difficultyLabel),
       ('플레이시간', '${scenario.estimatedMinutes}분'),
-      ('용의자', '${scenario.suspectsCount}명'),
-      ('증거', '${scenario.evidenceCount}개'),
+      ('용의자', scenario.suspectsCount > 0 ? '${scenario.suspectsCount}명' : '—'),
+      ('증거', scenario.evidenceCount > 0 ? '${scenario.evidenceCount}개' : '—'),
     ];
 
     return Container(
