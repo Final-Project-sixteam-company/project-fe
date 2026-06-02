@@ -23,7 +23,9 @@ class SuspectCard extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: '${suspect.name}, ${suspect.role}, 의심도 ${suspect.suspicion}$countLabel',
+      label: suspect.isWitness
+          ? '${suspect.name}, ${suspect.role}$countLabel'
+          : '${suspect.name}, ${suspect.role}, 의심도 ${suspect.suspicion}$countLabel',
       child: Material(
         color: c.bg,
         borderRadius: BorderRadius.circular(AppTokens.r4),

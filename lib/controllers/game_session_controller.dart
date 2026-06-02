@@ -195,6 +195,7 @@ class GameSessionController extends ChangeNotifier {
         role: s.role ?? '',
         suspicion: s.suspicionLevel,
         interrogationCount: s.interrogationCount,
+        isWitness: s.role == 'NEUTRAL_WITNESS',
       );
 
   Evidence _toEvidence(PlayEvidence e) => Evidence(
