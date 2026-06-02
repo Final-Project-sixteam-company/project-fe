@@ -115,7 +115,9 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
                   const MSKicker('사건 증거 보드'),
                   const SizedBox(height: AppTokens.sp3),
                   Expanded(
-                    child: results.isEmpty
+                    child: ctrl.isLoading && ctrl.evidences.isEmpty
+                        ? const MSListSkeleton(itemHeight: 76)
+                        : results.isEmpty
                         ? const MSEmpty(
                             icon: Icons.search_off,
                             title: '일치하는 증거가 없습니다',

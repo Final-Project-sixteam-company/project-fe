@@ -66,8 +66,15 @@ class _CaseScreenState extends State<CaseScreen> {
   Future<void> _handlePop(bool didPop) async {
     if (didPop) return;
     final navigator = Navigator.of(context);
-    // 이미 제출 완료됐거나 서버 세션이 없으면 그대로 나간다(중단 대상 아님).
-    if (_session.isCompleted || _session.backendSessionId == null) {
+    // 이미 제출 완료된 경우만 그대로 나간다.
+    if (_session.isCompleted) {
+      navigator.pop();
+      return;
+    }
+    // 서버 세션이 없고 생성 중도 아니면(샘플 시나리오 등) 중단 대상이 아니다.
+    // 생성 중(isLoading)이면 다이얼로그를 거쳐 abandonSession 이 생성 완료를 기다린 뒤
+    // 정리하도록 한다(생성 직후 이탈 시 PLAYING 세션 잔류 → 409 레이스 방지).
+    if (_session.backendSessionId == null && !_session.isLoading) {
       navigator.pop();
       return;
     }

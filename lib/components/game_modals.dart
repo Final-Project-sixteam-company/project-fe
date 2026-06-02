@@ -172,9 +172,17 @@ class _HintSheetState extends State<_HintSheet> {
                   child: Center(child: MSSpinner(size: 20)),
                 )
               else if (_error != null)
-                Text(
-                  _error!,
-                  style: AppText.bodySm.copyWith(color: c.danger),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppTokens.sp6),
+                  child: MSEmpty(
+                    icon: Icons.cloud_off,
+                    title: '힌트를 불러오지 못했습니다',
+                    action: MSButton(
+                      label: '다시 시도',
+                      variant: MSButtonVariant.secondary,
+                      onPressed: _load,
+                    ),
+                  ),
                 )
               else
                 ..._hints.map(

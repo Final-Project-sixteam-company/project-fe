@@ -397,6 +397,8 @@ class _ScenarioMeta extends StatelessWidget {
         const SizedBox(height: 5),
         Text(
           scenario.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: AppText.body.copyWith(
             fontSize: 13,
             fontWeight: FontWeight.w600,

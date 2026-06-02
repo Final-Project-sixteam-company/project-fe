@@ -85,6 +85,10 @@ class GameSessionController extends ChangeNotifier {
     await prefs.remove(_activeSessionKey(scenarioId));
   }
 
+  /// 진행 중인 세션 생성/로딩 future. 생성 직후 이탈(abandon) 시 이 future 의
+  /// 완료를 기다려 backendSessionId 를 확보한 뒤 정리하기 위해 보관한다.
+  Future<void>? _loadFuture;
+
   /// 서버에서 세션을 확보 + 초기 데이터(대시보드/용의자/증거) 로딩.
   /// 저장된 세션이 아직 진행 중이면 재개하고, 없으면 새로 생성한다.
   Future<void> loadFromServer() async {
@@ -259,8 +263,8 @@ class GameSessionController extends ChangeNotifier {
     _isStarted = true;
     _startTimer();
     notifyListeners();
-    // 서버 세션 생성 + 데이터 로딩(비동기)
-    loadFromServer();
+    // 서버 세션 생성 + 데이터 로딩(비동기). future 를 보관해 생성 중 이탈 시 대기 가능.
+    _loadFuture = loadFromServer();
   }
 
   void _startTimer() {
@@ -304,18 +308,34 @@ class GameSessionController extends ChangeNotifier {
   /// 무시(best-effort)하되, 로컬 재개 기록과 타이머는 반드시 정리한다.
   Future<void> abandonSession() async {
     if (_isCompleted) return; // 이미 끝난 세션은 포기 대상이 아니다
+    // 세션 생성이 진행 중이면 완료를 기다려 backendSessionId 를 확보한 뒤 정리한다.
+    // (생성 직후 이탈 시 PLAYING 세션이 서버에 잔류해 다음 진입이 409가 되는 레이스 방지)
+    try {
+      await _loadFuture;
+    } catch (_) {
+      // 로딩 실패는 무시 — 아래에서 backendSessionId 유무로 분기
+    }
     _timer?.cancel();
     final id = backendSessionId;
-    if (id != null) {
-      try {
-        await _repo.abandon(id);
-      } catch (_) {
-        // best-effort: 서버 정리 실패해도 로컬 상태는 정리하고 진행
-      }
+    if (id == null) {
+      // 정리할 서버 세션이 없으면 로컬 기록만 정리
+      final sid = _backendScenarioId;
+      if (sid != null) await _clearSavedSession(sid);
+      return;
+    }
+    bool abandoned = false;
+    try {
+      await _repo.abandon(id);
+      abandoned = true;
+    } catch (_) {
+      // 서버 정리 실패: 로컬 재개 기록을 보존해 다음 진입에서 재개/복구가 가능하도록 한다.
+      // (키를 지우면 서버엔 PLAYING 세션이 남아 409가 나는데 재개할 ID도 잃는다)
     }
     backendSessionId = null;
-    final sid = _backendScenarioId;
-    if (sid != null) await _clearSavedSession(sid);
+    if (abandoned) {
+      final sid = _backendScenarioId;
+      if (sid != null) await _clearSavedSession(sid);
+    }
   }
 
   @override
