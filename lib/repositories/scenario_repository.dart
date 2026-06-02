@@ -44,7 +44,7 @@ abstract class ScenarioRepository {
 
 /// 백엔드(`/api/scenarios`) 연동 구현체.
 class ApiScenarioRepository implements ScenarioRepository {
-  const ApiScenarioRepository({ApiClient? client}) : _client = client;
+  const ApiScenarioRepository({this._client});
 
   final ApiClient? _client;
   ApiClient get _api => _client ?? ApiClient.instance;

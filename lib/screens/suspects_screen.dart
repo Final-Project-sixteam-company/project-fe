@@ -123,7 +123,7 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
       itemCount: results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: AppTokens.sp3),
+      separatorBuilder: (_, _) => const SizedBox(height: AppTokens.sp3),
       itemBuilder: (_, i) => SuspectCard(
         results[i],
         onTap: () {

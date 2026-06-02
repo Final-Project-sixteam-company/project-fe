@@ -4,7 +4,7 @@ import '../models/play_models.dart';
 
 /// 플레이 세션 전체 API(`/api/play-sessions/...`) 연동.
 class PlaySessionRepository {
-  const PlaySessionRepository({ApiClient? client}) : _client = client;
+  const PlaySessionRepository({this._client});
 
   final ApiClient? _client;
   ApiClient get _api => _client ?? ApiClient.instance;
@@ -76,8 +76,7 @@ class PlaySessionRepository {
         'suspectId': suspectId,
         'questionType': questionTypeToApi(questionType),
         'question': question,
-        if (presentedEvidenceId != null)
-          'presentedEvidenceId': presentedEvidenceId,
+        'presentedEvidenceId': ?presentedEvidenceId,
       },
     );
     return InterrogationResult.fromJson(data as Map<String, dynamic>);
@@ -90,7 +89,7 @@ class PlaySessionRepository {
   }) async {
     final data = await _api.get(
       '/api/play-sessions/$sessionId/interrogations',
-      query: {if (suspectId != null) 'suspectId': suspectId},
+      query: {'suspectId': ?suspectId},
     );
     return (data as List<dynamic>)
         .map((e) => InterrogationResult.fromJson(e as Map<String, dynamic>))
@@ -113,7 +112,7 @@ class PlaySessionRepository {
         'selectedCulpritId': selectedCulpritId,
         'motiveText': motiveText,
         'methodText': methodText,
-        if (coverUpText != null) 'coverUpText': coverUpText,
+        'coverUpText': ?coverUpText,
         'selectedEvidenceIds': selectedEvidenceIds,
       },
     );

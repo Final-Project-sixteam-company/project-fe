@@ -214,7 +214,7 @@ class _InterrogationChatScreenState
                 vertical: AppTokens.sp4,
               ),
               itemCount: _messages.length + (_isWaiting ? 1 : 0),
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
               const SizedBox(height: AppTokens.sp2),
               itemBuilder: (_, i) {
                 if (i == _messages.length && _isWaiting) {
@@ -476,7 +476,7 @@ class _SuggestedQuestions extends StatelessWidget {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
         itemCount: _suggestedQuestions.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppTokens.sp2),
+        separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
         itemBuilder: (_, i) {
           return GestureDetector(
             onTap: disabled ? null : () => onSelect(_suggestedQuestions[i]),

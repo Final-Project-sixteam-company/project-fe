@@ -174,7 +174,7 @@ class _ScenarioList extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: _scenarios.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppTokens.sp3),
+        separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp3),
         itemBuilder: (_, i) => _ScenarioMiniCard(data: _scenarios[i]),
       ),
     );

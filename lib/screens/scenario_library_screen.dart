@@ -254,7 +254,7 @@ class _ScenarioLibraryScreenState
                         AppTokens.sp10,
                       ),
                       itemCount: results.length,
-                      separatorBuilder: (_, __) =>
+                      separatorBuilder: (_, _) =>
                           const SizedBox(height: AppTokens.sp3),
                       itemBuilder: (_, i) => _ScenarioRow(
                         scenario: results[i],

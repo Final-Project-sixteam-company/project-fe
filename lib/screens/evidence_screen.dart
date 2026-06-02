@@ -123,7 +123,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
                         : ListView.separated(
                             physics: const BouncingScrollPhysics(),
                             itemCount: results.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (_, _) =>
                                 const SizedBox(height: AppTokens.sp2),
                             itemBuilder: (_, i) {
                               final e = results[i];
