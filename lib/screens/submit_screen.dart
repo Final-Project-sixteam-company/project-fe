@@ -131,7 +131,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
       if (!mounted) return;
       // 타이머 정지 + 세션 완료 표시(점수는 결과 화면에서 서버 값으로 표시).
-      controller.completeSession(rawScore: 0);
+      controller.completeSession();
 
       await Navigator.of(context).push(
         MaterialPageRoute(

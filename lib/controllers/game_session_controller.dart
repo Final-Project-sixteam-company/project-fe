@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api/api_exception.dart';
@@ -10,19 +9,9 @@ import '../repositories/play_session_repository.dart';
 
 class GameSessionController extends ChangeNotifier {
   GameSessionController({required this.scenarioId, PlaySessionRepository? repo})
-      : sessionId = _generateSessionId(),
-        _repo = repo ?? playSessionRepo;
+      : _repo = repo ?? playSessionRepo;
 
   final String scenarioId;
-
-  /// 클라이언트 측 임시 ID(로깅/표시용). 실제 서버 세션은 [backendSessionId].
-  final String sessionId;
-
-  static String _generateSessionId() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final rand = Random().nextInt(0xFFFF).toRadixString(16).padLeft(4, '0');
-    return 'sess_${now}_$rand';
-  }
 
   final PlaySessionRepository _repo;
 
@@ -244,12 +233,6 @@ class GameSessionController extends ChangeNotifier {
   int get totalEvidenceCount =>
       _dashboard?.totalEvidenceCount ?? _evidences.length;
 
-  // ── 힌트 ─────────────────────────────────────────────────────────────────
-  final List<HintRecord> _usedHints = [];
-  List<HintRecord> get usedHints => List.unmodifiable(_usedHints);
-
-  int get hintPenalty => _usedHints.fold(0, (sum, h) => sum + h.penalty);
-
   // ── 심문 로그 ─────────────────────────────────────────────────────────────
   final List<InterrogationLog> _logs = [];
   List<InterrogationLog> get interrogationLogs => List.unmodifiable(_logs);
@@ -259,20 +242,6 @@ class GameSessionController extends ChangeNotifier {
   bool _isCompleted = false;
   bool get isStarted => _isStarted;
   bool get isCompleted => _isCompleted;
-
-  int? _finalScore;
-  int? get finalScore => _finalScore;
-
-  // ── 진행률 ────────────────────────────────────────────────────────────────
-  int progressPercent({int totalUnlockable = totalUnlockableCount}) {
-    if (_isCompleted) return 100;
-    if (!_isStarted) return 0;
-    final total = totalEvidenceCount > 0 ? totalEvidenceCount : totalUnlockable;
-    return ((unlockedCount / total) * 80).clamp(0, 80).round();
-  }
-
-  // 진행률 fallback 분모(서버 카운트가 없을 때만 사용)
-  static const int totalUnlockableCount = 8;
 
   // ── 세션 시작 ─────────────────────────────────────────────────────────────
   void startSession() {
@@ -302,15 +271,6 @@ class GameSessionController extends ChangeNotifier {
     }
   }
 
-  // ── 힌트 사용 ─────────────────────────────────────────────────────────────
-  void useHint(HintLevel level) {
-    final record = HintRecord(level: level, usedAt: _elapsed);
-    _usedHints.add(record);
-    notifyListeners();
-  }
-
-  bool get canUseHint => !_isCompleted;
-
   // ── 심문 로그 저장 ────────────────────────────────────────────────────────
   void addInterrogationLog(InterrogationLog log) {
     _logs.add(log);
@@ -318,10 +278,10 @@ class GameSessionController extends ChangeNotifier {
   }
 
   // ── 세션 종료 ─────────────────────────────────────────────────────────────
-  void completeSession({required int rawScore}) {
+  /// 최종 제출 완료 표시. 점수/등급은 결과 화면에서 서버 값으로 표시한다.
+  void completeSession() {
     _isCompleted = true;
     _timer?.cancel();
-    _finalScore = (rawScore - hintPenalty).clamp(0, 100).toInt();
     // 종료된 세션은 재개 대상이 아니므로 저장 기록 정리(다음 진입은 신규 생성).
     final sid = _backendScenarioId;
     if (sid != null) _clearSavedSession(sid);
