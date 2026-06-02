@@ -229,6 +229,12 @@ class _ResultScreenState extends State<ResultScreen>
       const MSKicker('추리 채점 결과'),
       const SizedBox(height: AppTokens.sp3),
       _MatchCard(matched: data.matched),
+      if (data.matchedParts.isNotEmpty || data.missedParts.isNotEmpty) ...[
+        const SizedBox(height: AppTokens.sp8),
+        const MSKicker('맞춘 추리 · 놓친 추리'),
+        const SizedBox(height: AppTokens.sp3),
+        _PartsCard(matched: data.matchedParts, missed: data.missedParts),
+      ],
       const SizedBox(height: AppTokens.sp8),
       const MSKicker('사건의 진상 · 해설'),
       const SizedBox(height: AppTokens.sp3),
@@ -397,6 +403,72 @@ class _MatchRow extends StatelessWidget {
             trailing ?? (matched ? '정답' : '오답'),
             style: AppText.monoLabel.copyWith(
               color: matched ? c.success : c.danger,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 맞춘/놓친 추리 카드 (서버) ────────────────────────────────────────────────
+
+class _PartsCard extends StatelessWidget {
+  const _PartsCard({required this.matched, required this.missed});
+
+  final List<String> matched;
+  final List<String> missed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.sp4),
+      decoration: BoxDecoration(
+        color: c.bgElev,
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(AppTokens.r4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final part in matched) _PartRow(text: part, matched: true),
+          for (final part in missed) _PartRow(text: part, matched: false),
+        ],
+      ),
+    );
+  }
+}
+
+class _PartRow extends StatelessWidget {
+  const _PartRow({required this.text, required this.matched});
+
+  final String text;
+  final bool matched;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            matched ? Icons.check_circle : Icons.cancel_outlined,
+            size: 18,
+            color: matched ? c.success : c.danger,
+          ),
+          const SizedBox(width: AppTokens.sp3),
+          Expanded(
+            child: Text(
+              text,
+              style: AppText.body.copyWith(
+                color: matched ? c.text : c.textSub,
+                height: 1.5,
+              ),
             ),
           ),
         ],
