@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api/api_exception.dart';
 import '../models/case.dart';
 import '../models/play_models.dart';
@@ -33,6 +34,10 @@ class GameSessionController extends ChangeNotifier {
   bool get isLoading => _loading;
   String? get loadError => _loadError;
 
+  /// 서버에 이미 진행 중인 세션이 있어(409) 새 세션 생성이 막힌 상태.
+  bool _sessionConflict = false;
+  bool get sessionConflict => _sessionConflict;
+
   DashboardInfo? _dashboard;
   DashboardInfo? get dashboard => _dashboard;
 
@@ -59,19 +64,56 @@ class GameSessionController extends ChangeNotifier {
 
   bool get isServerBacked => _backendScenarioId != null;
 
-  /// 서버에서 세션 생성 + 초기 데이터(대시보드/용의자/증거) 로딩.
+  // ── 진행 중 세션 영속화(재진입 시 재개용) ─────────────────────────────────
+  // 백엔드에 '내 활성 세션 조회' 엔드포인트가 없고, 409 응답도 기존 세션 ID를
+  // 돌려주지 않는다. 그래서 세션 생성 시 ID를 기기에 저장해 두고, 재진입/콜드
+  // 스타트 때 그 세션이 아직 PLAYING이면 새로 만들지 않고 그대로 이어한다.
+  static String _activeSessionKey(int scenarioId) =>
+      'active_play_session_$scenarioId';
+
+  Future<int?> _readSavedSession(int scenarioId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_activeSessionKey(scenarioId));
+  }
+
+  Future<void> _saveSession(int scenarioId, int sessionId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_activeSessionKey(scenarioId), sessionId);
+  }
+
+  Future<void> _clearSavedSession(int scenarioId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_activeSessionKey(scenarioId));
+  }
+
+  /// 서버에서 세션을 확보 + 초기 데이터(대시보드/용의자/증거) 로딩.
+  /// 저장된 세션이 아직 진행 중이면 재개하고, 없으면 새로 생성한다.
   Future<void> loadFromServer() async {
     final sid = _backendScenarioId;
     if (sid == null) return; // 샘플 시나리오는 서버 연동 생략
     _loading = true;
     _loadError = null;
+    _sessionConflict = false;
     notifyListeners();
     try {
+      // 1) 재개: 직전에 생성한 세션이 아직 PLAYING이면 그대로 이어한다.
+      final saved = await _readSavedSession(sid);
+      if (saved != null && await _tryResume(saved, sid)) {
+        return; // 재개 성공(_refreshAll 완료)
+      }
+      // 2) 신규 세션 생성
       final session = await _repo.createSession(sid);
       backendSessionId = session.sessionId;
+      await _saveSession(sid, session.sessionId);
       await _refreshAll();
     } on ApiException catch (e) {
-      _loadError = e.message;
+      if (e.status == 409) {
+        // 진행 중 세션이 있으나 ID를 알 수 없는 경우(영속 ID 유실/다른 기기 등).
+        _sessionConflict = true;
+        _loadError = '이미 진행 중인 세션이 있어 새로 시작할 수 없습니다.';
+      } else {
+        _loadError = e.message;
+      }
     } catch (_) {
       _loadError = '플레이 데이터를 불러오지 못했습니다.';
     } finally {
@@ -79,6 +121,28 @@ class GameSessionController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// 저장된 세션을 재개 시도. 아직 PLAYING이면 데이터를 채우고 true 반환.
+  /// 완료/포기/소멸된 세션이면 저장 기록을 지우고 false(→ 신규 생성).
+  Future<bool> _tryResume(int savedId, int scenarioId) async {
+    try {
+      backendSessionId = savedId;
+      await _refreshAll();
+    } on ApiException catch (e) {
+      backendSessionId = null;
+      if (e.isNetwork) rethrow; // 네트워크 오류는 상위 catch에서 처리
+      await _clearSavedSession(scenarioId); // 404 등 → 정리 후 신규 생성
+      return false;
+    }
+    if (_dashboard?.status == PlaySessionStatus.playing) return true;
+    // 이미 끝난 세션 → 재개 불가
+    backendSessionId = null;
+    await _clearSavedSession(scenarioId);
+    return false;
+  }
+
+  /// 로딩 실패 후 재시도(에러 화면의 '다시 시도').
+  Future<void> retry() => loadFromServer();
 
   Future<void> _refreshAll() async {
     final id = backendSessionId;
@@ -257,6 +321,9 @@ class GameSessionController extends ChangeNotifier {
     _isCompleted = true;
     _timer?.cancel();
     _finalScore = (rawScore - hintPenalty).clamp(0, 100).toInt();
+    // 종료된 세션은 재개 대상이 아니므로 저장 기록 정리(다음 진입은 신규 생성).
+    final sid = _backendScenarioId;
+    if (sid != null) _clearSavedSession(sid);
     notifyListeners();
   }
 

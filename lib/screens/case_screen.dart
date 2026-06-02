@@ -1,6 +1,8 @@
 // lib/screens/case_screen.dart
 import 'package:flutter/material.dart';
 import '../components/ms_bottom_nav.dart';
+import '../components/ms_button.dart';
+import '../components/states.dart';
 import '../controllers/game_session_controller.dart';
 import '../controllers/game_session_provider.dart';
 import '../theme/app_text.dart';
@@ -71,9 +73,42 @@ class _CaseScreenState extends State<CaseScreen> {
             if (i == 1) _session.refreshEvidences();
           },
         ),
-        body: IndexedStack(
-          index: _navIndex,
-          children: _kScreens,
+        body: AnimatedBuilder(
+          animation: _session,
+          builder: (context, _) {
+            // 세션 초기 로딩/실패 시에는 탭(가짜/빈 데이터) 대신 전역 상태를 노출.
+            // dashboard가 채워지면 정상 로딩 완료로 본다.
+            if (_session.dashboard == null) {
+              if (_session.isLoading) {
+                return const Center(child: MSSpinner(size: 28));
+              }
+              if (_session.loadError != null) {
+                return _buildLoadError(context);
+              }
+            }
+            return IndexedStack(
+              index: _navIndex,
+              children: _kScreens,
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // ── 세션 로딩 실패 화면(재시도) ──────────────────────────────────────────
+  Widget _buildLoadError(BuildContext context) {
+    final conflict = _session.sessionConflict;
+    return Padding(
+      padding: const EdgeInsets.all(AppTokens.sp6),
+      child: MSEmpty(
+        icon: conflict ? Icons.lock_clock_outlined : Icons.cloud_off,
+        title: conflict ? '진행 중인 세션이 있습니다' : '세션을 시작하지 못했습니다',
+        subtitle: _session.loadError,
+        action: MSButton(
+          label: '다시 시도',
+          variant: MSButtonVariant.secondary,
+          onPressed: () => _session.retry(),
         ),
       ),
     );
