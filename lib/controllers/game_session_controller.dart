@@ -9,8 +9,9 @@ import '../models/session_models.dart';
 import '../repositories/play_session_repository.dart';
 
 class GameSessionController extends ChangeNotifier {
-  GameSessionController({required this.scenarioId})
-      : sessionId = _generateSessionId();
+  GameSessionController({required this.scenarioId, PlaySessionRepository? repo})
+      : sessionId = _generateSessionId(),
+        _repo = repo ?? playSessionRepo;
 
   final String scenarioId;
 
@@ -23,7 +24,7 @@ class GameSessionController extends ChangeNotifier {
     return 'sess_${now}_$rand';
   }
 
-  final PlaySessionRepository _repo = playSessionRepo;
+  final PlaySessionRepository _repo;
 
   // ── 서버 세션 ─────────────────────────────────────────────────────────────
   /// 백엔드 플레이 세션 ID. 세션 생성 성공 후 채워진다.
