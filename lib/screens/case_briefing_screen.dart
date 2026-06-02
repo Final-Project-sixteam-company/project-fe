@@ -1,5 +1,6 @@
 // lib/screens/case_briefing_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../models/scenario.dart';
@@ -29,6 +30,9 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
   final List<Animation<Offset>> _slides = [];
 
   static const int _sectionCount = 5;
+
+  /// 수사 시작 전환 진행 중 플래그(버튼 로딩 표시 + 이중 탭 방지).
+  bool _starting = false;
 
   @override
   void initState() {
@@ -69,6 +73,22 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
       ctrl.dispose();
     }
     super.dispose();
+  }
+
+  /// 수사 시작: 버튼 로딩 상태를 한 프레임 노출한 뒤 CaseScreen으로 전환.
+  /// (CaseScreen 진입 직후 세션 시작 로딩이 이어지므로 즉시 피드백을 보장한다.)
+  void _startInvestigation() {
+    if (_starting) return;
+    setState(() => _starting = true);
+    HapticFeedback.selectionClick();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => CaseScreen(scenarioId: _scenario.id),
+        ),
+      );
+    });
   }
 
   Widget _animated(int index, Widget child) {
@@ -191,11 +211,8 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
                   label: '수사 시작하기',
                   variant: MSButtonVariant.primary,
                   expanded: true,
-                  onPressed: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => CaseScreen(scenarioId: _scenario.id),
-                    ),
-                  ),
+                  loading: _starting,
+                  onPressed: _starting ? null : _startInvestigation,
                 ),
               ),
               const SizedBox(height: AppTokens.sp6),

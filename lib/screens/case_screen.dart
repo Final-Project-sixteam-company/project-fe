@@ -138,24 +138,33 @@ class _CaseScreenState extends State<CaseScreen> {
   // ── 세션 로딩 실패 화면(재시도) ──────────────────────────────────────────
   Widget _buildLoadError(BuildContext context) {
     final conflict = _session.sessionConflict;
+
+    // 409 충돌은 '다시 시도'로 해소되지 않는다(이미 진행 중인 세션이 점유 중).
+    // 이 경우 '나가기'를 주 액션(primary)으로 올려 탈출 경로를 분명히 한다.
+    final retryButton = MSButton(
+      label: '다시 시도',
+      variant: conflict ? MSButtonVariant.ghost : MSButtonVariant.secondary,
+      onPressed: () => _session.retry(),
+    );
+    final exitButton = MSButton(
+      label: '나가기',
+      variant: conflict ? MSButtonVariant.primary : MSButtonVariant.ghost,
+      onPressed: () => Navigator.of(context).pop(),
+    );
+
     return Padding(
       padding: const EdgeInsets.all(AppTokens.sp6),
       child: MSEmpty(
         icon: conflict ? Icons.lock_clock_outlined : Icons.cloud_off,
         title: conflict ? '진행 중인 세션이 있습니다' : '세션을 시작하지 못했습니다',
-        subtitle: _session.loadError,
-        action: MSButton(
-          label: '다시 시도',
-          variant: MSButtonVariant.secondary,
-          onPressed: () => _session.retry(),
-        ),
-        // 세션을 시작하지 못한 상태에서는 화면을 빠져나갈 수단이 필요하다.
-        // (특히 409 충돌 시 '다시 시도'만으로는 탈출 불가)
-        secondaryAction: MSButton(
-          label: '나가기',
-          variant: MSButtonVariant.ghost,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        // 서버 메시지가 있으면 우선 사용하고, 없으면 상황별 구체적 안내를 제공한다.
+        subtitle: _session.loadError ??
+            (conflict
+                ? '다른 기기나 창에서 이미 이 사건을 수사 중입니다. 나가서 기존 수사를 마치거나 중단한 뒤 다시 시작하세요.'
+                : '네트워크 상태를 확인한 뒤 다시 시도해 주세요.'),
+        // 회복 불가(409)일 때 '나가기'를 주 액션으로, 그 외에는 '다시 시도'를 주 액션으로.
+        action: conflict ? exitButton : retryButton,
+        secondaryAction: conflict ? retryButton : exitButton,
       ),
     );
   }
@@ -189,23 +198,38 @@ class _CaseScreenState extends State<CaseScreen> {
                   style: AppText.monoLabel.copyWith(color: c.textMute),
                 ),
                 // 사건 브리핑 재확인(개요·피해자·목표). 데이터 로드 후에만 노출.
+                // 아이콘 전용(16px·textMute·~32dp)은 발견성·터치가 약해
+                // '브리핑' 라벨 + 20px 아이콘 + primary 색 + HUD 풀하이트 터치로 강화.
                 if (_session.dashboard != null) ...[
-                  const SizedBox(width: AppTokens.sp1),
+                  const SizedBox(width: AppTokens.sp2),
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => showCaseBriefingModal(
                       context,
                       dashboard: _session.dashboard!,
                     ),
-                    child: Padding(
+                    child: Container(
+                      height: AppTokens.sp10, // HUD 높이만큼 세로 터치 영역 확보
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppTokens.sp2,
-                        vertical: AppTokens.sp2,
                       ),
-                      child: Icon(
-                        Icons.assignment_outlined,
-                        size: 16,
-                        color: c.textMute,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.assignment_outlined,
+                            size: 20,
+                            color: c.primary,
+                          ),
+                          const SizedBox(width: AppTokens.sp1),
+                          Text(
+                            '브리핑',
+                            style: AppText.monoLabel.copyWith(
+                              color: c.primary,
+                              height: 1.0,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
