@@ -215,7 +215,11 @@ class _MSModalContent extends StatelessWidget {
     final c = context.c;
 
     return Center(
-      child: ConstrainedBox(
+      // showGeneralDialog 경로엔 Material 조상이 없어 텍스트가 기본(밑줄) 스타일로
+      // 새므로, 투명 Material 로 감싸 정상 텍스트 스타일을 제공한다.
+      child: Material(
+        type: MaterialType.transparency,
+        child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
@@ -259,6 +263,7 @@ class _MSModalContent extends StatelessWidget {
               ],
             ),
           ),
+        ),
         ),
       ),
     );
