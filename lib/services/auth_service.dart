@@ -1,11 +1,43 @@
+// lib/services/auth_service.dart
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// JWT 토큰 저장/조회 서비스.
+/// Phase 2(로그인 도입) 전까지는 mock_token을 사용한다.
 class AuthService {
   AuthService._privateConstructor();
   static final AuthService instance = AuthService._privateConstructor();
 
-  // TODO: 추후 실제 로그인 로직 및 JWT 토큰 저장 로직 구현
-  // 현재는 임시 하드코딩 토큰 혹은 기기 저장소에서 읽어오도록 설계
-  // 현재는 로컬 테스트용 가짜 토큰을 반환합니다.
-  // 배포(Release) 버전에서는 백엔드가 401 에러로 거부하므로
-  // 실제 로그인 로직 및 기기 저장소(SecureStorage 등)에서 JWT를 읽어오도록 수정해야 합니다.
-  String? get token => 'mock_or_saved_jwt_token_here';
+  static const String _accessKey = 'access_token';
+  static const String _refreshKey = 'refresh_token';
+
+  String? _cachedToken;
+
+  String? get token => _cachedToken;
+
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    _cachedToken = prefs.getString(_accessKey);
+    // Phase 1: 토큰 없으면 mock 사용
+    _cachedToken ??= 'mock_jwt_token';
+  }
+
+  Future<void> saveTokens({
+    required String access,
+    required String refresh,
+  }) async {
+    _cachedToken = access;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accessKey, access);
+    await prefs.setString(_refreshKey, refresh);
+  }
+
+  Future<void> clearTokens() async {
+    _cachedToken = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_accessKey);
+    await prefs.remove(_refreshKey);
+  }
+
+  bool get isLoggedIn =>
+      _cachedToken != null && _cachedToken != 'mock_jwt_token';
 }
