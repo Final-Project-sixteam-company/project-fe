@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
+import '../components/review_write_sheet.dart';
 import '../components/states.dart';
 import '../core/api/api_exception.dart';
 import '../models/play_models.dart';
+import '../models/review_models.dart';
 import '../repositories/play_session_repository.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
@@ -70,12 +72,16 @@ const _sampleResult = CaseResult(
 class ResultScreen extends StatefulWidget {
   const ResultScreen({
     this.sessionId,
+    this.scenarioId,
     this.result = _sampleResult,
     super.key,
   });
 
   /// 서버 플레이 세션 ID. 지정 시 서버에서 채점 결과를 조회한다.
   final int? sessionId;
+
+  /// 리뷰 작성 진입을 위한 시나리오 ID(완료 후 진입점). 없으면 리뷰 버튼 숨김.
+  final String? scenarioId;
 
   /// 레거시/미리보기용 샘플 결과(서버 미연동 경로).
   final CaseResult result;
@@ -136,6 +142,16 @@ class _ResultScreenState extends State<ResultScreen>
         });
       }
     }
+  }
+
+  Future<void> _writeReview(BuildContext context, String scenarioId) async {
+    final review = await showReviewWriteSheet(context, scenarioId: scenarioId);
+    if (review == null || !mounted) return;
+    sampleReviews.insert(0, review);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('리뷰가 등록되었습니다. 감사합니다!')),
+    );
   }
 
   @override
@@ -213,6 +229,17 @@ class _ResultScreenState extends State<ResultScreen>
             ..._buildSampleSections(context),
           const SizedBox(height: AppTokens.sp8),
           // ── 하단 액션 ───────────────────────────────────────────
+          // 리뷰 작성 진입점 — 플레이를 마친 지금 시점에 노출(상세에서 이전).
+          if (widget.scenarioId != null) ...[
+            MSButton(
+              label: '이 사건 리뷰 작성하기',
+              variant: MSButtonVariant.secondary,
+              expanded: true,
+              icon: Icons.rate_review_outlined,
+              onPressed: () => _writeReview(context, widget.scenarioId!),
+            ),
+            const SizedBox(height: AppTokens.sp3),
+          ],
           MSButton(
             label: '홈으로 돌아가기',
             variant: MSButtonVariant.primary,

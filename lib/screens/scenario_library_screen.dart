@@ -192,23 +192,25 @@ class _ScenarioLibraryScreenState
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: _LibraryTab.values.map((tab) {
-                        final active = _tab == tab;
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            right: tab != _LibraryTab.values.last
-                                ? AppTokens.sp2
-                                : 0,
+                      children: [
+                        // 첫 칩 좌측 여백(끝 칩 우측 여백과 대칭) + 끝 칩 터치 여유.
+                        const SizedBox(width: AppTokens.sp2),
+                        for (final tab in _LibraryTab.values)
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(right: AppTokens.sp2),
+                            child: _FilterChip(
+                              label: tab.label,
+                              active: _tab == tab,
+                              onTap: () => _onTabChanged(tab),
+                            ),
                           ),
-                          child: _FilterChip(
-                            label: tab.label,
-                            active: active,
-                            onTap: () => _onTabChanged(tab),
-                          ),
-                        );
-                      }).toList(),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: AppTokens.sp4),
+                  // 필터 영역 ↔ 결과 목록 경계 구분.
+                  Divider(height: 1, thickness: 1, color: c.line),
                   const SizedBox(height: AppTokens.sp4),
                   Row(
                     children: [

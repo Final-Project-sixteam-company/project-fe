@@ -137,7 +137,10 @@ class _SubmitScreenState extends State<SubmitScreen> {
       // 재제출하는 것을 막는다(게임 화면을 스택에서 치우고 결과만 남긴다).
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => ResultScreen(sessionId: sessionId),
+          builder: (_) => ResultScreen(
+            sessionId: sessionId,
+            scenarioId: controller.scenarioId,
+          ),
         ),
       );
     } on ApiException catch (e) {

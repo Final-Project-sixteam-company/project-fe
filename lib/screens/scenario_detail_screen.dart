@@ -177,6 +177,8 @@ class _ScenarioDetailScreenState
                   _RatingSection(scenario: s),
                   const SizedBox(height: AppTokens.sp4),
                   // ── 리뷰 목록 ──────────────────────────────────
+                  // 리뷰 '작성'은 플레이 완료 후(결과 화면)로 이전했다.
+                  // 여기서는 기존 리뷰 열람만 제공한다.
                   if (reviews.isNotEmpty) ...[
                     ...reviews.map(
                       (r) => Padding(
@@ -186,14 +188,6 @@ class _ScenarioDetailScreenState
                       ),
                     ),
                   ],
-                  // ── 리뷰 작성 버튼 ──────────────────────────────
-                  MSButton(
-                    label: '리뷰 작성하기',
-                    variant: MSButtonVariant.secondary,
-                    expanded: true,
-                    icon: Icons.rate_review_outlined,
-                    onPressed: () => _showReviewSheet(context),
-                  ),
                   const SizedBox(height: AppTokens.sp10),
                 ],
               ),
@@ -204,17 +198,6 @@ class _ScenarioDetailScreenState
     );
   }
 
-  Future<void> _showReviewSheet(BuildContext context) async {
-    final review = await showModalBottomSheet<ScenarioReview>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ReviewWriteSheet(scenarioId: widget.scenario.id),
-    );
-    if (review != null && mounted) {
-      setState(() => sampleReviews.insert(0, review));
-    }
-  }
 }
 
 // ── 리뷰 카드 ─────────────────────────────────────────────────────────────────
@@ -305,172 +288,6 @@ class _ReviewCardState extends State<_ReviewCard> {
                   .copyWith(color: c.textSub, height: 1.6),
             ),
         ],
-      ),
-    );
-  }
-}
-
-// ── 리뷰 작성 시트 ────────────────────────────────────────────────────────────
-
-class _ReviewWriteSheet extends StatefulWidget {
-  const _ReviewWriteSheet({required this.scenarioId});
-
-  final String scenarioId;
-
-  @override
-  State<_ReviewWriteSheet> createState() => _ReviewWriteSheetState();
-}
-
-class _ReviewWriteSheetState extends State<_ReviewWriteSheet> {
-  double _rating = 5.0;
-  final TextEditingController _bodyCtrl = TextEditingController();
-  bool _isSpoiler = false;
-
-  @override
-  void dispose() {
-    _bodyCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: c.bgElev,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(AppTokens.r6),
-            topRight: Radius.circular(AppTokens.r6),
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(AppTokens.sp4),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    margin:
-                        const EdgeInsets.only(bottom: AppTokens.sp4),
-                    decoration: BoxDecoration(
-                      color: c.line,
-                      borderRadius:
-                          BorderRadius.circular(AppTokens.rPill),
-                    ),
-                  ),
-                ),
-                Text(
-                  '리뷰 작성',
-                  style: AppText.titleM.copyWith(color: c.text),
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                // 별점 슬라이더
-                Row(
-                  children: [
-                    Text(
-                      '평점',
-                      style: AppText.body.copyWith(color: c.textSub),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '★ ${_rating.toStringAsFixed(1)}',
-                      style: AppText.monoNum.copyWith(
-                        fontSize: 16,
-                        color: c.primary,
-                        height: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
-                Slider(
-                  value: _rating,
-                  min: 1.0,
-                  max: 5.0,
-                  divisions: 8,
-                  activeColor: c.primary,
-                  inactiveColor: c.bgHover,
-                  onChanged: (v) => setState(() => _rating = v),
-                ),
-                const SizedBox(height: AppTokens.sp3),
-                // 리뷰 본문
-                Container(
-                  decoration: BoxDecoration(
-                    color: c.bg,
-                    border: Border.all(color: c.line),
-                    borderRadius: BorderRadius.circular(AppTokens.r3),
-                  ),
-                  child: TextField(
-                    controller: _bodyCtrl,
-                    maxLines: 4,
-                    style: AppText.body.copyWith(color: c.text),
-                    cursorColor: c.primary,
-                    decoration: InputDecoration(
-                      hintText: '이 사건은 어떠셨나요?',
-                      hintStyle: AppText.body.copyWith(color: c.textMute),
-                      border: InputBorder.none,
-                      contentPadding:
-                          const EdgeInsets.all(AppTokens.sp3),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppTokens.sp3),
-                // 스포일러 토글
-                Row(
-                  children: [
-                    Switch(
-                      value: _isSpoiler,
-                      activeThumbColor: c.danger,
-                      onChanged: (v) =>
-                          setState(() => _isSpoiler = v),
-                    ),
-                    const SizedBox(width: AppTokens.sp2),
-                    Text(
-                      '스포일러 포함',
-                      style: AppText.body.copyWith(
-                        color: _isSpoiler ? c.danger : c.textSub,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                MSButton(
-                  label: '리뷰 등록',
-                  variant: MSButtonVariant.primary,
-                  expanded: true,
-                  onPressed: () {
-                    final body = _bodyCtrl.text.trim();
-                    if (body.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('리뷰 내용을 입력해 주세요.')),
-                      );
-                      return;
-                    }
-                    final review = ScenarioReview(
-                      id: 'r_${DateTime.now().millisecondsSinceEpoch}',
-                      scenarioId: widget.scenarioId,
-                      authorName: '나',
-                      rating: _rating,
-                      body: body,
-                      createdAt: DateTime.now(),
-                      isSpoiler: _isSpoiler,
-                    );
-                    Navigator.of(context).pop(review);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
