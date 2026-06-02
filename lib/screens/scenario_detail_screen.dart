@@ -449,7 +449,12 @@ class _ReviewWriteSheetState extends State<_ReviewWriteSheet> {
                   expanded: true,
                   onPressed: () {
                     final body = _bodyCtrl.text.trim();
-                    if (body.isEmpty) return;
+                    if (body.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('리뷰 내용을 입력해 주세요.')),
+                      );
+                      return;
+                    }
                     final review = ScenarioReview(
                       id: 'r_${DateTime.now().millisecondsSinceEpoch}',
                       scenarioId: widget.scenarioId,
@@ -751,8 +756,8 @@ class _BottomCta extends StatelessWidget {
                     const SizedBox(width: AppTokens.sp2),
                     Expanded(
                       child: Text(
-                        '${scenario.code} 시나리오 데이터가 준비 중입니다. '
-                        'CL-001만 현재 플레이 가능합니다.',
+                        '${scenario.code} 시나리오는 아직 준비 중입니다. '
+                        '곧 플레이할 수 있어요.',
                         style: AppText.bodySm.copyWith(
                           fontSize: 12,
                           color: c.textMute,
@@ -786,7 +791,8 @@ class _BottomCta extends StatelessWidget {
                     icon: isPlayable
                         ? Icons.play_arrow
                         : Icons.lock_clock_outlined,
-                    onPressed: onStart,
+                    // 플레이 불가 시 버튼을 비활성화(라벨만 '준비 중'이고 눌리던 문제 수정).
+                    onPressed: isPlayable ? onStart : null,
                   ),
                 ),
               ],

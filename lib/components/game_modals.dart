@@ -276,7 +276,7 @@ class _HintTile extends StatelessWidget {
 
     // 사용 가능: 사용 버튼
     return MSButton(
-      label: busy ? '확인 중...' : '$label (-${hint.penaltyScore}점)',
+      label: busy ? '사용 중...' : '$label (-${hint.penaltyScore}점)',
       variant: hint.hintLevel >= 3
           ? MSButtonVariant.danger
           : MSButtonVariant.secondary,
@@ -397,8 +397,7 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
                         icon: Icon(Icons.close, color: c.textSub, size: 20),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                        // 기본 48dp 최소 터치 타깃 유지(별도 padding/constraints 억제 안 함).
                       ),
                     ],
                   ),

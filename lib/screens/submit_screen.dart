@@ -209,7 +209,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
               ),
               const SizedBox(height: AppTokens.sp8),
               // ── 1. 진범 지목 ────────────────────────────────────
-              const MSKicker('1. FINAL SUSPECT · 진범 지목'),
+              const MSKicker('1. 진범 지목'),
               const SizedBox(height: AppTokens.sp3),
               _SuspectDropdown(
                 suspects: controller.suspects,
@@ -436,6 +436,17 @@ class _SuspectDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
 
+    // DropdownButton 의 value 는 items 중 정확히 0/1개와 == 일치해야 한다.
+    // selected 가 리스트 재생성으로 다른 인스턴스이거나 목록이 비면 assertion 크래시가
+    // 나므로, id 기준으로 현재 items 안의 인스턴스를 찾아 안전한 value 를 만든다.
+    Suspect? selectedValue;
+    for (final s in suspects) {
+      if (s.id == selected?.id) {
+        selectedValue = s;
+        break;
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppTokens.sp3,
@@ -448,7 +459,7 @@ class _SuspectDropdown extends StatelessWidget {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<Suspect>(
-          value: selected,
+          value: selectedValue,
           isExpanded: true,
           dropdownColor: c.bgElev,
           icon: Icon(
@@ -537,7 +548,7 @@ class _EvidenceSelector extends StatelessWidget {
                   curve: AppMotion.easeOut,
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppTokens.sp3,
-                    vertical: 10,
+                    vertical: 14, // ≈48dp 터치 타깃
                   ),
                   decoration: BoxDecoration(
                     color:

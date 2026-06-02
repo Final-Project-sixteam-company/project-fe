@@ -295,7 +295,9 @@ class _InterrogationChatScreenState
             final sessionId = context.sessionRead.backendSessionId;
             if (sessionId == null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('세션이 아직 준비되지 않았습니다.')),
+                const SnackBar(
+                  content: Text('세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.'),
+                ),
               );
               return;
             }
@@ -504,7 +506,7 @@ class _SuggestedQuestions extends StatelessWidget {
     final c = context.c;
 
     return SizedBox(
-      height: 40,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),

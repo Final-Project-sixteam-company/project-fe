@@ -148,7 +148,9 @@ class _SceneScreenState extends State<SceneScreen> {
               final sessionId = context.sessionRead.backendSessionId;
               if (sessionId == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('세션이 아직 준비되지 않았습니다.')),
+                  const SnackBar(
+                    content: Text('세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.'),
+                  ),
                 );
                 return;
               }
@@ -192,7 +194,7 @@ class _SceneMap extends StatelessWidget {
                   Icon(Icons.map_outlined, size: 48, color: c.textMute),
                   const SizedBox(height: AppTokens.sp3),
                   Text(
-                    '건물 평면도 영역',
+                    '현장 지도',
                     style: AppText.bodySm.copyWith(color: c.textMute),
                   ),
                 ],
