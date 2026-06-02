@@ -272,6 +272,21 @@ class _InterrogationChatScreenState
         ],
       ),
       actions: [
+        // 힌트 진입점(현장 화면과 동일하게 서버 세션 기반).
+        IconButton(
+          tooltip: '힌트 보기',
+          onPressed: () {
+            final sessionId = context.sessionRead.backendSessionId;
+            if (sessionId == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('세션이 아직 준비되지 않았습니다.')),
+              );
+              return;
+            }
+            showHintModal(context, sessionId: sessionId);
+          },
+          icon: Icon(Icons.lightbulb_outline, color: c.primary),
+        ),
         Padding(
           padding: const EdgeInsets.only(right: AppTokens.sp4),
           child: MSButton(
