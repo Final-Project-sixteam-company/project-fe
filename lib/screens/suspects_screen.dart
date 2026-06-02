@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_stat_row.dart';
 import '../components/ms_text_field.dart';
@@ -112,6 +113,11 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
         icon: Icons.cloud_off,
         title: '불러오지 못했습니다',
         subtitle: ctrl.loadError,
+        action: MSButton(
+          label: '다시 시도',
+          variant: MSButtonVariant.secondary,
+          onPressed: () => ctrl.retry(),
+        ),
       );
     }
     if (results.isEmpty) {

@@ -133,7 +133,10 @@ class _InterrogationChatScreenState
         ? QuestionType.evidencePresented
         : QuestionType.free;
 
-    String answer = '...대답을 거부하고 있습니다. (네트워크 연결을 확인하세요)';
+    String answer = '...대답을 거부하고 있습니다.';
+    // 서버/네트워크 오류 메시지(영문일 수 있음)를 용의자 대사처럼 노출하지 않고,
+    // 별도 시스템 안내(SnackBar)로 전달한다.
+    String? errorNotice;
     List<RelatedEvidence> unlockedEvidences = const [];
     try {
       final result = await playSessionRepo.interrogate(
@@ -158,9 +161,12 @@ class _InterrogationChatScreenState
           presentedEvidenceId: evidenceId,
         ),
       );
-    } on ApiException catch (e) {
-      answer = e.message;
+    } on ApiException {
+      answer = '...지금은 대답하기 어려운 것 같습니다.';
+      errorNotice = '응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.';
     } catch (_) {
+      answer = '...지금은 대답하기 어려운 것 같습니다.';
+      errorNotice = '오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
     } finally {
       if (mounted) {
         setState(() {
@@ -169,6 +175,12 @@ class _InterrogationChatScreenState
         });
         _scrollToBottom();
       }
+    }
+
+    if (errorNotice != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorNotice)),
+      );
     }
 
     // 심문으로 새 증거가 해금되면 증거/대시보드를 다시 로드하고 안내한다.
@@ -263,10 +275,14 @@ class _InterrogationChatScreenState
         children: [
           Text(
             widget.suspect.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: AppText.titleM.copyWith(color: c.text),
           ),
           Text(
             widget.suspect.role,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: AppText.bodySm.copyWith(color: c.textSub),
           ),
         ],
@@ -279,7 +295,9 @@ class _InterrogationChatScreenState
             final sessionId = context.sessionRead.backendSessionId;
             if (sessionId == null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('세션이 아직 준비되지 않았습니다.')),
+                const SnackBar(
+                  content: Text('세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.'),
+                ),
               );
               return;
             }
@@ -293,15 +311,18 @@ class _InterrogationChatScreenState
             label: '증거',
             variant: MSButtonVariant.ghost,
             icon: Icons.description_outlined,
-            onPressed: () async {
-              final evidence = await showEvidencePresentModal(context);
-              if (evidence != null && mounted) {
-                await _sendMessage(
-                  '이 증거를 제시합니다: ${evidence.name}',
-                  evidenceId: evidence.id,
-                );
-              }
-            },
+            // AI 응답 대기 중 중복 전송(동시 요청) 방지.
+            onPressed: _isWaiting
+                ? null
+                : () async {
+                    final evidence = await showEvidencePresentModal(context);
+                    if (evidence != null && mounted) {
+                      await _sendMessage(
+                        '이 증거를 제시합니다: ${evidence.name}',
+                        evidenceId: evidence.id,
+                      );
+                    }
+                  },
           ),
         ),
       ],
@@ -485,7 +506,7 @@ class _SuggestedQuestions extends StatelessWidget {
     final c = context.c;
 
     return SizedBox(
-      height: 40,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),

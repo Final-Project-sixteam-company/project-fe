@@ -15,8 +15,8 @@ class AppTokens {
   static const double sp16 = 64;
 
   // ── 컴포넌트 고정 치수 ─────────────────────────────────────────────────────
-  /// MSButton 기본 높이
-  static const double btnH = 36;
+  /// MSButton 기본 높이(최소 권장 터치 타깃 48dp)
+  static const double btnH = 48;
   /// MSButton 로딩 스피너 크기
   static const double btnSpinnerSize = 14;
   /// MSButton 아이콘↔텍스트 간격

@@ -133,17 +133,19 @@ class _SubmitScreenState extends State<SubmitScreen> {
       // 타이머 정지 + 세션 완료 표시(점수는 결과 화면에서 서버 값으로 표시).
       controller.completeSession();
 
-      await Navigator.of(context).push(
+      // pushReplacement: 결과 화면에서 하드웨어 백으로 완료된 제출 화면에 되돌아가
+      // 재제출하는 것을 막는다(게임 화면을 스택에서 치우고 결과만 남긴다).
+      Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => ResultScreen(sessionId: sessionId),
         ),
       );
     } on ApiException catch (e) {
-      // 서버 오류(5xx)는 사용자가 고칠 수 없으므로 원인을 분명히 안내한다.
+      // 서버 오류 메시지(영문일 수 있음)를 그대로 노출하지 않고 한국어로 안내한다.
       final isServerError = (e.status ?? 0) >= 500;
       final message = isServerError
-          ? '채점 서버 오류로 제출하지 못했습니다. (${e.message})\n입력은 그대로 유지되니 잠시 후 다시 제출해 주세요.'
-          : '제출 실패: ${e.message}';
+          ? '채점 서버 오류로 제출하지 못했습니다.\n입력은 그대로 유지되니 잠시 후 다시 제출해 주세요.'
+          : '제출하지 못했습니다. 입력을 확인하고 다시 시도해 주세요.';
       if (mounted) _showSubmitError(message);
     } catch (_) {
       if (mounted) _showSubmitError('제출 중 오류가 발생했습니다. 입력은 유지되니 다시 시도해 주세요.');
@@ -207,7 +209,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
               ),
               const SizedBox(height: AppTokens.sp8),
               // ── 1. 진범 지목 ────────────────────────────────────
-              const MSKicker('1. FINAL SUSPECT · 진범 지목'),
+              const MSKicker('1. 진범 지목'),
               const SizedBox(height: AppTokens.sp3),
               _SuspectDropdown(
                 suspects: controller.suspects,
@@ -434,6 +436,17 @@ class _SuspectDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
 
+    // DropdownButton 의 value 는 items 중 정확히 0/1개와 == 일치해야 한다.
+    // selected 가 리스트 재생성으로 다른 인스턴스이거나 목록이 비면 assertion 크래시가
+    // 나므로, id 기준으로 현재 items 안의 인스턴스를 찾아 안전한 value 를 만든다.
+    Suspect? selectedValue;
+    for (final s in suspects) {
+      if (s.id == selected?.id) {
+        selectedValue = s;
+        break;
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppTokens.sp3,
@@ -446,7 +459,7 @@ class _SuspectDropdown extends StatelessWidget {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<Suspect>(
-          value: selected,
+          value: selectedValue,
           isExpanded: true,
           dropdownColor: c.bgElev,
           icon: Icon(
@@ -462,7 +475,11 @@ class _SuspectDropdown extends StatelessWidget {
           items: suspects.map((s) {
             return DropdownMenuItem<Suspect>(
               value: s,
-              child: Text('${s.name} · ${s.role}'),
+              child: Text(
+                '${s.name} · ${s.role}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             );
           }).toList(),
           onChanged: onSelect,
@@ -531,7 +548,7 @@ class _EvidenceSelector extends StatelessWidget {
                   curve: AppMotion.easeOut,
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppTokens.sp3,
-                    vertical: 10,
+                    vertical: 14, // ≈48dp 터치 타깃
                   ),
                   decoration: BoxDecoration(
                     color:

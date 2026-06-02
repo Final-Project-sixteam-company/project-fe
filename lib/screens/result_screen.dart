@@ -167,8 +167,15 @@ class _ResultScreenState extends State<ResultScreen>
           title: '결과를 불러오지 못했습니다',
           subtitle: _error,
           action: MSButton(
-            label: '홈으로 돌아가기',
+            label: '다시 시도',
             variant: MSButtonVariant.primary,
+            onPressed: widget.sessionId != null
+                ? () => _fetchResult(widget.sessionId!)
+                : null,
+          ),
+          secondaryAction: MSButton(
+            label: '홈으로 돌아가기',
+            variant: MSButtonVariant.ghost,
             onPressed: () =>
                 Navigator.of(context).popUntil((route) => route.isFirst),
           ),

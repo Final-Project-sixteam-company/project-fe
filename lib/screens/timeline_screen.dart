@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/ms_kicker.dart';
 import '../components/states.dart';
 import '../components/timeline_list.dart';
+import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
 import '../theme/app_text.dart';
@@ -44,6 +45,23 @@ class _TimelineScreenState extends State<TimelineScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    // CL-001 외 시나리오(4·5 등)에서는 하드코딩 타임라인이 스포일러가 되므로
+    // 표시하지 않는다(백엔드 timeline 엔드포인트 미구현). 구현 시 게이트 제거.
+    final showSample = context.sessionRead.usesCl001SampleCaseData;
+    if (!showSample) {
+      return Scaffold(
+        backgroundColor: c.bg,
+        appBar: _buildAppBar(context),
+        body: const Padding(
+          padding: EdgeInsets.only(top: AppTokens.sp10),
+          child: MSEmpty(
+            icon: Icons.schedule,
+            title: '타임라인 준비 중',
+            subtitle: '이 시나리오의 타임라인은 곧 제공될 예정입니다.',
+          ),
+        ),
+      );
+    }
     final entries = _filtered;
 
     return Scaffold(

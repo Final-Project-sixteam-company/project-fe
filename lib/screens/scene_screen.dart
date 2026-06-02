@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/game_modals.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
+import '../components/states.dart';
 import '../controllers/game_session_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
@@ -77,6 +78,9 @@ class _SceneScreenState extends State<SceneScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    // CL-001 외 시나리오(4·5 등)에서는 하드코딩 현장 데이터가 스포일러가 되므로
+    // 표시하지 않는다(백엔드 locations 엔드포인트 미구현). 구현 시 게이트 제거.
+    final showSample = context.sessionRead.usesCl001SampleCaseData;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -94,14 +98,25 @@ class _SceneScreenState extends State<SceneScreen> {
             _SceneMap(selectedIndex: _selectedIndex),
             const SizedBox(height: AppTokens.sp6),
             // ── 2. 주요 현장 정보 ─────────────────────────────────
-            const MSKicker('주요 현장 정보'),
-            const SizedBox(height: AppTokens.sp3),
-            _LocationList(
-              selectedIndex: _selectedIndex,
-              onTap: (i) => setState(
-                    () => _selectedIndex = _selectedIndex == i ? null : i,
+            if (showSample) ...[
+              const MSKicker('주요 현장 정보'),
+              const SizedBox(height: AppTokens.sp3),
+              _LocationList(
+                selectedIndex: _selectedIndex,
+                onTap: (i) => setState(
+                      () => _selectedIndex = _selectedIndex == i ? null : i,
+                ),
               ),
-            ),
+            ] else ...[
+              const Padding(
+                padding: EdgeInsets.only(top: AppTokens.sp8),
+                child: MSEmpty(
+                  icon: Icons.map_outlined,
+                  title: '현장 정보 준비 중',
+                  subtitle: '이 시나리오의 현장 데이터는 곧 제공될 예정입니다.',
+                ),
+              ),
+            ],
             const SizedBox(height: AppTokens.sp10),
           ],
         ),
@@ -133,7 +148,9 @@ class _SceneScreenState extends State<SceneScreen> {
               final sessionId = context.sessionRead.backendSessionId;
               if (sessionId == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('세션이 아직 준비되지 않았습니다.')),
+                  const SnackBar(
+                    content: Text('세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.'),
+                  ),
                 );
                 return;
               }
@@ -177,7 +194,7 @@ class _SceneMap extends StatelessWidget {
                   Icon(Icons.map_outlined, size: 48, color: c.textMute),
                   const SizedBox(height: AppTokens.sp3),
                   Text(
-                    '건물 평면도 영역',
+                    '현장 지도',
                     style: AppText.bodySm.copyWith(color: c.textMute),
                   ),
                 ],

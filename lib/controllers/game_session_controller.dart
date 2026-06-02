@@ -54,6 +54,15 @@ class GameSessionController extends ChangeNotifier {
 
   bool get isServerBacked => _backendScenarioId != null;
 
+  /// timeline/scene 화면의 하드코딩 CL-001 샘플 데이터(`sampleCase.timeline`,
+  /// scene_screen 의 `_locations`)는 CL-001 케이스에서만 유효하다.
+  /// 백엔드 `GET .../timeline` · `.../locations` 가 아직 404(미구현)라, 그 외
+  /// 시나리오(4·5 등)에서 이 샘플을 그대로 띄우면 스포일러/서사 모순이 된다.
+  /// 따라서 CL-001(샘플 id 'demoday-eve' 또는 백엔드 시드 '1')에서만 표시한다.
+  /// 엔드포인트 구현 시 이 게이트를 제거하고 실데이터로 교체할 것.
+  bool get usesCl001SampleCaseData =>
+      scenarioId == 'demoday-eve' || scenarioId == '1';
+
   // ── 진행 중 세션 영속화(재진입 시 재개용) ─────────────────────────────────
   // 백엔드에 '내 활성 세션 조회' 엔드포인트가 없고, 409 응답도 기존 세션 ID를
   // 돌려주지 않는다. 그래서 세션 생성 시 ID를 기기에 저장해 두고, 재진입/콜드
@@ -75,6 +84,10 @@ class GameSessionController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_activeSessionKey(scenarioId));
   }
+
+  /// 진행 중인 세션 생성/로딩 future. 생성 직후 이탈(abandon) 시 이 future 의
+  /// 완료를 기다려 backendSessionId 를 확보한 뒤 정리하기 위해 보관한다.
+  Future<void>? _loadFuture;
 
   /// 서버에서 세션을 확보 + 초기 데이터(대시보드/용의자/증거) 로딩.
   /// 저장된 세션이 아직 진행 중이면 재개하고, 없으면 새로 생성한다.
@@ -250,8 +263,8 @@ class GameSessionController extends ChangeNotifier {
     _isStarted = true;
     _startTimer();
     notifyListeners();
-    // 서버 세션 생성 + 데이터 로딩(비동기)
-    loadFromServer();
+    // 서버 세션 생성 + 데이터 로딩(비동기). future 를 보관해 생성 중 이탈 시 대기 가능.
+    _loadFuture = loadFromServer();
   }
 
   void _startTimer() {
@@ -295,18 +308,34 @@ class GameSessionController extends ChangeNotifier {
   /// 무시(best-effort)하되, 로컬 재개 기록과 타이머는 반드시 정리한다.
   Future<void> abandonSession() async {
     if (_isCompleted) return; // 이미 끝난 세션은 포기 대상이 아니다
+    // 세션 생성이 진행 중이면 완료를 기다려 backendSessionId 를 확보한 뒤 정리한다.
+    // (생성 직후 이탈 시 PLAYING 세션이 서버에 잔류해 다음 진입이 409가 되는 레이스 방지)
+    try {
+      await _loadFuture;
+    } catch (_) {
+      // 로딩 실패는 무시 — 아래에서 backendSessionId 유무로 분기
+    }
     _timer?.cancel();
     final id = backendSessionId;
-    if (id != null) {
-      try {
-        await _repo.abandon(id);
-      } catch (_) {
-        // best-effort: 서버 정리 실패해도 로컬 상태는 정리하고 진행
-      }
+    if (id == null) {
+      // 정리할 서버 세션이 없으면 로컬 기록만 정리
+      final sid = _backendScenarioId;
+      if (sid != null) await _clearSavedSession(sid);
+      return;
+    }
+    bool abandoned = false;
+    try {
+      await _repo.abandon(id);
+      abandoned = true;
+    } catch (_) {
+      // 서버 정리 실패: 로컬 재개 기록을 보존해 다음 진입에서 재개/복구가 가능하도록 한다.
+      // (키를 지우면 서버엔 PLAYING 세션이 남아 409가 나는데 재개할 ID도 잃는다)
     }
     backendSessionId = null;
-    final sid = _backendScenarioId;
-    if (sid != null) await _clearSavedSession(sid);
+    if (abandoned) {
+      final sid = _backendScenarioId;
+      if (sid != null) await _clearSavedSession(sid);
+    }
   }
 
   @override
