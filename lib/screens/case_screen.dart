@@ -1,5 +1,6 @@
 // lib/screens/case_screen.dart
 import 'package:flutter/material.dart';
+import '../components/game_modals.dart';
 import '../components/ms_bottom_nav.dart';
 import '../components/ms_button.dart';
 import '../components/states.dart';
@@ -187,6 +188,28 @@ class _CaseScreenState extends State<CaseScreen> {
                   _caseCode,
                   style: AppText.monoLabel.copyWith(color: c.textMute),
                 ),
+                // 사건 브리핑 재확인(개요·피해자·목표). 데이터 로드 후에만 노출.
+                if (_session.dashboard != null) ...[
+                  const SizedBox(width: AppTokens.sp1),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => showCaseBriefingModal(
+                      context,
+                      dashboard: _session.dashboard!,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTokens.sp2,
+                        vertical: AppTokens.sp2,
+                      ),
+                      child: Icon(
+                        Icons.assignment_outlined,
+                        size: 16,
+                        color: c.textMute,
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 // 경과 시간
                 Icon(
