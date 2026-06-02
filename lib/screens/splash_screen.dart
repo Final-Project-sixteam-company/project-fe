@@ -36,12 +36,22 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _opacity;
+  late final Animation<Offset> _slide;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: AppMotion.dur3);
+    // 320ms→1100ms 로 연장하고 완만한 슬라이드업을 더해
+    // 노출 시간(2.2s) 초반의 정적 구간을 줄인다.
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
     _opacity = CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.06),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut));
     _ctrl.forward();
     _resolveDestination();
   }
@@ -97,6 +107,8 @@ class _SplashScreenState extends State<SplashScreen>
           // ── 콘텐츠 ───────────────────────────────────────────────
           FadeTransition(
             opacity: _opacity,
+            child: SlideTransition(
+            position: _slide,
             child: SafeArea(
               child: Column(
                 children: [
@@ -153,6 +165,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ],
               ),
+            ),
             ),
           ),
         ],
