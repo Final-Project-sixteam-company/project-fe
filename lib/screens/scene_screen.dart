@@ -124,8 +124,10 @@ class _SceneScreenState extends State<SceneScreen> {
       ),
       actions: [
         Padding(
-          padding: const EdgeInsets.only(right: AppTokens.sp4),
+          padding: const EdgeInsets.only(right: AppTokens.sp2),
           child: IconButton(
+            // 48dp 최소 탭 타깃 유지(기본 IconButton 제약 사용).
+            tooltip: '힌트 보기',
             onPressed: () {
               // 힌트는 서버 세션 기반. 세션 미생성 시 안내.
               final sessionId = context.sessionRead.backendSessionId;
@@ -138,8 +140,6 @@ class _SceneScreenState extends State<SceneScreen> {
               showHintModal(context, sessionId: sessionId);
             },
             icon: Icon(Icons.lightbulb_outline, color: c.primary),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
         ),
       ],
