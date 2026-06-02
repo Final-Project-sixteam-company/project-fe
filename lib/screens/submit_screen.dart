@@ -38,6 +38,10 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
   bool _submitting = false;
 
+  /// 서버 제출 실패 메시지. SnackBar(5초 소멸) 대신 입력 영역 상단에 지속 표시해
+  /// '입력이 보존됐다'는 안심을 유지한다. 재제출 시작 시 해제.
+  String? _submitError;
+
   String get _motive => _motiveCtrl.text.trim();
   String get _method => _methodCtrl.text.trim();
   String get _conceal => _concealCtrl.text.trim();
@@ -118,7 +122,10 @@ class _SubmitScreenState extends State<SubmitScreen> {
         .whereType<int>()
         .toList();
 
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _submitError = null; // 재시도 시작 → 이전 오류 배너 해제
+    });
     try {
       await playSessionRepo.submitFinalDeduction(
         sessionId,
@@ -157,19 +164,9 @@ class _SubmitScreenState extends State<SubmitScreen> {
     }
   }
 
-  /// 제출 실패 안내 — 놓치지 않도록 길게(5초) 띄운다.
+  /// 제출 실패 안내 — 입력 영역 상단에 지속 표시되는 배너로 노출(소멸 없음).
   void _showSubmitError(String message) {
-    final c = context.c;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 5),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: c.danger,
-        ),
-      );
+    setState(() => _submitError = message);
   }
 
   @override
@@ -210,6 +207,14 @@ class _SubmitScreenState extends State<SubmitScreen> {
                   ),
                 ],
               ),
+              // ── 제출 실패 보존 배너(지속) ───────────────────────
+              if (_submitError != null) ...[
+                const SizedBox(height: AppTokens.sp6),
+                _SubmitErrorBanner(
+                  message: _submitError!,
+                  onDismiss: () => setState(() => _submitError = null),
+                ),
+              ],
               const SizedBox(height: AppTokens.sp8),
               // ── 1. 진범 지목 ────────────────────────────────────
               const MSKicker('1. 진범 지목'),
@@ -311,45 +316,114 @@ class _RequirementChecklist extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
 
+    // 미충족 안내는 제출 차단의 핵심 정보 → dangerSoft 배경 + 좌측 accent bar 로
+    // 일반 카드(bgElev) 대비 우선순위를 끌어올린다.
     return Container(
-      padding: const EdgeInsets.all(AppTokens.sp4),
       decoration: BoxDecoration(
-        color: c.bgElev,
-        border: Border.all(color: c.line),
+        color: c.dangerSoft,
         borderRadius: BorderRadius.circular(AppTokens.r4),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '제출하려면 아래 항목을 완료해 주세요',
-            style: AppText.monoLabel.copyWith(color: c.textSub),
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          for (final r in requirements)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Icon(
-                    r.met
-                        ? Icons.check_circle
-                        : Icons.radio_button_unchecked,
-                    size: 16,
-                    color: r.met ? c.success : c.textMute,
-                  ),
-                  const SizedBox(width: AppTokens.sp3),
-                  Expanded(
-                    child: Text(
-                      r.label,
-                      style: AppText.bodySm.copyWith(
-                        color: r.met ? c.textMute : c.text,
-                      ),
+      clipBehavior: Clip.hardEdge,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 좌측 강조 바
+            Container(width: 4, color: c.danger),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(AppTokens.sp4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.error_outline,
+                            size: 16, color: c.danger),
+                        const SizedBox(width: AppTokens.sp2),
+                        Expanded(
+                          child: Text(
+                            '제출하려면 아래 항목을 완료해 주세요',
+                            style: AppText.monoLabel.copyWith(
+                              color: c.danger,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: AppTokens.sp3),
+                    for (final r in requirements)
+                      Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              r.met
+                                  ? Icons.check_circle
+                                  : Icons.radio_button_unchecked,
+                              size: 16,
+                              color: r.met ? c.success : c.danger,
+                            ),
+                            const SizedBox(width: AppTokens.sp3),
+                            Expanded(
+                              child: Text(
+                                r.label,
+                                style: AppText.bodySm.copyWith(
+                                  color: r.met ? c.textMute : c.text,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── 제출 실패 보존 배너 (지속 표시) ───────────────────────────────────────────
+
+class _SubmitErrorBanner extends StatelessWidget {
+  const _SubmitErrorBanner({required this.message, required this.onDismiss});
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.sp3),
+      decoration: BoxDecoration(
+        color: c.dangerSoft,
+        border: Border.all(color: c.danger),
+        borderRadius: BorderRadius.circular(AppTokens.r4),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, size: 18, color: c.danger),
+          const SizedBox(width: AppTokens.sp3),
+          Expanded(
+            child: Text(
+              message,
+              style: AppText.bodySm.copyWith(color: c.text, height: 1.5),
+            ),
+          ),
+          const SizedBox(width: AppTokens.sp2),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onDismiss,
+            child: Icon(Icons.close, size: 18, color: c.textSub),
+          ),
         ],
       ),
     );
@@ -546,7 +620,11 @@ class _EvidenceSelector extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: AppTokens.sp2),
               child: GestureDetector(
                 onTap: isDisabled ? null : () => onToggle(e),
-                child: AnimatedContainer(
+                // 최대(3개) 도달로 더 못 고르는 항목은 bgHover 배경 + 0.5 불투명도로
+                // '지금은 선택 불가' 상태를 또렷이 구분한다.
+                child: Opacity(
+                  opacity: isDisabled ? 0.5 : 1.0,
+                  child: AnimatedContainer(
                   duration: AppMotion.dur2,
                   curve: AppMotion.easeOut,
                   padding: const EdgeInsets.symmetric(
@@ -554,8 +632,9 @@ class _EvidenceSelector extends StatelessWidget {
                     vertical: 14, // ≈48dp 터치 타깃
                   ),
                   decoration: BoxDecoration(
-                    color:
-                    isSelected ? c.primarySoft : Colors.transparent,
+                    color: isSelected
+                        ? c.primarySoft
+                        : (isDisabled ? c.bgHover : Colors.transparent),
                     border: Border.all(
                       color: isSelected ? c.primary : c.line,
                     ),
@@ -592,6 +671,7 @@ class _EvidenceSelector extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
                   ),
                 ),
               ),

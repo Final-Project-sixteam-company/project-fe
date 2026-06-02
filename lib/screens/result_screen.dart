@@ -260,16 +260,8 @@ class _ResultScreenState extends State<ResultScreen>
     DeductionResult data,
   ) {
     return [
-      const MSKicker('추리 채점 결과'),
-      const SizedBox(height: AppTokens.sp3),
-      _MatchCard(matched: data.matched),
-      if (data.matchedParts.isNotEmpty || data.missedParts.isNotEmpty) ...[
-        const SizedBox(height: AppTokens.sp8),
-        const MSKicker('맞춘 추리 · 놓친 추리'),
-        const SizedBox(height: AppTokens.sp3),
-        _PartsCard(matched: data.matchedParts, missed: data.missedParts),
-      ],
-      const SizedBox(height: AppTokens.sp8),
+      // 등급/점수 직후 가장 읽고 싶은 '사건의 진상·해설'을 먼저 노출하고,
+      // 상세 채점표(매칭/맞춘·놓친 추리)는 그 아래로 배치한다.
       const MSKicker('사건의 진상 · 해설'),
       const SizedBox(height: AppTokens.sp3),
       _RevelationCard(
@@ -290,6 +282,16 @@ class _ResultScreenState extends State<ResultScreen>
               .toList(),
         ),
       ],
+      const SizedBox(height: AppTokens.sp8),
+      const MSKicker('추리 채점 결과'),
+      const SizedBox(height: AppTokens.sp3),
+      _MatchCard(matched: data.matched),
+      if (data.matchedParts.isNotEmpty || data.missedParts.isNotEmpty) ...[
+        const SizedBox(height: AppTokens.sp8),
+        const MSKicker('맞춘 추리 · 놓친 추리'),
+        const SizedBox(height: AppTokens.sp3),
+        _PartsCard(matched: data.matchedParts, missed: data.missedParts),
+      ],
     ];
   }
 
@@ -298,10 +300,7 @@ class _ResultScreenState extends State<ResultScreen>
   List<Widget> _buildSampleSections(BuildContext context) {
     final result = widget.result;
     return [
-      const MSKicker('추리 채점 결과'),
-      const SizedBox(height: AppTokens.sp3),
-      _ScoreCard(items: result.scoreItems),
-      const SizedBox(height: AppTokens.sp8),
+      // 서버 경로와 동일하게 해설을 먼저, 상세 점수표를 뒤에 배치.
       const MSKicker('사건의 진상 · 해설'),
       const SizedBox(height: AppTokens.sp3),
       _RevelationCard(
@@ -309,6 +308,10 @@ class _ResultScreenState extends State<ResultScreen>
         feedback: result.revelation,
         fullExplanation: '',
       ),
+      const SizedBox(height: AppTokens.sp8),
+      const MSKicker('추리 채점 결과'),
+      const SizedBox(height: AppTokens.sp3),
+      _ScoreCard(items: result.scoreItems),
     ];
   }
 
@@ -322,7 +325,7 @@ class _ResultScreenState extends State<ResultScreen>
       automaticallyImplyLeading: false,
       titleSpacing: AppTokens.sp4,
       title: Text(
-        'CASE CLOSED',
+        '사건 종결 · 최종 판정',
         style: AppText.monoLabel.copyWith(color: c.textMute),
       ),
     );
