@@ -13,8 +13,8 @@ import '../theme/app_theme.dart';
 import 'case_briefing_screen.dart';
 
 // 현재 백엔드에 플레이 데이터(용의자/증거/정답)가 시드된 시나리오.
-// 데모 시나리오는 scenarioId=1 ("CL-001").
-const _kPlayableIds = {'1'};
+// 데모 시나리오는 scenarioId=1 ("CL-001"), 4·5는 정식 씨드 시나리오.
+const _kPlayableIds = {'1', '4', '5'};
 const _kBookmarkPrefix = 'bookmark_';
 
 class ScenarioDetailScreen extends StatefulWidget {

@@ -139,20 +139,32 @@ class _SubmitScreenState extends State<SubmitScreen> {
         ),
       );
     } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('제출 실패: ${e.message}')),
-        );
-      }
+      // 서버 오류(5xx)는 사용자가 고칠 수 없으므로 원인을 분명히 안내한다.
+      final isServerError = (e.status ?? 0) >= 500;
+      final message = isServerError
+          ? '채점 서버 오류로 제출하지 못했습니다. (${e.message})\n입력은 그대로 유지되니 잠시 후 다시 제출해 주세요.'
+          : '제출 실패: ${e.message}';
+      if (mounted) _showSubmitError(message);
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('제출 중 오류가 발생했습니다.')),
-        );
-      }
+      if (mounted) _showSubmitError('제출 중 오류가 발생했습니다. 입력은 유지되니 다시 시도해 주세요.');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  /// 제출 실패 안내 — 놓치지 않도록 길게(5초) 띄운다.
+  void _showSubmitError(String message) {
+    final c = context.c;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: c.danger,
+        ),
+      );
   }
 
   @override

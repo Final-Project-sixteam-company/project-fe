@@ -30,6 +30,14 @@ class _CaseScreenState extends State<CaseScreen> {
   late final GameSessionController _session;
   int _navIndex = 0;
 
+  /// 상단 HUD에 표시할 사건 코드. 숫자 시나리오 id는 'CL-XXX'로 합성하고,
+  /// 샘플(demoday-eve)은 CL-001로 표시한다.
+  String get _caseCode {
+    final n = int.tryParse(widget.scenarioId);
+    if (n != null) return 'CL-${n.toString().padLeft(3, '0')}';
+    return 'CL-001';
+  }
+
   static const _kScreens = <Widget>[
     SceneScreen(),
     EvidenceScreen(),
@@ -133,6 +141,13 @@ class _CaseScreenState extends State<CaseScreen> {
           variant: MSButtonVariant.secondary,
           onPressed: () => _session.retry(),
         ),
+        // 세션을 시작하지 못한 상태에서는 화면을 빠져나갈 수단이 필요하다.
+        // (특히 409 충돌 시 '다시 시도'만으로는 탈출 불가)
+        secondaryAction: MSButton(
+          label: '나가기',
+          variant: MSButtonVariant.ghost,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
     );
   }
@@ -162,7 +177,7 @@ class _CaseScreenState extends State<CaseScreen> {
               children: [
                 // 사건 코드
                 Text(
-                  'CL-001',
+                  _caseCode,
                   style: AppText.monoLabel.copyWith(color: c.textMute),
                 ),
                 const Spacer(),

@@ -131,6 +131,7 @@ class MSEmpty extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.action,
+    this.secondaryAction,
     super.key,
   });
 
@@ -138,6 +139,9 @@ class MSEmpty extends StatelessWidget {
   final String title;
   final String? subtitle;
   final MSButton? action;
+
+  /// 주 액션 아래에 표시되는 보조 액션(예: '나가기').
+  final MSButton? secondaryAction;
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +169,10 @@ class MSEmpty extends StatelessWidget {
           if (action != null) ...[
             const SizedBox(height: AppTokens.sp4),
             action!,
+          ],
+          if (secondaryAction != null) ...[
+            const SizedBox(height: AppTokens.sp2),
+            secondaryAction!,
           ],
         ],
       ),
