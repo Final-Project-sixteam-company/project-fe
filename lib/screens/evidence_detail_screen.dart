@@ -1,5 +1,6 @@
 // lib/screens/evidence_detail_screen.dart
 import 'package:flutter/material.dart';
+import '../components/asset_image_widget.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../models/case.dart';
@@ -7,13 +8,11 @@ import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
+import 'evidence_image_viewer.dart';
 
 class EvidenceDetailScreen extends StatelessWidget {
   const EvidenceDetailScreen({
     required this.evidence,
-    /// 세션에서 시간 해금된 경우 true 를 전달한다.
-    /// Evidence.isLocked 는 정적 데이터이므로 이 값으로 재정의한다.
-    /// 전달하지 않으면 evidence.isLocked 를 그대로 따른다.
     this.isUnlocked = false,
     super.key,
   });
@@ -21,7 +20,6 @@ class EvidenceDetailScreen extends StatelessWidget {
   final Evidence evidence;
   final bool isUnlocked;
 
-  /// 실제 잠금 여부 — 정적 플래그와 세션 해금 상태를 합산한 단일 진실
   bool get _effectiveLocked => evidence.isLocked && !isUnlocked;
 
   String get _statusLabel {
@@ -30,6 +28,8 @@ class EvidenceDetailScreen extends StatelessWidget {
     if (evidence.isAnalyzed) return 'ANALYZED';
     return evidence.isNew ? 'NEW' : 'PENDING';
   }
+
+  String get _heroTag => 'evidence_image_${evidence.id}';
 
   @override
   Widget build(BuildContext context) {
@@ -60,33 +60,15 @@ class EvidenceDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: AppTokens.sp6),
-                // ── 아이콘 썸네일 ────────────────────────────────────
-                Center(
-                  child: Container(
-                    width: 86,
-                    height: 86,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.tealBase, AppColors.skyBase],
-                      ),
-                      borderRadius:
-                      BorderRadius.circular(AppTokens.r6),
-                      border: Border.all(
-                          color: AppColors.ink0.withValues(alpha: .14)),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      evidence.icon,
-                      size: 34,
-                      color: AppColors.ink0,
-                    ),
-                  ),
+                const SizedBox(height: AppTokens.sp4),
+                // ── 이미지 또는 아이콘 썸네일 ────────────────────
+                _ImageOrIcon(
+                  evidence: evidence,
+                  effectiveLocked: _effectiveLocked,
+                  heroTag: _heroTag,
                 ),
                 const SizedBox(height: AppTokens.sp4),
-                // ── 이름 ────────────────────────────────────────────
+                // ── 이름 ────────────────────────────────────────
                 Center(
                   child: Text(
                     _effectiveLocked ? '잠긴 증거' : evidence.name,
@@ -95,39 +77,42 @@ class EvidenceDetailScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp2),
-                // ── 발견 위치 ────────────────────────────────────────
+                // ── 발견 위치 ────────────────────────────────────
                 Center(
                   child: Text(
-                    // 잠금 상태면 위치 정보도 노출하지 않는다
                     _effectiveLocked
                         ? '해금 후 위치 정보가 공개됩니다'
                         : evidence.location,
                     style: AppText.monoLabel.copyWith(
-                      color: _effectiveLocked
-                          ? c.textMute
-                          : c.textSub,
+                      color: _effectiveLocked ? c.textMute : c.textSub,
                     ),
                     textAlign: TextAlign.center,
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp6),
-                // ── 상태 필 ──────────────────────────────────────────
+                // ── 상태 필 ──────────────────────────────────────
                 Center(
                   child: _StatusPill(
                     statusLabel: _statusLabel,
-                    effectiveLocked: _effectiveLocked,
-                    isAnalyzed: evidence.isAnalyzed,
-                    isNew: evidence.isNew,
-                    isNewlyUnlocked: isUnlocked && evidence.isLocked,
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp6),
-                // ── 관찰 정보 카드 ───────────────────────────────────
+                // ── 관찰 정보 카드 ───────────────────────────────
                 _ObservationCard(
                   evidence: evidence,
                   effectiveLocked: _effectiveLocked,
                   statusLabel: _statusLabel,
                 ),
+                // ── 이미지 있으면 열기 안내 ──────────────────────
+                if (!_effectiveLocked &&
+                    evidence.imageAssetKey != null &&
+                    evidence.imageAssetKey!.isNotEmpty) ...[
+                  const SizedBox(height: AppTokens.sp4),
+                  _ViewImageButton(
+                    evidence: evidence,
+                    heroTag: _heroTag,
+                  ),
+                ],
                 const SizedBox(height: AppTokens.sp10),
               ],
             ),
@@ -138,22 +123,184 @@ class EvidenceDetailScreen extends StatelessWidget {
   }
 }
 
+// ── 이미지 / 아이콘 썸네일 ────────────────────────────────────────────────────
+
+class _ImageOrIcon extends StatelessWidget {
+  const _ImageOrIcon({
+    required this.evidence,
+    required this.effectiveLocked,
+    required this.heroTag,
+  });
+
+  final Evidence evidence;
+  final bool effectiveLocked;
+  final String heroTag;
+
+  bool get _hasImage =>
+      !effectiveLocked &&
+          evidence.imageAssetKey != null &&
+          evidence.imageAssetKey!.isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    if (_hasImage) {
+      return Center(
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EvidenceImageViewer(
+                heroTag: heroTag,
+                assetKey: evidence.imageAssetKey!,
+                title: evidence.name,
+                location: evidence.location,
+                categoryLabel: evidence.categoryLabel,
+              ),
+            ),
+          ),
+          child: Hero(
+            tag: heroTag,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppTokens.r6),
+              child: Stack(
+                children: [
+                  AssetImageWidget(
+                    assetKey: evidence.imageAssetKey,
+                    width: 240,
+                    height: 160,
+                    fit: BoxFit.cover,
+                    borderRadius: BorderRadius.circular(AppTokens.r6),
+                    fallback: _GradientIconBox(
+                      icon: evidence.icon,
+                      width: 240,
+                      height: 160,
+                    ),
+                  ),
+                  // 확대 힌트 오버레이
+                  Positioned(
+                    right: AppTokens.sp2,
+                    bottom: AppTokens.sp2,
+                    child: Container(
+                      padding: const EdgeInsets.all(AppTokens.sp1),
+                      decoration: BoxDecoration(
+                        color: AppColors.ink950.withValues(alpha: .6),
+                        borderRadius: BorderRadius.circular(AppTokens.r2),
+                      ),
+                      child: const Icon(
+                        Icons.zoom_in,
+                        size: 16,
+                        color: AppColors.ink50,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Center(
+      child: _GradientIconBox(
+        icon: evidence.icon,
+        width: 86,
+        height: 86,
+      ),
+    );
+  }
+}
+
+class _GradientIconBox extends StatelessWidget {
+  const _GradientIconBox({
+    required this.icon,
+    required this.width,
+    required this.height,
+  });
+  final IconData icon;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.tealBase, AppColors.skyBase],
+        ),
+        borderRadius: BorderRadius.circular(AppTokens.r6),
+        border: Border.all(color: AppColors.ink0.withValues(alpha: .14)),
+      ),
+      alignment: Alignment.center,
+      child: Icon(icon, size: width * 0.38, color: AppColors.ink0),
+    );
+  }
+}
+
+// ── 이미지 열기 버튼 ─────────────────────────────────────────────────────────
+
+class _ViewImageButton extends StatelessWidget {
+  const _ViewImageButton({
+    required this.evidence,
+    required this.heroTag,
+  });
+  final Evidence evidence;
+  final String heroTag;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EvidenceImageViewer(
+            heroTag: heroTag,
+            assetKey: evidence.imageAssetKey!,
+            title: evidence.name,
+            location: evidence.location,
+            categoryLabel: evidence.categoryLabel,
+          ),
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          vertical: AppTokens.sp3,
+          horizontal: AppTokens.sp4,
+        ),
+        decoration: BoxDecoration(
+          color: c.primarySoft,
+          border: Border.all(color: c.primary),
+          borderRadius: BorderRadius.circular(AppTokens.r3),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.zoom_in, size: 16, color: c.primary),
+            const SizedBox(width: AppTokens.sp2),
+            Text(
+              '증거 이미지 크게 보기',
+              style: AppText.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: c.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── 상태 필 ───────────────────────────────────────────────────────────────────
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({
-    required this.statusLabel,
-    required this.effectiveLocked,
-    required this.isAnalyzed,
-    required this.isNew,
-    required this.isNewlyUnlocked,
-  });
-
+  const _StatusPill({required this.statusLabel});
   final String statusLabel;
-  final bool effectiveLocked;
-  final bool isAnalyzed;
-  final bool isNew;
-  final bool isNewlyUnlocked;
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +311,6 @@ class _StatusPill extends StatelessWidget {
       'NEW' => MSPillTone.primary,
       _ => MSPillTone.mute,
     };
-
     return MSPill(statusLabel, tone: tone);
   }
 }
@@ -195,7 +341,6 @@ class _ObservationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
     return Container(
       padding: const EdgeInsets.all(AppTokens.sp4),
       decoration: BoxDecoration(
@@ -236,18 +381,14 @@ class _ObservationCard extends StatelessWidget {
   }
 }
 
-// ── 메타 셀 ───────────────────────────────────────────────────────────────────
-
 class _MetaCell extends StatelessWidget {
   const _MetaCell({required this.label, required this.value});
-
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
     return Container(
       padding: const EdgeInsets.all(AppTokens.sp3),
       decoration: BoxDecoration(
