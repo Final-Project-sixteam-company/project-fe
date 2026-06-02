@@ -206,6 +206,7 @@ class GameSessionController extends ChangeNotifier {
         isLocked: !e.isUnlocked,
         // 핵심(CORE) 증거는 '핵심 증거' 필터에 노출되도록 표시
         isAnalyzed: e.importance == EvidenceImportance.core,
+        imageAssetKey: e.imageUrl,
       );
 
   static IconData _iconForImportance(EvidenceImportance imp) => switch (imp) {

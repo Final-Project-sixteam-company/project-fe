@@ -101,16 +101,18 @@ class _EvidenceImageViewerState extends State<EvidenceImageViewer>
               top: 0,
               left: 0,
               right: 0,
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [AppColors.ink950, Colors.transparent],
+              child: IgnorePointer(
+                ignoring: !_overlayVisible,
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [AppColors.ink950, Colors.transparent],
+                      ),
                     ),
-                  ),
                   child: SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -157,6 +159,7 @@ class _EvidenceImageViewerState extends State<EvidenceImageViewer>
                     ),
                   ),
                 ),
+                ),
               ),
             ),
             // ── 하단 오버레이 ─────────────────────────────────────
@@ -164,9 +167,11 @@ class _EvidenceImageViewerState extends State<EvidenceImageViewer>
               bottom: 0,
               left: 0,
               right: 0,
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: Container(
+              child: IgnorePointer(
+                ignoring: !_overlayVisible,
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: Container(
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
@@ -197,6 +202,7 @@ class _EvidenceImageViewerState extends State<EvidenceImageViewer>
                       ),
                     ),
                   ),
+                ),
                 ),
               ),
             ),

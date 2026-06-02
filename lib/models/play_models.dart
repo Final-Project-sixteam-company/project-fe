@@ -130,6 +130,7 @@ class PlayEvidence {
     required this.isUnlocked,
     this.description,
     this.locationName,
+    this.imageUrl,
     this.unlockHint,
     this.relatedSuspects = const [],
   });
@@ -140,6 +141,7 @@ class PlayEvidence {
   final bool isUnlocked;
   final String? description;
   final String? locationName;
+  final String? imageUrl;
   final String? unlockHint;
   final List<RelatedSuspect> relatedSuspects;
 
@@ -150,6 +152,7 @@ class PlayEvidence {
         isUnlocked: j['isUnlocked'] as bool? ?? false,
         description: j['description'] as String?,
         locationName: j['locationName'] as String?,
+        imageUrl: j['imageUrl'] as String?,
         unlockHint: j['unlockHint'] as String?,
         relatedSuspects: ((j['relatedSuspects'] as List<dynamic>?) ?? const [])
             .map((e) => RelatedSuspect.fromJson(e as Map<String, dynamic>))
