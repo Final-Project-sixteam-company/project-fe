@@ -51,14 +51,27 @@ class _CaseScreenState extends State<CaseScreen> {
   void initState() {
     super.initState();
     _session = GameSessionController(scenarioId: widget.scenarioId);
+    // 증거 상세 등에서 올린 탭 전환 인텐트를 소비해 바텀 탭을 전환한다.
+    _session.addListener(_onSessionChanged);
     // 화면 진입 직후 세션 시작
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _session.startSession();
     });
   }
 
+  /// 컨트롤러가 올린 탭 전환 요청을 처리(소비는 재알림 없이 → 루프 방지).
+  void _onSessionChanged() {
+    final req = _session.tabRequest;
+    if (req == null) return;
+    _session.consumeTabRequest();
+    if (req != _navIndex && req >= 0 && req < _kScreens.length) {
+      setState(() => _navIndex = req);
+    }
+  }
+
   @override
   void dispose() {
+    _session.removeListener(_onSessionChanged);
     _session.dispose();
     super.dispose();
   }

@@ -95,7 +95,11 @@ class _SceneScreenState extends State<SceneScreen> {
             // ── 1. 현장 맵 ────────────────────────────────────────
             // 경과 시간/해금 증거 수는 상단 HUD(CaseScreen)가 라이브로
             // 표시하므로 여기서 중복 통계 헤더를 두지 않는다.
-            _SceneMap(selectedIndex: _selectedIndex),
+            // CL-001 외 시나리오는 현장 데이터 미제공 → 맵을 '준비 중'으로 명시.
+            _SceneMap(
+              selectedIndex: _selectedIndex,
+              disabled: !showSample,
+            ),
             const SizedBox(height: AppTokens.sp6),
             // ── 2. 주요 현장 정보 ─────────────────────────────────
             if (showSample) ...[
@@ -167,9 +171,16 @@ class _SceneScreenState extends State<SceneScreen> {
 // ── 현장 맵 ───────────────────────────────────────────────────────────────────
 
 class _SceneMap extends StatelessWidget {
-  const _SceneMap({required this.selectedIndex});
+  const _SceneMap({
+    required this.selectedIndex,
+    this.disabled = false,
+  });
 
   final int? selectedIndex;
+
+  /// 현장 데이터가 제공되지 않는 시나리오(CL-001 외)에서 true.
+  /// 맵을 '준비 중'으로 명시하고 CL-001 전용 피해자 핀을 숨긴다.
+  final bool disabled;
 
   @override
   Widget build(BuildContext context) {
@@ -194,29 +205,37 @@ class _SceneMap extends StatelessWidget {
                   Icon(Icons.map_outlined, size: 48, color: c.textMute),
                   const SizedBox(height: AppTokens.sp3),
                   Text(
-                    '현장 지도',
+                    disabled ? '현장 지도 준비 중' : '현장 지도',
                     style: AppText.bodySm.copyWith(color: c.textMute),
                   ),
                 ],
               ),
             ),
-            // ── 피해자 위치 핀 ───────────────────────────────────
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final dx = constraints.maxWidth * _victimPinOffset.dx;
-                final dy = constraints.maxHeight * _victimPinOffset.dy;
+            // ── 피해자 위치 핀 (CL-001 전용) ─────────────────────
+            if (!disabled)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final dx = constraints.maxWidth * _victimPinOffset.dx;
+                  final dy = constraints.maxHeight * _victimPinOffset.dy;
 
-                return Stack(
-                  children: [
-                    Positioned(
-                      left: dx - 12,
-                      top: dy - 28,
-                      child: _VictimPin(),
-                    ),
-                  ],
-                );
-              },
-            ),
+                  return Stack(
+                    children: [
+                      Positioned(
+                        left: dx - 12,
+                        top: dy - 28,
+                        child: _VictimPin(),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            // ── 비활성 안내 배지 ─────────────────────────────────
+            if (disabled)
+              Positioned(
+                top: AppTokens.sp2,
+                right: AppTokens.sp2,
+                child: MSPill('준비 중', tone: MSPillTone.mute),
+              ),
           ],
         ),
       ),

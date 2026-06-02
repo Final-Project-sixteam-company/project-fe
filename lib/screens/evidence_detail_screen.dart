@@ -1,5 +1,6 @@
 // lib/screens/evidence_detail_screen.dart
 import 'package:flutter/material.dart';
+import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../models/case.dart';
@@ -15,11 +16,15 @@ class EvidenceDetailScreen extends StatelessWidget {
     /// Evidence.isLocked 는 정적 데이터이므로 이 값으로 재정의한다.
     /// 전달하지 않으면 evidence.isLocked 를 그대로 따른다.
     this.isUnlocked = false,
+    /// 확보된 증거에서 '용의자 심문하기' 다음 단계 경로를 제공할 때 전달한다.
+    /// null 이면 CTA 를 표시하지 않는다(세션 외부에서 열람한 경우 등).
+    this.onInterrogate,
     super.key,
   });
 
   final Evidence evidence;
   final bool isUnlocked;
+  final VoidCallback? onInterrogate;
 
   /// 실제 잠금 여부 — 정적 플래그와 세션 해금 상태를 합산한 단일 진실
   bool get _effectiveLocked => evidence.isLocked && !isUnlocked;
@@ -128,6 +133,22 @@ class EvidenceDetailScreen extends StatelessWidget {
                   effectiveLocked: _effectiveLocked,
                   statusLabel: _statusLabel,
                 ),
+                // ── 다음 단계: 용의자 심문 CTA ───────────────────────
+                // 확보된(잠금 해제) 증거에 한해 '이 증거로 심문하러 가기' 경로 제공.
+                if (!_effectiveLocked && onInterrogate != null) ...[
+                  const SizedBox(height: AppTokens.sp6),
+                  MSButton(
+                    label: '용의자 심문하기',
+                    icon: Icons.gavel_outlined,
+                    variant: MSButtonVariant.primary,
+                    expanded: true,
+                    onPressed: () {
+                      // 상세를 닫고 용의자 탭으로 전환한다.
+                      Navigator.of(context).pop();
+                      onInterrogate!();
+                    },
+                  ),
+                ],
                 const SizedBox(height: AppTokens.sp10),
               ],
             ),

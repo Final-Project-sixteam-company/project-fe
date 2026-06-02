@@ -257,6 +257,24 @@ class GameSessionController extends ChangeNotifier {
   bool get isStarted => _isStarted;
   bool get isCompleted => _isCompleted;
 
+  // ── 탭 전환 인텐트 ────────────────────────────────────────────────────────
+  // 증거 상세(별도 push 라우트)는 CaseScreen 의 GameSessionProvider 하위가 아니라
+  // 바텀 탭 인덱스를 직접 바꿀 수 없다. 그래서 공유 컨트롤러를 인텐트 버스로 써서
+  // 원하는 탭 인덱스를 올려두면 CaseScreen 이 이를 소비해 탭을 전환한다.
+  int? _tabRequest;
+  int? get tabRequest => _tabRequest;
+
+  /// 특정 탭으로 전환 요청(예: 증거 상세 → 용의자 심문 탭 2).
+  void requestTab(int index) {
+    _tabRequest = index;
+    notifyListeners();
+  }
+
+  /// CaseScreen 이 전환을 처리한 뒤 인텐트를 비운다(재알림 없음 → 루프 방지).
+  void consumeTabRequest() {
+    _tabRequest = null;
+  }
+
   // ── 세션 시작 ─────────────────────────────────────────────────────────────
   void startSession() {
     if (_isStarted) return;

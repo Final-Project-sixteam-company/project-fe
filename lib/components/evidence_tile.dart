@@ -1,11 +1,15 @@
 // lib/components/evidence_tile.dart
 import 'package:flutter/material.dart';
+import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
 import '../screens/evidence_detail_screen.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'ms_pill.dart';
+
+/// CaseScreen 바텀 탭 중 용의자(심문) 탭 인덱스. _kScreens 순서와 일치해야 한다.
+const int _kSuspectsTabIndex = 2;
 
 class EvidenceTile extends StatelessWidget {
   const EvidenceTile({
@@ -45,6 +49,11 @@ class EvidenceTile extends StatelessWidget {
       );
     }
 
+    // 증거 상세는 별도 push 라우트라 GameSessionProvider 하위가 아니다.
+    // 탭 전환은 컨트롤러(인텐트 버스)를 통해 위임한다. 컨트롤러는 provider 트리
+    // 안인 이 타일에서 미리 읽어 둔다.
+    final session = GameSessionProvider.read(context);
+
     return _Tile(
       evidence: evidence,
       isNewlyUnlocked: isNewlyUnlocked,
@@ -56,6 +65,8 @@ class EvidenceTile extends StatelessWidget {
                 // isTimeLocked == false 이면서 evidence.isLocked == true
                 // 인 경우가 시간 해금 상태다.
                 isUnlocked: isNewlyUnlocked,
+                // 확보된 증거 상세에서 용의자 심문 탭으로 이동하는 다음 단계 경로.
+                onInterrogate: () => session.requestTab(_kSuspectsTabIndex),
               ),
             ),
           ),
@@ -152,7 +163,10 @@ class _Tile extends StatelessWidget {
               else if (evidence.isAnalyzed)
                 const MSPill('분석완료', tone: MSPillTone.success)
               else if (evidence.isNew)
-                  const MSPill('NEW', tone: MSPillTone.primary),
+                const MSPill('NEW', tone: MSPillTone.primary)
+              else
+                // 배지 누락 시 상태 불명확 → '대기'로 통일(EvidenceItem과 동일).
+                const MSPill('대기', tone: MSPillTone.mute),
             ],
           ),
         ),
