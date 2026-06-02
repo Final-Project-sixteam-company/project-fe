@@ -195,6 +195,17 @@ class _InterrogationChatScreenState
     }
   }
 
+  // 증거 제시 진입점(AppBar·입력창 양쪽에서 재사용).
+  Future<void> _presentEvidence() async {
+    final evidence = await showEvidencePresentModal(context);
+    if (evidence != null && mounted) {
+      await _sendMessage(
+        '이 증거를 제시합니다: ${evidence.name}',
+        evidenceId: evidence.id,
+      );
+    }
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -249,9 +260,12 @@ class _InterrogationChatScreenState
             onSelect: _sendMessage,
             disabled: _isWaiting,
           ),
+          // 추천 질문 배지와 입력창 사이 간격 — 오탭 방지.
+          const SizedBox(height: AppTokens.sp3),
           _InputBar(
             controller: _inputCtrl,
             onSend: () => _sendMessage(_inputCtrl.text),
+            onPresentEvidence: _isWaiting ? null : _presentEvidence,
             disabled: _isWaiting,
           ),
         ],
@@ -305,24 +319,14 @@ class _InterrogationChatScreenState
           },
           icon: Icon(Icons.lightbulb_outline, color: c.primary),
         ),
+        // 증거 제시 보조 진입점(주 진입점은 입력창 위 강조 버튼).
+        // AI 응답 대기 중 중복 전송(동시 요청) 방지.
         Padding(
-          padding: const EdgeInsets.only(right: AppTokens.sp4),
-          child: MSButton(
-            label: '증거',
-            variant: MSButtonVariant.ghost,
-            icon: Icons.description_outlined,
-            // AI 응답 대기 중 중복 전송(동시 요청) 방지.
-            onPressed: _isWaiting
-                ? null
-                : () async {
-                    final evidence = await showEvidencePresentModal(context);
-                    if (evidence != null && mounted) {
-                      await _sendMessage(
-                        '이 증거를 제시합니다: ${evidence.name}',
-                        evidenceId: evidence.id,
-                      );
-                    }
-                  },
+          padding: const EdgeInsets.only(right: AppTokens.sp2),
+          child: IconButton(
+            tooltip: '증거 제시',
+            onPressed: _isWaiting ? null : _presentEvidence,
+            icon: Icon(Icons.description_outlined, color: c.primary),
           ),
         ),
       ],
@@ -412,6 +416,7 @@ class _DetectiveBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final isEvidence = evidenceId != null;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -424,9 +429,10 @@ class _DetectiveBubble extends StatelessWidget {
               vertical: AppTokens.sp2,
             ),
             decoration: BoxDecoration(
-              color: c.primarySoft,
+              // 증거 제시는 배경까지 success 계열로 강조해 일반 질문과 구분.
+              color: isEvidence ? c.successSoft : c.primarySoft,
               border: Border.all(
-                color: evidenceId != null ? c.success : c.primary,
+                color: isEvidence ? c.success : c.primary,
               ),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(AppTokens.r4),
@@ -435,13 +441,40 @@ class _DetectiveBubble extends StatelessWidget {
                 bottomRight: Radius.circular(AppTokens.r4),
               ),
             ),
-            child: Text(
-              text,
-              style: AppText.body.copyWith(
-                fontSize: 13,
-                color: c.primary,
-                height: 1.55,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isEvidence) ...[
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.description_outlined,
+                        size: 12,
+                        color: c.success,
+                      ),
+                      const SizedBox(width: AppTokens.sp1),
+                      Text(
+                        '증거 제시',
+                        style: AppText.monoLabel.copyWith(
+                          fontSize: 10,
+                          color: c.success,
+                          height: 1.0,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppTokens.sp1),
+                ],
+                Text(
+                  text,
+                  style: AppText.body.copyWith(
+                    fontSize: 13,
+                    color: isEvidence ? c.text : c.primary,
+                    height: 1.55,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -546,11 +579,14 @@ class _InputBar extends StatelessWidget {
   const _InputBar({
     required this.controller,
     required this.onSend,
+    required this.onPresentEvidence,
     required this.disabled,
   });
 
   final TextEditingController controller;
   final VoidCallback onSend;
+  // null 이면 비활성(응답 대기 중).
+  final VoidCallback? onPresentEvidence;
   final bool disabled;
 
   @override
@@ -565,21 +601,34 @@ class _InputBar extends StatelessWidget {
       padding: const EdgeInsets.all(AppTokens.sp3),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: MSTextField(
-                controller: controller,
-                hintText: '질문을 입력하세요...',
-                onChanged: (_) {},
-              ),
-            ),
-            const SizedBox(width: AppTokens.sp2),
+            // 핵심 메커닉 — 증거 제시 강조 액션(입력창 바로 위, 발견성 확보).
             MSButton(
-              label: '',
-              variant: MSButtonVariant.primary,
-              icon: Icons.send,
-              onPressed: disabled ? null : onSend,
+              label: '증거 제시',
+              variant: MSButtonVariant.secondary,
+              icon: Icons.description_outlined,
+              onPressed: onPresentEvidence,
+            ),
+            const SizedBox(height: AppTokens.sp2),
+            Row(
+              children: [
+                Expanded(
+                  child: MSTextField(
+                    controller: controller,
+                    hintText: '질문을 입력하세요...',
+                    onChanged: (_) {},
+                  ),
+                ),
+                const SizedBox(width: AppTokens.sp2),
+                MSButton(
+                  label: '',
+                  variant: MSButtonVariant.primary,
+                  icon: Icons.send,
+                  onPressed: disabled ? null : onSend,
+                ),
+              ],
             ),
           ],
         ),
