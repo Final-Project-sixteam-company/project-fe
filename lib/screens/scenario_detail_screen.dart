@@ -56,8 +56,10 @@ class _ScenarioDetailScreenState
   Widget build(BuildContext context) {
     final c = context.c;
     final s = widget.scenario;
+    // CL-001처럼 같은 사건이 백엔드 id('1')와 샘플 id('demoday-eve')로 나뉘어도
+    // 리뷰가 한 버킷으로 모이도록 정규화 키로 비교한다(작성·열람 경로 키 불일치 수정).
     final reviews = sampleReviews
-        .where((r) => r.scenarioId == s.id)
+        .where((r) => canonicalScenarioId(r.scenarioId) == canonicalScenarioId(s.id))
         .toList();
 
     return Scaffold(
