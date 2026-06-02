@@ -328,6 +328,26 @@ class GameSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 진행 중인 수사를 중단(포기)한다. 뒤로가기 이탈 등에서 호출.
+  /// 서버 active_key(userId_scenarioId) 유니크 제약상 PLAYING 세션을 남기면
+  /// 다음 진입이 409로 막히므로 abandon API로 정리한다. 네트워크 실패는
+  /// 무시(best-effort)하되, 로컬 재개 기록과 타이머는 반드시 정리한다.
+  Future<void> abandonSession() async {
+    if (_isCompleted) return; // 이미 끝난 세션은 포기 대상이 아니다
+    _timer?.cancel();
+    final id = backendSessionId;
+    if (id != null) {
+      try {
+        await _repo.abandon(id);
+      } catch (_) {
+        // best-effort: 서버 정리 실패해도 로컬 상태는 정리하고 진행
+      }
+    }
+    backendSessionId = null;
+    final sid = _backendScenarioId;
+    if (sid != null) await _clearSavedSession(sid);
+  }
+
   @override
   void dispose() {
     _timer?.cancel();

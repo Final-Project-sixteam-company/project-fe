@@ -54,13 +54,35 @@ class _CaseScreenState extends State<CaseScreen> {
     super.dispose();
   }
 
+  /// 뒤로가기 이탈 시: 진행 중인 수사를 중단할지 확인하고, 확정 시 abandon.
+  Future<void> _handlePop(bool didPop) async {
+    if (didPop) return;
+    final navigator = Navigator.of(context);
+    // 이미 제출 완료됐거나 서버 세션이 없으면 그대로 나간다(중단 대상 아님).
+    if (_session.isCompleted || _session.backendSessionId == null) {
+      navigator.pop();
+      return;
+    }
+    final leave = await showDialog<bool>(
+      context: context,
+      barrierColor: context.c.scrim,
+      builder: (_) => const _AbandonDialog(),
+    );
+    if (leave != true || !mounted) return;
+    await _session.abandonSession();
+    if (mounted) navigator.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
 
-    return GameSessionProvider(
-      controller: _session,
-      child: Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) => _handlePop(didPop),
+      child: GameSessionProvider(
+        controller: _session,
+        child: Scaffold(
         backgroundColor: c.bg,
         appBar: _buildHud(context),
         bottomNavigationBar: MSBottomNav(
@@ -91,6 +113,7 @@ class _CaseScreenState extends State<CaseScreen> {
               children: _kScreens,
             );
           },
+        ),
         ),
       ),
     );
@@ -181,6 +204,72 @@ class _CaseScreenState extends State<CaseScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 수사 중단 확인 다이얼로그 ─────────────────────────────────────────────────
+
+class _AbandonDialog extends StatelessWidget {
+  const _AbandonDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Dialog(
+      backgroundColor: c.bgElev,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTokens.r6),
+        side: BorderSide(color: c.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.sp6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.logout, size: 22, color: c.danger),
+                const SizedBox(width: AppTokens.sp2),
+                Text(
+                  '수사 중단',
+                  style: AppText.titleM.copyWith(color: c.text),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTokens.sp3),
+            Text(
+              '지금 나가면 진행 중인 수사가 중단됩니다.\n'
+              '진행 상황은 저장되지 않으며 다음에 새로 시작해야 합니다.',
+              style: AppText.body.copyWith(color: c.textSub, height: 1.6),
+            ),
+            const SizedBox(height: AppTokens.sp6),
+            Row(
+              children: [
+                Expanded(
+                  child: MSButton(
+                    label: '계속 수사',
+                    variant: MSButtonVariant.secondary,
+                    expanded: true,
+                    onPressed: () => Navigator.of(context).pop(false),
+                  ),
+                ),
+                const SizedBox(width: AppTokens.sp3),
+                Expanded(
+                  child: MSButton(
+                    label: '나가기',
+                    variant: MSButtonVariant.danger,
+                    expanded: true,
+                    onPressed: () => Navigator.of(context).pop(true),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
