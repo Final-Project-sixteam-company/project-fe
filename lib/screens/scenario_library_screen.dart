@@ -228,7 +228,7 @@ class _ScenarioLibraryScreenState
             ),
             Expanded(
               child: _loading
-                  ? const Center(child: MSSpinner(size: 24))
+                  ? const MSListSkeleton(itemHeight: 96)
                   : _error != null
                       ? MSEmpty(
                           icon: Icons.cloud_off,

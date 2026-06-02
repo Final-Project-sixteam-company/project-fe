@@ -105,7 +105,7 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
     List<Suspect> results,
   ) {
     if (ctrl.isLoading && results.isEmpty) {
-      return const Center(child: MSSpinner(size: 24));
+      return const MSListSkeleton(itemHeight: 84);
     }
     if (ctrl.loadError != null && results.isEmpty) {
       return MSEmpty(
