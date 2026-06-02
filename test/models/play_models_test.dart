@@ -101,10 +101,10 @@ void main() {
       expect(r.suspectName, '이준호');
       expect(r.question, '어디 있었나요?');
       expect(r.answer, '서버실에 있었습니다.');
-      // 현재 구현은 evidenceId/title을 RelatedSuspect.suspectId/name에 적재한다.
+      // unlockedEvidences는 RelatedEvidence(evidenceId/title)로 파싱된다.
       expect(r.unlockedEvidences, hasLength(1));
-      expect(r.unlockedEvidences.first.suspectId, 5);
-      expect(r.unlockedEvidences.first.name, '데모 시연 코드 변경 로그');
+      expect(r.unlockedEvidences.first.evidenceId, 5);
+      expect(r.unlockedEvidences.first.title, '데모 시연 코드 변경 로그');
       expect(r.createdAt, DateTime.parse('2026-06-02T10:00:00'));
     });
 

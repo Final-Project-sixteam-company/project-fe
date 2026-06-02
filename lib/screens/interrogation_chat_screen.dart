@@ -134,7 +134,7 @@ class _InterrogationChatScreenState
         : QuestionType.free;
 
     String answer = '...대답을 거부하고 있습니다. (네트워크 연결을 확인하세요)';
-    List<RelatedSuspect> unlockedEvidences = const [];
+    List<RelatedEvidence> unlockedEvidences = const [];
     try {
       final result = await playSessionRepo.interrogate(
         sessionId,
@@ -175,7 +175,7 @@ class _InterrogationChatScreenState
     if (unlockedEvidences.isNotEmpty && mounted) {
       await controller.refreshEvidences();
       if (mounted) {
-        final names = unlockedEvidences.map((e) => e.name).join(', ');
+        final names = unlockedEvidences.map((e) => e.title).join(', ');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('새로운 증거 확보: $names')),
         );

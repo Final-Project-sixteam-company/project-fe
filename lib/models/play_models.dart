@@ -169,6 +169,19 @@ class RelatedSuspect {
       );
 }
 
+/// 심문 응답으로 해금된 증거(`{evidenceId, title}`). 용의자 모델 재사용 불가.
+class RelatedEvidence {
+  const RelatedEvidence({required this.evidenceId, required this.title});
+
+  final int evidenceId;
+  final String title;
+
+  factory RelatedEvidence.fromJson(Map<String, dynamic> j) => RelatedEvidence(
+        evidenceId: (j['evidenceId'] as num).toInt(),
+        title: j['title'] as String? ?? '',
+      );
+}
+
 // ── 용의자 ───────────────────────────────────────────────────────────────────
 
 class PlaySuspect {
@@ -275,7 +288,7 @@ class InterrogationResult {
   final String suspectName;
   final String question;
   final String answer;
-  final List<RelatedSuspect> unlockedEvidences; // {evidenceId,title} 재사용 불가 → 별도
+  final List<RelatedEvidence> unlockedEvidences;
   final DateTime? createdAt;
 
   factory InterrogationResult.fromJson(Map<String, dynamic> j) =>
@@ -286,11 +299,7 @@ class InterrogationResult {
         question: j['question'] as String? ?? '',
         answer: j['answer'] as String? ?? '',
         unlockedEvidences: ((j['unlockedEvidences'] as List<dynamic>?) ?? const [])
-            .map((e) => RelatedSuspect(
-                  suspectId: ((e as Map<String, dynamic>)['evidenceId'] as num)
-                      .toInt(),
-                  name: e['title'] as String? ?? '',
-                ))
+            .map((e) => RelatedEvidence.fromJson(e as Map<String, dynamic>))
             .toList(),
         createdAt: _parseDate(j['createdAt']),
       );
