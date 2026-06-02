@@ -18,23 +18,25 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
 
-  static const _screens = <Widget>[
-    HomeScreen(),
-    ScenarioLibraryScreen(),
-    MyRecordsScreen(),
-    _BuilderPlaceholder(),
-    MyPageScreen(),
-  ];
+  void _goTo(int index) => setState(() => _currentIndex = index);
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
 
+    final screens = <Widget>[
+      HomeScreen(onBrowse: () => _goTo(1), onCreate: () => _goTo(3)),
+      const ScenarioLibraryScreen(),
+      const MyRecordsScreen(),
+      const _BuilderPlaceholder(),
+      const MyPageScreen(),
+    ];
+
     return Scaffold(
       backgroundColor: c.bg,
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: screens,
       ),
       bottomNavigationBar: _AppBottomNav(
         currentIndex: _currentIndex,

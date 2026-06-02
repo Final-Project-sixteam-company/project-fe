@@ -72,6 +72,30 @@ class _MSSkeletonState extends State<MSSkeleton>
   }
 }
 
+/// 리스트 로딩 자리표시자 — 카드 모양 스켈레톤을 n개 쌓는다.
+class MSListSkeleton extends StatelessWidget {
+  const MSListSkeleton({
+    this.itemCount = 5,
+    this.itemHeight = 76,
+    super.key,
+  });
+
+  final int itemCount;
+  final double itemHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const BouncingScrollPhysics(),
+      itemCount: itemCount,
+      separatorBuilder: (_, _) => const SizedBox(height: AppTokens.sp3),
+      itemBuilder: (_, _) =>
+          MSSkeleton(height: itemHeight, radius: AppTokens.r4),
+      padding: const EdgeInsets.only(bottom: AppTokens.sp10),
+    );
+  }
+}
+
 // ── 2. 스피너 ─────────────────────────────────────────────────────────────────
 
 class MSSpinner extends StatelessWidget {
@@ -107,6 +131,7 @@ class MSEmpty extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.action,
+    this.secondaryAction,
     super.key,
   });
 
@@ -114,6 +139,9 @@ class MSEmpty extends StatelessWidget {
   final String title;
   final String? subtitle;
   final MSButton? action;
+
+  /// 주 액션 아래에 표시되는 보조 액션(예: '나가기').
+  final MSButton? secondaryAction;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +169,10 @@ class MSEmpty extends StatelessWidget {
           if (action != null) ...[
             const SizedBox(height: AppTokens.sp4),
             action!,
+          ],
+          if (secondaryAction != null) ...[
+            const SizedBox(height: AppTokens.sp2),
+            secondaryAction!,
           ],
         ],
       ),

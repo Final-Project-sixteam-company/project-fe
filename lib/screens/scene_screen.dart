@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import '../components/game_modals.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
-import '../components/ms_stat_row.dart';
-import '../models/sample_case.dart';
-import '../models/session_models.dart';
+import '../controllers/game_session_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
@@ -90,16 +88,12 @@ class _SceneScreenState extends State<SceneScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: AppTokens.sp4),
-            // ── 1. 통계 헤더 ───────────────────────────────────────
-            const MSStatRow([
-              StatCell('조사 진행 시간', '14:22'),
-              StatCell('단서 발견', '8/12', tone: StatTone.good),
-            ]),
-            const SizedBox(height: AppTokens.sp4),
-            // ── 2. 현장 맵 ────────────────────────────────────────
+            // ── 1. 현장 맵 ────────────────────────────────────────
+            // 경과 시간/해금 증거 수는 상단 HUD(CaseScreen)가 라이브로
+            // 표시하므로 여기서 중복 통계 헤더를 두지 않는다.
             _SceneMap(selectedIndex: _selectedIndex),
             const SizedBox(height: AppTokens.sp6),
-            // ── 3. 주요 현장 정보 ─────────────────────────────────
+            // ── 2. 주요 현장 정보 ─────────────────────────────────
             const MSKicker('주요 현장 정보'),
             const SizedBox(height: AppTokens.sp3),
             _LocationList(
@@ -130,41 +124,22 @@ class _SceneScreenState extends State<SceneScreen> {
       ),
       actions: [
         Padding(
-          padding: const EdgeInsets.only(right: AppTokens.sp4),
+          padding: const EdgeInsets.only(right: AppTokens.sp2),
           child: IconButton(
-            onPressed: () async {
-              final selectedLevel = await showHintModal(context);
-
-              if (selectedLevel == null) return;
-
-              String hintContent = '';
-              if (selectedLevel == HintLevel.direction) {
-                hintContent = sampleCase.clue1HintText;      // 방향 힌트 매핑
-              } else if (selectedLevel == HintLevel.connection) {
-                hintContent = sampleCase.clue2HintText;      // 증거 연결 힌트 매핑
-              } else if (selectedLevel == HintLevel.decisive) {
-                hintContent = sampleCase.decisiveHintText;  // 결정적 힌트 매핑
+            // 48dp 최소 탭 타깃 유지(기본 IconButton 제약 사용).
+            tooltip: '힌트 보기',
+            onPressed: () {
+              // 힌트는 서버 세션 기반. 세션 미생성 시 안내.
+              final sessionId = context.sessionRead.backendSessionId;
+              if (sessionId == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('세션이 아직 준비되지 않았습니다.')),
+                );
+                return;
               }
-              if (!context.mounted) return;
-
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (dialogContext) => AlertDialog(
-                  title: Text('🔍 힌트 확인 (${selectedLevel.label})'),
-                  content: Text(hintContent),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text('확인'),
-                    ),
-                  ],
-                ),
-              );
+              showHintModal(context, sessionId: sessionId);
             },
             icon: Icon(Icons.lightbulb_outline, color: c.primary),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
         ),
       ],

@@ -1,8 +1,6 @@
 // lib/repositories/scenario_repository.dart
+import '../core/api/api_client.dart';
 import '../models/scenario.dart';
-import '../models/api_models.dart';
-import '../models/sample_scenarios.dart';
-import '../services/api_client.dart';
 
 enum ScenarioSort { popular, newest, rating }
 
@@ -12,23 +10,18 @@ class ScenarioFilter {
     this.difficulty,
     this.sort = ScenarioSort.popular,
     this.query = '',
-    this.page = 0,
-    this.size = 20,
   });
 
   final ScenarioType? type;
   final Difficulty? difficulty;
   final ScenarioSort sort;
   final String query;
-  final int page;
-  final int size;
 
   ScenarioFilter copyWith({
     ScenarioType? type,
     Difficulty? difficulty,
     ScenarioSort? sort,
     String? query,
-    int? page,
     bool clearType = false,
     bool clearDifficulty = false,
   }) {
@@ -37,185 +30,137 @@ class ScenarioFilter {
       difficulty: clearDifficulty ? null : (difficulty ?? this.difficulty),
       sort: sort ?? this.sort,
       query: query ?? this.query,
-      page: page ?? this.page,
-      size: size,
     );
-  }
-
-  Map<String, String> toQueryParams() {
-    final params = <String, String>{
-      'sort': sort == ScenarioSort.popular
-          ? 'popular'
-          : sort == ScenarioSort.newest
-          ? 'latest'
-          : 'rating',
-      'page': '$page',
-      'size': '$size',
-    };
-    if (query.isNotEmpty) params['keyword'] = query;
-    if (type != null) {
-      params['type'] =
-      type == ScenarioType.official ? 'OFFICIAL' : 'CUSTOM';
-    }
-    if (difficulty != null) {
-      params['difficulty'] = difficulty == Difficulty.easy
-          ? 'EASY'
-          : difficulty == Difficulty.hard
-          ? 'HARD'
-          : 'NORMAL';
-    }
-    return params;
   }
 }
 
+/// 시나리오 데이터 소스.
+/// 비동기(API) 기반 — UI는 로딩/에러/빈 상태를 함께 처리해야 한다.
 abstract class ScenarioRepository {
   Future<List<Scenario>> query(ScenarioFilter filter);
   Future<List<Scenario>> popular({int limit = 5});
-  Future<Scenario?> getDetail(String scenarioId);
+  Future<Scenario> detail(String scenarioId);
 }
 
-/// API 연동 구현체.
-/// 서버 오류 시 로컬 샘플 데이터로 폴백한다.
+/// 백엔드(`/api/scenarios`) 연동 구현체.
 class ApiScenarioRepository implements ScenarioRepository {
-  const ApiScenarioRepository();
+  const ApiScenarioRepository({this._client});
 
-  static const _fallback = LocalScenarioRepository();
+  final ApiClient? _client;
+  ApiClient get _api => _client ?? ApiClient.instance;
 
   @override
   Future<List<Scenario>> query(ScenarioFilter filter) async {
-    final result = await ApiClient.instance.get(
+    final data = await _api.get(
       '/api/scenarios',
-      query: filter.toQueryParams(),
-      auth: false,
-      fromJson: (data) =>
-          ScenarioListResponseDto.fromJson(data as Map<String, dynamic>),
+      query: {
+        if (filter.query.isNotEmpty) 'keyword': filter.query,
+        if (filter.type != null) 'type': _typeToApi(filter.type!),
+        if (filter.difficulty != null)
+          'difficulty': _difficultyToApi(filter.difficulty!),
+        'sort': _sortToApi(filter.sort),
+        'page': 0,
+        'size': 50,
+      },
     );
-    if (result.isSuccess) {
-      return result.data!.content.map(_dtoToScenario).toList();
-    }
-    return _fallback.query(filter);
+    final page = Page<Scenario>.fromJson(
+      data as Map<String, dynamic>,
+      _fromSummaryJson,
+    );
+    return page.content;
   }
 
   @override
   Future<List<Scenario>> popular({int limit = 5}) async {
-    final result = await ApiClient.instance.get(
+    final data = await _api.get(
       '/api/scenarios',
-      query: {'sort': 'popular', 'size': '$limit'},
-      auth: false,
-      fromJson: (data) =>
-          ScenarioListResponseDto.fromJson(data as Map<String, dynamic>),
+      query: {'sort': 'popular', 'page': 0, 'size': limit},
     );
-    if (result.isSuccess) {
-      return result.data!.content.map(_dtoToScenario).toList();
-    }
-    return _fallback.popular(limit: limit);
+    final page = Page<Scenario>.fromJson(
+      data as Map<String, dynamic>,
+      _fromSummaryJson,
+    );
+    return page.content;
   }
 
   @override
-  Future<Scenario?> getDetail(String scenarioId) async {
-    final result = await ApiClient.instance.get(
-      '/api/scenarios/$scenarioId',
-      auth: false,
-      fromJson: (data) =>
-          ScenarioDetailDto.fromJson(data as Map<String, dynamic>),
-    );
-    if (result.isSuccess) return _detailDtoToScenario(result.data!);
-    // 폴백: 로컬 샘플에서 검색
-    try {
-      return sampleScenarios.firstWhere((s) => s.id == scenarioId);
-    } catch (_) {
-      return null;
-    }
+  Future<Scenario> detail(String scenarioId) async {
+    final data = await _api.get('/api/scenarios/$scenarioId');
+    return _fromDetailJson(data as Map<String, dynamic>);
   }
+}
 
-  static Scenario _dtoToScenario(ScenarioSummaryDto d) => Scenario(
-    id: '${d.scenarioId}',
-    code: 'CL-${d.scenarioId.toString().padLeft(3, '0')}',
-    title: d.title,
-    subtitle: d.description,
-    type: d.scenarioType == 'OFFICIAL'
-        ? ScenarioType.official
-        : ScenarioType.custom,
-    difficulty: _parseDifficulty(d.difficulty),
-    estimatedMinutes: d.estimatedPlayTimeMinutes,
-    suspectsCount: d.suspectCount,
-    evidenceCount: d.evidenceCount,
-    rating: d.averageRating,
-    plays: d.playCount,
+// ── JSON → 앱 모델 매퍼 ──────────────────────────────────────────────────────
+
+Scenario _fromSummaryJson(Map<String, dynamic> json) {
+  final id = (json['scenarioId'] as num).toInt();
+  final desc = json['description'] as String? ?? '';
+  return Scenario(
+    id: id.toString(),
+    code: _synthCode(id),
+    title: json['title'] as String? ?? '제목 없음',
+    subtitle: desc,
+    type: _typeFromApi(json['scenarioType'] as String?),
+    difficulty: _difficultyFromApi(json['difficulty'] as String?),
+    estimatedMinutes: (json['estimatedPlayTimeMinutes'] as num?)?.toInt() ?? 0,
+    suspectsCount: (json['suspectCount'] as num?)?.toInt() ?? 0,
+    evidenceCount: (json['evidenceCount'] as num?)?.toInt() ?? 0,
+    rating: (json['averageRating'] as num?)?.toDouble() ?? 0,
+    plays: (json['playCount'] as num?)?.toInt() ?? 0,
     tags: const [],
-    synopsis: d.description,
+    synopsis: desc,
+    thumbnailUrl: json['thumbnailUrl'] as String?,
   );
-
-  static Scenario _detailDtoToScenario(ScenarioDetailDto d) => Scenario(
-    id: '${d.scenarioId}',
-    code: 'CL-${d.scenarioId.toString().padLeft(3, '0')}',
-    title: d.title,
-    subtitle: d.synopsis,
-    type: d.scenarioType == 'OFFICIAL'
-        ? ScenarioType.official
-        : ScenarioType.custom,
-    difficulty: _parseDifficulty(d.difficulty),
-    estimatedMinutes: d.estimatedPlayTimeMinutes,
-    suspectsCount: d.suspectCount,
-    evidenceCount: d.evidenceCount,
-    rating: d.averageRating,
-    plays: d.playCount,
-    tags: d.tags,
-    synopsis: d.synopsis,
-  );
-
-  static Difficulty _parseDifficulty(String s) => switch (s) {
-    'EASY' => Difficulty.easy,
-    'HARD' => Difficulty.hard,
-    _ => Difficulty.medium,
-  };
 }
 
-/// 로컬 샘플 구현체 — 폴백 전용
-class LocalScenarioRepository implements ScenarioRepository {
-  const LocalScenarioRepository();
+Scenario _fromDetailJson(Map<String, dynamic> json) {
+  final id = (json['scenarioId'] as num).toInt();
+  final creator = json['creator'] as Map<String, dynamic>?;
+  return Scenario(
+    id: id.toString(),
+    code: _synthCode(id),
+    title: json['title'] as String? ?? '제목 없음',
+    subtitle: json['description'] as String? ?? '',
+    type: _typeFromApi(json['scenarioType'] as String?),
+    difficulty: _difficultyFromApi(json['difficulty'] as String?),
+    estimatedMinutes: (json['estimatedPlayTimeMinutes'] as num?)?.toInt() ?? 0,
+    suspectsCount: (json['suspectCount'] as num?)?.toInt() ?? 0,
+    evidenceCount: (json['evidenceCount'] as num?)?.toInt() ?? 0,
+    rating: (json['averageRating'] as num?)?.toDouble() ?? 0,
+    plays: (json['playCount'] as num?)?.toInt() ?? 0,
+    tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? const [],
+    synopsis: json['synopsis'] as String? ?? json['description'] as String? ?? '',
+    author: creator?['nickname'] as String?,
+    thumbnailUrl: json['thumbnailUrl'] as String?,
+  );
+}
 
-  @override
-  Future<List<Scenario>> query(ScenarioFilter filter) async {
-    var list = List<Scenario>.from(sampleScenarios);
+// 백엔드에는 표시용 코드(CL-XXX)가 없어 scenarioId로 합성한다.
+String _synthCode(int id) => 'CL-${id.toString().padLeft(3, '0')}';
 
-    if (filter.query.isNotEmpty) {
-      list = list
-          .where((s) =>
-      s.title.contains(filter.query) ||
-          s.tags.any((t) => t.contains(filter.query)) ||
-          (s.author?.contains(filter.query) ?? false))
-          .toList();
-    }
-    if (filter.type != null) {
-      list = list.where((s) => s.type == filter.type).toList();
-    }
-    if (filter.difficulty != null) {
-      list = list.where((s) => s.difficulty == filter.difficulty).toList();
-    }
-    list = switch (filter.sort) {
-      ScenarioSort.popular => list..sort((a, b) => b.plays.compareTo(a.plays)),
-      ScenarioSort.newest => list..sort((a, b) => b.code.compareTo(a.code)),
-      ScenarioSort.rating => list..sort((a, b) => b.rating.compareTo(a.rating)),
+ScenarioType _typeFromApi(String? v) =>
+    v == 'CUSTOM' ? ScenarioType.custom : ScenarioType.official;
+
+String _typeToApi(ScenarioType t) =>
+    t == ScenarioType.custom ? 'CUSTOM' : 'OFFICIAL';
+
+Difficulty _difficultyFromApi(String? v) => switch (v) {
+      'EASY' => Difficulty.easy,
+      'HARD' => Difficulty.hard,
+      _ => Difficulty.medium, // NORMAL
     };
-    return list;
-  }
 
-  @override
-  Future<List<Scenario>> popular({int limit = 5}) async {
-    final sorted = List<Scenario>.from(sampleScenarios)
-      ..sort((a, b) => b.plays.compareTo(a.plays));
-    return sorted.take(limit).toList();
-  }
+String _difficultyToApi(Difficulty d) => switch (d) {
+      Difficulty.easy => 'EASY',
+      Difficulty.medium => 'NORMAL',
+      Difficulty.hard => 'HARD',
+    };
 
-  @override
-  Future<Scenario?> getDetail(String scenarioId) async {
-    try {
-      return sampleScenarios.firstWhere((s) => s.id == scenarioId);
-    } catch (_) {
-      return null;
-    }
-  }
-}
+String _sortToApi(ScenarioSort s) => switch (s) {
+      ScenarioSort.popular => 'popular',
+      ScenarioSort.newest => 'latest',
+      ScenarioSort.rating => 'rating',
+    };
 
+/// 전역 싱글턴 — 추후 DI 컨테이너로 교체 가능.
 const ScenarioRepository scenarioRepo = ApiScenarioRepository();

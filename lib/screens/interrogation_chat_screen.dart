@@ -4,10 +4,11 @@ import '../components/ms_button.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
 import '../controllers/game_session_provider.dart';
+import '../core/api/api_exception.dart';
 import '../models/case.dart';
-import '../models/sample_case.dart';
+import '../models/play_models.dart';
 import '../models/session_models.dart';
-import '../repositories/interrogation_repository.dart';
+import '../repositories/play_session_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
@@ -47,16 +48,39 @@ class InterrogationChatScreen extends StatefulWidget {
 
 class _InterrogationChatScreenState
     extends State<InterrogationChatScreen> {
-  final InterrogationRepository _repo = buildInterrogationRepository();
   final TextEditingController _inputCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
-  final List<_Message> _messages = [
-    const _Message(
-      text: '저는 할 말이 없습니다. 변호사를 불러주세요.',
-      sender: _Sender.suspect,
-    ),
-  ];
+  final List<_Message> _messages = [];
   bool _isWaiting = false;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
+
+    // 같은 세션 내에서 이전에 이 용의자와 나눈 심문 기록을 복원한다.
+    final controller = context.sessionRead;
+    final priorLogs = controller.interrogationLogs
+        .where((log) => log.suspectId == widget.suspect.id);
+    for (final log in priorLogs) {
+      _messages.add(_Message(
+        text: log.question,
+        sender: _Sender.detective,
+        presentedEvidenceId: log.presentedEvidenceId,
+      ));
+      _messages.add(_Message(text: log.answer, sender: _Sender.suspect));
+    }
+
+    if (_messages.isEmpty) {
+      _messages.add(const _Message(
+        text: '저는 할 말이 없습니다. 변호사를 불러주세요.',
+        sender: _Sender.suspect,
+      ));
+    }
+    _scrollToBottom();
+  }
 
   @override
   void dispose() {
@@ -72,17 +96,9 @@ class _InterrogationChatScreenState
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isWaiting) return;
 
-    final session = context.sessionRead;
-
-    final baseEvidenceIds = sampleCase.evidences
-        .where((e) => !e.isLocked)
-        .map((e) => e.id);
-    final unlockedIds = [
-      ...baseEvidenceIds,
-      ...session.unlockedEvidenceIds,
-    ];
-
-    final history = _buildConversationHistory();
+    final controller = context.sessionRead;
+    final sessionId = controller.backendSessionId;
+    final suspectIdInt = int.tryParse(widget.suspect.id);
 
     setState(() {
       _messages.add(_Message(
@@ -96,32 +112,54 @@ class _InterrogationChatScreenState
 
     _scrollToBottom();
 
+    // 서버 세션이 아직 준비되지 않았거나 용의자 ID가 정수가 아니면(샘플 시나리오)
+    // 심문을 진행할 수 없다.
+    if (sessionId == null || suspectIdInt == null) {
+      if (mounted) {
+        setState(() {
+          _messages.add(const _Message(
+            text: '세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.',
+            sender: _Sender.suspect,
+          ));
+          _isWaiting = false;
+        });
+        _scrollToBottom();
+      }
+      return;
+    }
+
+    final evidenceIdInt = evidenceId != null ? int.tryParse(evidenceId) : null;
+    final questionType = evidenceIdInt != null
+        ? QuestionType.evidencePresented
+        : QuestionType.free;
+
     String answer = '...대답을 거부하고 있습니다. (네트워크 연결을 확인하세요)';
+    List<RelatedEvidence> unlockedEvidences = const [];
     try {
-      answer = await _repo.ask(
-        InterrogationRequest(
-          sessionId: session.serverSessionId?.toString() ?? session.sessionId,
-          scenarioId: session.scenarioId,
-          suspectId: widget.suspect.id,
-          question: trimmed,
-          unlockedEvidenceIds: unlockedIds,
-          conversationHistory: history,
-          presentedEvidenceId: evidenceId,
-        ),
+      final result = await playSessionRepo.interrogate(
+        sessionId,
+        suspectId: suspectIdInt,
+        questionType: questionType,
+        question: trimmed,
+        presentedEvidenceId: evidenceIdInt,
       );
+      answer = result.answer;
+      unlockedEvidences = result.unlockedEvidences;
 
       if (!mounted) return;
 
-      session.addInterrogationLog(
+      controller.addInterrogationLog(
         InterrogationLog(
           suspectId: widget.suspect.id,
           suspectName: widget.suspect.name,
           question: trimmed,
           answer: answer,
-          askedAt: session.elapsed,
+          askedAt: controller.elapsed,
           presentedEvidenceId: evidenceId,
         ),
       );
+    } on ApiException catch (e) {
+      answer = e.message;
     } catch (_) {
     } finally {
       if (mounted) {
@@ -132,22 +170,17 @@ class _InterrogationChatScreenState
         _scrollToBottom();
       }
     }
-  }
 
-  List<Map<String, String>> _buildConversationHistory() {
-    final recent = _messages.length > 12
-        ? _messages.sublist(_messages.length - 12)
-        : _messages;
-    return recent
-        .map(
-          (msg) => {
-        'role': msg.sender == _Sender.detective ? 'user' : 'assistant',
-        'content': msg.text,
-        if (msg.presentedEvidenceId != null)
-          'presented_evidence_id': msg.presentedEvidenceId!,
-      },
-    )
-        .toList();
+    // 심문으로 새 증거가 해금되면 증거/대시보드를 다시 로드하고 안내한다.
+    if (unlockedEvidences.isNotEmpty && mounted) {
+      await controller.refreshEvidences();
+      if (mounted) {
+        final names = unlockedEvidences.map((e) => e.title).join(', ');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('새로운 증거 확보: $names')),
+        );
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -181,7 +214,7 @@ class _InterrogationChatScreenState
                 vertical: AppTokens.sp4,
               ),
               itemCount: _messages.length + (_isWaiting ? 1 : 0),
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
               const SizedBox(height: AppTokens.sp2),
               itemBuilder: (_, i) {
                 if (i == _messages.length && _isWaiting) {
@@ -239,6 +272,21 @@ class _InterrogationChatScreenState
         ],
       ),
       actions: [
+        // 힌트 진입점(현장 화면과 동일하게 서버 세션 기반).
+        IconButton(
+          tooltip: '힌트 보기',
+          onPressed: () {
+            final sessionId = context.sessionRead.backendSessionId;
+            if (sessionId == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('세션이 아직 준비되지 않았습니다.')),
+              );
+              return;
+            }
+            showHintModal(context, sessionId: sessionId);
+          },
+          icon: Icon(Icons.lightbulb_outline, color: c.primary),
+        ),
         Padding(
           padding: const EdgeInsets.only(right: AppTokens.sp4),
           child: MSButton(
@@ -443,7 +491,7 @@ class _SuggestedQuestions extends StatelessWidget {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
         itemCount: _suggestedQuestions.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppTokens.sp2),
+        separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
         itemBuilder: (_, i) {
           return GestureDetector(
             onTap: disabled ? null : () => onSelect(_suggestedQuestions[i]),

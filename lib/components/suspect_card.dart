@@ -15,15 +15,22 @@ class SuspectCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final countLabel = suspect.interrogationCount > 0
+        ? ', 심문 ${suspect.interrogationCount}회'
+        : '';
 
-    return Material(
-      color: c.bg,
-      borderRadius: BorderRadius.circular(AppTokens.r4),
-      child: InkWell(
-        onTap: onTap,
-        splashColor: c.primary.withValues(alpha: .08),
-        highlightColor: c.primary.withValues(alpha: .04),
+    return Semantics(
+      button: true,
+      label: '${suspect.name}, ${suspect.role}, 의심도 ${suspect.suspicion}'
+          '$countLabel',
+      child: Material(
+        color: c.bg,
         borderRadius: BorderRadius.circular(AppTokens.r4),
+        child: InkWell(
+          onTap: onTap,
+          splashColor: c.primary.withValues(alpha: .08),
+          highlightColor: c.primary.withValues(alpha: .04),
+          borderRadius: BorderRadius.circular(AppTokens.r4),
         child: Container(
           padding: const EdgeInsets.all(AppTokens.sp4),
           decoration: BoxDecoration(
@@ -55,6 +62,10 @@ class SuspectCard extends StatelessWidget {
                           suspect.role,
                           style: AppText.bodySm.copyWith(color: c.textSub),
                         ),
+                        if (suspect.interrogationCount > 0) ...[
+                          const SizedBox(height: AppTokens.sp2),
+                          _InterrogationChip(count: suspect.interrogationCount),
+                        ],
                       ],
                     ),
                   ),
@@ -67,6 +78,39 @@ class SuspectCard extends StatelessWidget {
             ],
           ),
         ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 심문 횟수 칩 ──────────────────────────────────────────────────────────────
+
+class _InterrogationChip extends StatelessWidget {
+  const _InterrogationChip({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp2, vertical: 2),
+      decoration: BoxDecoration(
+        color: c.primarySoft,
+        borderRadius: BorderRadius.circular(AppTokens.r2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.forum_outlined, size: 11, color: c.primary),
+          const SizedBox(width: 4),
+          Text(
+            '심문 $count회',
+            style: AppText.monoLabel.copyWith(color: c.primary, height: 1.0),
+          ),
+        ],
       ),
     );
   }

@@ -28,6 +28,11 @@ class TimelineScreen extends StatefulWidget {
 class _TimelineScreenState extends State<TimelineScreen> {
   _TimelineFilter _filter = _TimelineFilter.all;
 
+  // TODO(backend): 서버 타임라인 연동.
+  // api-spec.md §9.9 GET /api/play-sessions/{sessionId}/timeline 가 정의돼 있으나
+  // 현재 백엔드에서 404(미구현)라 sampleCase.timeline(정적 데이터)로 표시한다.
+  // 엔드포인트 구현 시 PlayEvidence/PlaySuspect처럼 컨트롤러로 끌어올려
+  // controller.timeline 을 읽도록 교체할 것.
   List<TimelineEntry> get _filtered => switch (_filter) {
     _TimelineFilter.all => sampleCase.timeline,
     _TimelineFilter.conflict =>

@@ -1,181 +1,129 @@
 // lib/repositories/play_session_repository.dart
-//
-// 게임 플레이 관련 API — PRD Section 9, 10, 11
+import '../core/api/api_client.dart';
+import '../models/play_models.dart';
 
-import '../models/api_models.dart';
-import '../services/api_client.dart';
+/// 플레이 세션 전체 API(`/api/play-sessions/...`) 연동.
+class PlaySessionRepository {
+  const PlaySessionRepository({this._client});
 
-abstract class PlaySessionRepository {
-  Future<PlaySessionDto?> startSession(int scenarioId);
-  Future<DashboardDto?> getDashboard(int sessionId);
-  Future<List<LocationDto>> getLocations(int sessionId);
-  Future<List<EvidenceDto>> getEvidences(int sessionId);
-  Future<EvidenceDto?> getEvidenceDetail(int sessionId, int evidenceId);
-  Future<bool> unlockEvidence(int sessionId, int evidenceId, String reason);
-  Future<List<SuspectDto>> getSuspects(int sessionId);
-  Future<SuspectDto?> getSuspectDetail(int sessionId, int suspectId);
-  Future<List<TimelineEventDto>> getTimeline(int sessionId);
-  Future<List<HintDto>> getHints(int sessionId);
-  Future<HintUseResultDto?> useHint(int sessionId, int hintId);
-  Future<FinalDeductionResultDto?> submitDeduction({
-    required int sessionId,
-    required int selectedCulpritId,
-    required String motiveText,
-    required String methodText,
-    required String coverUpText,
-    required List<int> selectedEvidenceIds,
-  });
-  Future<CaseResultDto?> getResult(int sessionId);
-}
+  final ApiClient? _client;
+  ApiClient get _api => _client ?? ApiClient.instance;
 
-class ApiPlaySessionRepository implements PlaySessionRepository {
-  const ApiPlaySessionRepository();
-
-  @override
-  Future<PlaySessionDto?> startSession(int scenarioId) async {
-    final res = await ApiClient.instance.post(
+  /// 게임 세션 시작. 이미 진행 중이면 `SESSION_ALREADY_EXISTS`(409) ApiException.
+  Future<PlaySessionInfo> createSession(int scenarioId) async {
+    final data = await _api.post(
       '/api/play-sessions',
       body: {'scenarioId': scenarioId},
-      fromJson: (d) => PlaySessionDto.fromJson(d as Map<String, dynamic>),
     );
-    return res.isSuccess ? res.data : null;
+    return PlaySessionInfo.fromJson(data as Map<String, dynamic>);
   }
 
-  @override
-  Future<DashboardDto?> getDashboard(int sessionId) async {
-    final res = await ApiClient.instance.get(
-      '/api/play-sessions/$sessionId/dashboard',
-      fromJson: (d) => DashboardDto.fromJson(d as Map<String, dynamic>),
-    );
-    return res.isSuccess ? res.data : null;
+  Future<DashboardInfo> dashboard(int sessionId) async {
+    final data = await _api.get('/api/play-sessions/$sessionId/dashboard');
+    return DashboardInfo.fromJson(data as Map<String, dynamic>);
   }
 
-  @override
-  Future<List<LocationDto>> getLocations(int sessionId) async {
-    final res = await ApiClient.instance.get(
-      '/api/play-sessions/$sessionId/locations',
-      fromJson: (d) => (d as List<dynamic>)
-          .map((e) => LocationDto.fromJson(e as Map<String, dynamic>))
-          .toList(),
-    );
-    return res.isSuccess ? res.data! : const [];
-  }
-
-  @override
-  Future<List<EvidenceDto>> getEvidences(int sessionId) async {
-    final res = await ApiClient.instance.get(
+  /// 증거 목록. [includeLocked]=true 면 잠긴 증거도 마스킹된 형태로 포함.
+  Future<List<PlayEvidence>> evidences(
+    int sessionId, {
+    bool includeLocked = false,
+  }) async {
+    final data = await _api.get(
       '/api/play-sessions/$sessionId/evidences',
-      fromJson: (d) => (d as List<dynamic>)
-          .map((e) => EvidenceDto.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      query: {'includeLocked': includeLocked},
     );
-    return res.isSuccess ? res.data! : const [];
+    return (data as List<dynamic>)
+        .map((e) => PlayEvidence.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
-  @override
-  Future<EvidenceDto?> getEvidenceDetail(
-      int sessionId, int evidenceId) async {
-    final res = await ApiClient.instance.get(
-      '/api/play-sessions/$sessionId/evidences/$evidenceId',
-      fromJson: (d) => EvidenceDto.fromJson(d as Map<String, dynamic>),
-    );
-    return res.isSuccess ? res.data : null;
+  Future<List<PlaySuspect>> suspects(int sessionId) async {
+    final data = await _api.get('/api/play-sessions/$sessionId/suspects');
+    return (data as List<dynamic>)
+        .map((e) => PlaySuspect.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
-  @override
-  Future<bool> unlockEvidence(
-      int sessionId, int evidenceId, String reason) async {
-    final res = await ApiClient.instance.post(
-      '/api/play-sessions/$sessionId/evidences/$evidenceId/unlock',
-      body: {'reason': reason},
-      fromJson: (d) => d as Map<String, dynamic>,
-    );
-    return res.isSuccess;
+  Future<List<PlayHint>> hints(int sessionId) async {
+    final data = await _api.get('/api/play-sessions/$sessionId/hints');
+    return (data as List<dynamic>)
+        .map((e) => PlayHint.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
-  @override
-  Future<List<SuspectDto>> getSuspects(int sessionId) async {
-    final res = await ApiClient.instance.get(
-      '/api/play-sessions/$sessionId/suspects',
-      fromJson: (d) => (d as List<dynamic>)
-          .map((e) => SuspectDto.fromJson(e as Map<String, dynamic>))
-          .toList(),
-    );
-    return res.isSuccess ? res.data! : const [];
+  Future<HintUseResult> useHint(int sessionId, int hintId) async {
+    final data =
+        await _api.post('/api/play-sessions/$sessionId/hints/$hintId/use');
+    return HintUseResult.fromJson(data as Map<String, dynamic>);
   }
 
-  @override
-  Future<SuspectDto?> getSuspectDetail(int sessionId, int suspectId) async {
-    final res = await ApiClient.instance.get(
-      '/api/play-sessions/$sessionId/suspects/$suspectId',
-      fromJson: (d) => SuspectDto.fromJson(d as Map<String, dynamic>),
-    );
-    return res.isSuccess ? res.data : null;
+  Future<void> abandon(int sessionId) async {
+    await _api.post('/api/play-sessions/$sessionId/abandon');
   }
 
-  @override
-  Future<List<TimelineEventDto>> getTimeline(int sessionId) async {
-    final res = await ApiClient.instance.get(
-      '/api/play-sessions/$sessionId/timeline',
-      fromJson: (d) => (d as List<dynamic>)
-          .map((e) => TimelineEventDto.fromJson(e as Map<String, dynamic>))
-          .toList(),
+  // ── 심문 ───────────────────────────────────────────────────────────────────
+
+  Future<InterrogationResult> interrogate(
+    int sessionId, {
+    required int suspectId,
+    required QuestionType questionType,
+    required String question,
+    int? presentedEvidenceId,
+  }) async {
+    final data = await _api.post(
+      '/api/play-sessions/$sessionId/interrogations',
+      body: {
+        'suspectId': suspectId,
+        'questionType': questionTypeToApi(questionType),
+        'question': question,
+        'presentedEvidenceId': ?presentedEvidenceId,
+      },
     );
-    return res.isSuccess ? res.data! : const [];
+    return InterrogationResult.fromJson(data as Map<String, dynamic>);
   }
 
-  @override
-  Future<List<HintDto>> getHints(int sessionId) async {
-    final res = await ApiClient.instance.get(
-      '/api/play-sessions/$sessionId/hints',
-      fromJson: (d) => (d as List<dynamic>)
-          .map((e) => HintDto.fromJson(e as Map<String, dynamic>))
-          .toList(),
+  /// 심문 로그 조회. [suspectId] 지정 시 해당 용의자만.
+  Future<List<InterrogationResult>> interrogationLogs(
+    int sessionId, {
+    int? suspectId,
+  }) async {
+    final data = await _api.get(
+      '/api/play-sessions/$sessionId/interrogations',
+      query: {'suspectId': ?suspectId},
     );
-    return res.isSuccess ? res.data! : const [];
+    return (data as List<dynamic>)
+        .map((e) => InterrogationResult.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
-  @override
-  Future<HintUseResultDto?> useHint(int sessionId, int hintId) async {
-    final res = await ApiClient.instance.post(
-      '/api/play-sessions/$sessionId/hints/$hintId/use',
-      fromJson: (d) => HintUseResultDto.fromJson(d as Map<String, dynamic>),
-    );
-    return res.isSuccess ? res.data : null;
-  }
+  // ── 최종 추리 / 결과 ───────────────────────────────────────────────────────
 
-  @override
-  Future<FinalDeductionResultDto?> submitDeduction({
-    required int sessionId,
+  Future<FinalDeductionResult> submitFinalDeduction(
+    int sessionId, {
     required int selectedCulpritId,
     required String motiveText,
     required String methodText,
-    required String coverUpText,
+    String? coverUpText,
     required List<int> selectedEvidenceIds,
   }) async {
-    final res = await ApiClient.instance.post(
+    final data = await _api.post(
       '/api/play-sessions/$sessionId/final-deduction',
       body: {
         'selectedCulpritId': selectedCulpritId,
         'motiveText': motiveText,
         'methodText': methodText,
-        'coverUpText': coverUpText,
+        'coverUpText': ?coverUpText,
         'selectedEvidenceIds': selectedEvidenceIds,
       },
-      fromJson: (d) =>
-          FinalDeductionResultDto.fromJson(d as Map<String, dynamic>),
     );
-    return res.isSuccess ? res.data : null;
+    return FinalDeductionResult.fromJson(data as Map<String, dynamic>);
   }
 
-  @override
-  Future<CaseResultDto?> getResult(int sessionId) async {
-    final res = await ApiClient.instance.get(
-      '/api/play-sessions/$sessionId/result',
-      fromJson: (d) => CaseResultDto.fromJson(d as Map<String, dynamic>),
-    );
-    return res.isSuccess ? res.data : null;
+  Future<DeductionResult> result(int sessionId) async {
+    final data = await _api.get('/api/play-sessions/$sessionId/result');
+    return DeductionResult.fromJson(data as Map<String, dynamic>);
   }
 }
 
-const PlaySessionRepository playSessionRepo = ApiPlaySessionRepository();
+/// 전역 싱글턴.
+const PlaySessionRepository playSessionRepo = PlaySessionRepository();

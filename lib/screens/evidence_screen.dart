@@ -7,7 +7,6 @@ import '../components/ms_text_field.dart';
 import '../components/states.dart';
 import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
-import '../models/sample_case.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 
@@ -40,8 +39,8 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
     super.dispose();
   }
 
-  List<Evidence> _filtered(Set<String> unlockedIds) {
-    final sorted = List<Evidence>.from(sampleCase.evidences)
+  List<Evidence> _filtered(List<Evidence> source, Set<String> unlockedIds) {
+    final sorted = List<Evidence>.from(source)
       ..sort((a, b) {
         final aU = unlockedIds.contains(a.id);
         final bU = unlockedIds.contains(b.id);
@@ -73,8 +72,9 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
     return AnimatedBuilder(
       animation: context.session,
       builder: (context, _) {
-        final unlockedIds = context.sessionRead.unlockedEvidenceIds;
-        final results = _filtered(unlockedIds);
+        final ctrl = context.sessionRead;
+        final unlockedIds = ctrl.unlockedEvidenceIds;
+        final results = _filtered(ctrl.evidences, unlockedIds);
 
         return Scaffold(
           backgroundColor: c.bg,
@@ -123,7 +123,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
                         : ListView.separated(
                             physics: const BouncingScrollPhysics(),
                             itemCount: results.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (_, _) =>
                                 const SizedBox(height: AppTokens.sp2),
                             itemBuilder: (_, i) {
                               final e = results[i];

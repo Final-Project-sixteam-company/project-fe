@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
+import '../components/ms_pill.dart';
+import '../components/states.dart';
+import '../core/api/api_exception.dart';
+import '../models/play_models.dart';
+import '../repositories/play_session_repository.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 
-// ── 데이터 모델 ───────────────────────────────────────────────────────────────
+// ── 데이터 모델 (레거시 샘플 표시용) ──────────────────────────────────────────
 
 class ScoreItem {
   final String label;
@@ -37,7 +42,7 @@ class CaseResult {
   });
 }
 
-// ── 샘플 결과 ─────────────────────────────────────────────────────────────────
+// ── 샘플 결과 (sessionId 없이 호출되는 미리보기 경로) ─────────────────────────
 
 const _sampleResult = CaseResult(
   grade: 'S',
@@ -64,10 +69,15 @@ const _sampleResult = CaseResult(
 
 class ResultScreen extends StatefulWidget {
   const ResultScreen({
+    this.sessionId,
     this.result = _sampleResult,
     super.key,
   });
 
+  /// 서버 플레이 세션 ID. 지정 시 서버에서 채점 결과를 조회한다.
+  final int? sessionId;
+
+  /// 레거시/미리보기용 샘플 결과(서버 미연동 경로).
   final CaseResult result;
 
   @override
@@ -80,6 +90,10 @@ class _ResultScreenState extends State<ResultScreen>
   late final Animation<double> _opacity;
   late final Animation<Offset> _slide;
 
+  bool _loading = false;
+  String? _error;
+  DeductionResult? _data;
+
   @override
   void initState() {
     super.initState();
@@ -89,7 +103,39 @@ class _ResultScreenState extends State<ResultScreen>
       begin: const Offset(0, 10),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut));
-    _ctrl.forward();
+
+    if (widget.sessionId != null) {
+      _fetchResult(widget.sessionId!);
+    } else {
+      _ctrl.forward();
+    }
+  }
+
+  Future<void> _fetchResult(int sessionId) async {
+    setState(() => _loading = true);
+    try {
+      final result = await playSessionRepo.result(sessionId);
+      if (!mounted) return;
+      setState(() {
+        _data = result;
+        _loading = false;
+      });
+      _ctrl.forward();
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = '결과를 불러오지 못했습니다.';
+          _loading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -105,56 +151,131 @@ class _ResultScreenState extends State<ResultScreen>
     return Scaffold(
       backgroundColor: c.bg,
       appBar: _buildAppBar(context),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: AppTokens.sp6),
-            // ── 1. 등급 및 점수 (애니메이션) ──────────────────────────
-            FadeTransition(
-              opacity: _opacity,
-              child: AnimatedBuilder(
-                animation: _slide,
-                builder: (context, child) => Transform.translate(
-                  offset: _slide.value,
-                  child: child,
-                ),
-                child: _GradeHeader(result: widget.result),
+      body: _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    if (_loading) {
+      return const Center(child: MSSpinner(size: 24));
+    }
+    if (_error != null) {
+      return Padding(
+        padding: const EdgeInsets.all(AppTokens.sp4),
+        child: MSEmpty(
+          icon: Icons.cloud_off,
+          title: '결과를 불러오지 못했습니다',
+          subtitle: _error,
+          action: MSButton(
+            label: '홈으로 돌아가기',
+            variant: MSButtonVariant.primary,
+            onPressed: () =>
+                Navigator.of(context).popUntil((route) => route.isFirst),
+          ),
+        ),
+      );
+    }
+
+    final data = _data;
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: AppTokens.sp6),
+          // ── 1. 등급 및 점수 (애니메이션) ──────────────────────────
+          FadeTransition(
+            opacity: _opacity,
+            child: AnimatedBuilder(
+              animation: _slide,
+              builder: (context, child) => Transform.translate(
+                offset: _slide.value,
+                child: child,
+              ),
+              child: _GradeHeader(
+                grade: data?.grade ?? widget.result.grade,
+                totalScore: data?.score ?? widget.result.totalScore,
               ),
             ),
-            const SizedBox(height: AppTokens.sp8),
-            // ── 2. 채점 결과 ───────────────────────────────────────
-            const MSKicker('추리 채점 결과'),
-            const SizedBox(height: AppTokens.sp3),
-            _ScoreCard(items: widget.result.scoreItems),
-            const SizedBox(height: AppTokens.sp8),
-            // ── 3. 사건의 진상 ─────────────────────────────────────
-            const MSKicker('사건의 진상 · 해설'),
-            const SizedBox(height: AppTokens.sp3),
-            _RevelationCard(result: widget.result),
-            const SizedBox(height: AppTokens.sp8),
-            // ── 4. 하단 액션 ───────────────────────────────────────
-            MSButton(
-              label: '홈으로 돌아가기',
-              variant: MSButtonVariant.primary,
-              expanded: true,
-              onPressed: () => Navigator.of(context)
-                  .popUntil((route) => route.isFirst),
-            ),
-            const SizedBox(height: AppTokens.sp2),
-            MSButton(
-              label: '내 기록 보기',
-              variant: MSButtonVariant.ghost,
-              expanded: true,
-              onPressed: () {},
-            ),
-            const SizedBox(height: AppTokens.sp10),
-          ],
-        ),
+          ),
+          const SizedBox(height: AppTokens.sp8),
+          if (data != null)
+            ..._buildServerSections(context, data)
+          else
+            ..._buildSampleSections(context),
+          const SizedBox(height: AppTokens.sp8),
+          // ── 하단 액션 ───────────────────────────────────────────
+          MSButton(
+            label: '홈으로 돌아가기',
+            variant: MSButtonVariant.primary,
+            expanded: true,
+            onPressed: () =>
+                Navigator.of(context).popUntil((route) => route.isFirst),
+          ),
+          const SizedBox(height: AppTokens.sp10),
+        ],
       ),
     );
+  }
+
+  // ── 서버 결과 섹션 ──────────────────────────────────────────────────────────
+
+  List<Widget> _buildServerSections(
+    BuildContext context,
+    DeductionResult data,
+  ) {
+    return [
+      const MSKicker('추리 채점 결과'),
+      const SizedBox(height: AppTokens.sp3),
+      _MatchCard(matched: data.matched),
+      if (data.matchedParts.isNotEmpty || data.missedParts.isNotEmpty) ...[
+        const SizedBox(height: AppTokens.sp8),
+        const MSKicker('맞춘 추리 · 놓친 추리'),
+        const SizedBox(height: AppTokens.sp3),
+        _PartsCard(matched: data.matchedParts, missed: data.missedParts),
+      ],
+      const SizedBox(height: AppTokens.sp8),
+      const MSKicker('사건의 진상 · 해설'),
+      const SizedBox(height: AppTokens.sp3),
+      _RevelationCard(
+        culpritName: data.correctCulprit?.name ?? '미상',
+        culpritRole: data.correctCulprit?.role,
+        feedback: data.feedback,
+        fullExplanation: data.fullExplanation,
+      ),
+      if (data.keyEvidences.isNotEmpty) ...[
+        const SizedBox(height: AppTokens.sp8),
+        const MSKicker('핵심 증거'),
+        const SizedBox(height: AppTokens.sp3),
+        Wrap(
+          spacing: AppTokens.sp2,
+          runSpacing: AppTokens.sp2,
+          children: data.keyEvidences
+              .map((e) => MSPill(e.title, tone: MSPillTone.primary))
+              .toList(),
+        ),
+      ],
+    ];
+  }
+
+  // ── 레거시 샘플 섹션 ────────────────────────────────────────────────────────
+
+  List<Widget> _buildSampleSections(BuildContext context) {
+    final result = widget.result;
+    return [
+      const MSKicker('추리 채점 결과'),
+      const SizedBox(height: AppTokens.sp3),
+      _ScoreCard(items: result.scoreItems),
+      const SizedBox(height: AppTokens.sp8),
+      const MSKicker('사건의 진상 · 해설'),
+      const SizedBox(height: AppTokens.sp3),
+      _RevelationCard(
+        culpritName: result.culpritName,
+        feedback: result.revelation,
+        fullExplanation: '',
+      ),
+    ];
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
@@ -177,12 +298,12 @@ class _ResultScreenState extends State<ResultScreen>
 // ── 등급 헤더 ─────────────────────────────────────────────────────────────────
 
 class _GradeHeader extends StatelessWidget {
-  const _GradeHeader({required this.result});
+  const _GradeHeader({required this.grade, required this.totalScore});
 
-  final CaseResult result;
+  final String grade;
+  final int totalScore;
 
-  bool get _isTopGrade =>
-      result.grade == 'S' || result.grade == 'A';
+  bool get _isTopGrade => grade == 'S' || grade == 'A';
 
   @override
   Widget build(BuildContext context) {
@@ -191,7 +312,7 @@ class _GradeHeader extends StatelessWidget {
     return Column(
       children: [
         Text(
-          result.grade,
+          grade,
           style: AppText.display.copyWith(
             fontSize: 96,
             color: _isTopGrade ? c.success : c.text,
@@ -200,7 +321,7 @@ class _GradeHeader extends StatelessWidget {
         ),
         const SizedBox(height: AppTokens.sp3),
         Text(
-          '${result.totalScore} / ${result.maxScore} PTS',
+          '$totalScore / 100 PTS',
           style: AppText.monoLabel.copyWith(
             fontSize: 14,
             color: c.primary,
@@ -212,7 +333,151 @@ class _GradeHeader extends StatelessWidget {
   }
 }
 
-// ── 점수 카드 ─────────────────────────────────────────────────────────────────
+// ── 채점 매칭 카드 (서버) ─────────────────────────────────────────────────────
+
+class _MatchCard extends StatelessWidget {
+  const _MatchCard({required this.matched});
+
+  final MatchedParts matched;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.sp4),
+      decoration: BoxDecoration(
+        color: c.bgElev,
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(AppTokens.r4),
+      ),
+      child: Column(
+        children: [
+          _MatchRow(label: '진범 지목', matched: matched.culprit),
+          _MatchRow(label: '범행 동기', matched: matched.motive),
+          _MatchRow(label: '범행 방법', matched: matched.method),
+          _MatchRow(label: '은폐 방법', matched: matched.coverUp),
+          _MatchRow(
+            label: '핵심 증거',
+            matched: matched.keyEvidences > 0,
+            trailing: '${matched.keyEvidences}개 일치',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MatchRow extends StatelessWidget {
+  const _MatchRow({
+    required this.label,
+    required this.matched,
+    this.trailing,
+  });
+
+  final String label;
+  final bool matched;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(
+            matched ? Icons.check_circle : Icons.cancel_outlined,
+            size: 18,
+            color: matched ? c.success : c.danger,
+          ),
+          const SizedBox(width: AppTokens.sp3),
+          Expanded(
+            child: Text(
+              label,
+              style: AppText.body.copyWith(color: c.textSub),
+            ),
+          ),
+          Text(
+            trailing ?? (matched ? '정답' : '오답'),
+            style: AppText.monoLabel.copyWith(
+              color: matched ? c.success : c.danger,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 맞춘/놓친 추리 카드 (서버) ────────────────────────────────────────────────
+
+class _PartsCard extends StatelessWidget {
+  const _PartsCard({required this.matched, required this.missed});
+
+  final List<String> matched;
+  final List<String> missed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.sp4),
+      decoration: BoxDecoration(
+        color: c.bgElev,
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(AppTokens.r4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final part in matched) _PartRow(text: part, matched: true),
+          for (final part in missed) _PartRow(text: part, matched: false),
+        ],
+      ),
+    );
+  }
+}
+
+class _PartRow extends StatelessWidget {
+  const _PartRow({required this.text, required this.matched});
+
+  final String text;
+  final bool matched;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            matched ? Icons.check_circle : Icons.cancel_outlined,
+            size: 18,
+            color: matched ? c.success : c.danger,
+          ),
+          const SizedBox(width: AppTokens.sp3),
+          Expanded(
+            child: Text(
+              text,
+              style: AppText.body.copyWith(
+                color: matched ? c.text : c.textSub,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 점수 카드 (레거시 샘플) ───────────────────────────────────────────────────
 
 class _ScoreCard extends StatelessWidget {
   const _ScoreCard({required this.items});
@@ -269,13 +534,24 @@ class _ScoreCard extends StatelessWidget {
 // ── 사건 해설 카드 ────────────────────────────────────────────────────────────
 
 class _RevelationCard extends StatelessWidget {
-  const _RevelationCard({required this.result});
+  const _RevelationCard({
+    required this.culpritName,
+    required this.feedback,
+    required this.fullExplanation,
+    this.culpritRole,
+  });
 
-  final CaseResult result;
+  final String culpritName;
+  final String? culpritRole;
+  final String feedback;
+  final String fullExplanation;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final culpritLabel = culpritRole != null && culpritRole!.isNotEmpty
+        ? '진범: $culpritName · $culpritRole'
+        : '진범: $culpritName';
 
     return Container(
       padding: const EdgeInsets.all(AppTokens.sp4),
@@ -288,17 +564,23 @@ class _RevelationCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '진범: ${result.culpritName}',
+            culpritLabel,
             style: AppText.titleM.copyWith(color: c.danger),
           ),
-          const SizedBox(height: AppTokens.sp3),
-          Text(
-            result.revelation,
-            style: AppText.body.copyWith(
-              color: c.text,
-              height: 1.6,
+          if (feedback.isNotEmpty) ...[
+            const SizedBox(height: AppTokens.sp3),
+            Text(
+              feedback,
+              style: AppText.body.copyWith(color: c.text, height: 1.6),
             ),
-          ),
+          ],
+          if (fullExplanation.isNotEmpty) ...[
+            const SizedBox(height: AppTokens.sp3),
+            Text(
+              fullExplanation,
+              style: AppText.body.copyWith(color: c.textSub, height: 1.6),
+            ),
+          ],
         ],
       ),
     );

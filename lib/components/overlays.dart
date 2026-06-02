@@ -168,13 +168,13 @@ Future<void> showMSModal(
         ? AppColors.ink950.withValues(alpha: .54)
         : AppColors.ink0.withValues(alpha: .26),
     transitionDuration: AppMotion.dur3,
-    pageBuilder: (_, __, ___) => _MSModalContent(
+    pageBuilder: (_, _, _) => _MSModalContent(
       title: title,
       primaryAction: primaryAction,
       secondaryAction: secondaryAction,
       child: child,
     ),
-    transitionBuilder: (_, anim, __, child) {
+    transitionBuilder: (_, anim, _, child) {
       final curved = CurvedAnimation(
         parent: anim,
         curve: AppMotion.easeOut,

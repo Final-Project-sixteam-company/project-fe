@@ -6,12 +6,14 @@ class Suspect {
   final String name;
   final String role;
   final int suspicion;
+  final int interrogationCount;
 
   const Suspect({
     required this.id,
     required this.name,
     required this.role,
     required this.suspicion,
+    this.interrogationCount = 0,
   });
 }
 
