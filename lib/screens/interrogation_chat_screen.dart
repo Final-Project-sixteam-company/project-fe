@@ -98,6 +98,9 @@ class _InterrogationChatScreenState
   Future<void> _sendMessage(
       String text, {
         String? evidenceId,
+        // 발신 질문 유형 힌트. 증거가 제시되면 EVIDENCE_PRESENTED가 항상 우선한다.
+        // 추천 질문 칩은 RECOMMENDED를, 자유 입력은 기본 FREE를 넘긴다.
+        QuestionType questionType = QuestionType.free,
       }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isWaiting) return;
@@ -135,9 +138,11 @@ class _InterrogationChatScreenState
     }
 
     final evidenceIdInt = evidenceId != null ? int.tryParse(evidenceId) : null;
-    final questionType = evidenceIdInt != null
+    // 증거 제시는 항상 EVIDENCE_PRESENTED로 강제하고, 그 외에는 호출자가 넘긴
+    // 유형(추천 칩=RECOMMENDED, 자유 입력=FREE)을 그대로 사용한다.
+    final resolvedType = evidenceIdInt != null
         ? QuestionType.evidencePresented
-        : QuestionType.free;
+        : questionType;
 
     String answer = '...대답을 거부하고 있습니다.';
     // 서버/네트워크 오류 메시지(영문일 수 있음)를 용의자 대사처럼 노출하지 않고,
@@ -148,7 +153,7 @@ class _InterrogationChatScreenState
       final result = await playSessionRepo.interrogate(
         sessionId,
         suspectId: suspectIdInt,
-        questionType: questionType,
+        questionType: resolvedType,
         question: trimmed,
         presentedEvidenceId: evidenceIdInt,
       );
@@ -263,7 +268,9 @@ class _InterrogationChatScreenState
             ),
           ),
           _SuggestedQuestions(
-            onSelect: _sendMessage,
+            // 추천 질문 칩은 RECOMMENDED 유형으로 전송(자유 입력 FREE와 구분).
+            onSelect: (q) =>
+                _sendMessage(q, questionType: QuestionType.recommended),
             disabled: _isWaiting,
           ),
           // 추천 질문 배지와 입력창 사이 간격 — 오탭 방지.
