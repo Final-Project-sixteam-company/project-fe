@@ -631,6 +631,8 @@ class _InputBar extends StatelessWidget {
                   child: MSTextField(
                     controller: controller,
                     hintText: '질문을 입력하세요...',
+                    // 백엔드 question 계약(maxLength 500)을 입력 단계에서 하드캡.
+                    maxLength: 500,
                     onChanged: (_) {},
                   ),
                 ),
