@@ -14,10 +14,11 @@ import '../theme/app_theme.dart';
 import 'case_briefing_screen.dart';
 
 // 현재 백엔드에 플레이 데이터(용의자/증거/정답)가 완전히 시드돼 끝까지 플레이 가능한 시나리오.
-// 1 = 데모데이 전야, 4 = 서월채의 마지막 처방.
-// 5(studio9)는 정답(solution) 미시드로 최종추리에서 AI011이 떠 제외. 백엔드 seed 후 재추가.
-// (백엔드 목록 응답에 canPlay가 채워지면 이 하드코딩을 제거하고 detail.canPlay로 대체)
-const _kPlayableIds = {'1', '4'};
+// 배포 백엔드(api.clueroom.xyz) 기준 ID:
+//   1 = 데모데이 전야(CL-001 데모), 10 = 서월채의 마지막 처방.
+// 11(studio9)은 정답(solution) 시드/채점이 미검증이라 제외. 백엔드 검증 후 재추가.
+// canPlay 백엔드 값은 신뢰 불가(studio9도 canPlay=true로 내려옴) → 화이트리스트 게이트 유지.
+const _kPlayableIds = {'1', '10'};
 const _kBookmarkPrefix = 'bookmark_';
 
 class ScenarioDetailScreen extends StatefulWidget {
@@ -37,8 +38,7 @@ class _ScenarioDetailScreenState
   // 우선 표시하고, GET /api/scenarios/{id} 로 풀데이터를 받아 교체한다(progressive).
   late Scenario _scenario = widget.scenario;
 
-  // canPlay 백엔드 값은 신뢰 불가(스텁 3·정답 미시드 5도 canPlay=true) →
-  // 끝까지 플레이 가능한 화이트리스트로 게이트 유지. (백엔드 정리 후 제거)
+  // 끝까지 플레이 가능한 화이트리스트로 게이트 유지(_kPlayableIds 주석 참고).
   bool get _isPlayable => _kPlayableIds.contains(_scenario.id);
 
   @override
