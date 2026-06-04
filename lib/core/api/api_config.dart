@@ -9,6 +9,11 @@ class ApiConfig {
   ApiConfig._();
 
   static const String _prodBaseUrl = 'https://api.clueroom.xyz';
+  // 컴파일 타임 override. 디버그 빌드에서 실서버로 붙일 때 사용:
+  //   flutter run --dart-define=API_BASE_URL=https://api.clueroom.xyz
+  // 빈 값(미지정)이면 아래 환경 자동 판별 로직을 그대로 따른다.
+  static const String _envBaseUrl =
+      String.fromEnvironment('API_BASE_URL');
   // 로컬 docker 백엔드 호스트 포트. 기본 8080이지만 다른 프로젝트(theo-core)가
   // 8080을 점유 중이라 ClueRoom 백엔드는 18080으로 띄워 연동한다.
   // 8080이 비면 18080 → 8080으로 되돌린다.
@@ -16,6 +21,8 @@ class ApiConfig {
 
   /// 현재 빌드 환경에 맞는 API base URL.
   static String get baseUrl {
+    // 컴파일 타임 override가 있으면 환경 판별보다 우선(디버그→실서버 연동 등).
+    if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
     if (kReleaseMode) return _prodBaseUrl;
 
     // 디버그/프로파일: 로컬 도커 백엔드(localhost:8080)
