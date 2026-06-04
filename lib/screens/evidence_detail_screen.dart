@@ -164,7 +164,6 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
                 _ObservationCard(
                   evidence: widget.evidence,
                   effectiveLocked: _effectiveLocked,
-                  statusLabel: _statusLabel,
                   description: _description,
                   loading: _loadingDetail && _description == null,
                 ),
@@ -286,14 +285,12 @@ class _ObservationCard extends StatelessWidget {
   const _ObservationCard({
     required this.evidence,
     required this.effectiveLocked,
-    required this.statusLabel,
     required this.description,
     required this.loading,
   });
 
   final Evidence evidence;
   final bool effectiveLocked;
-  final String statusLabel;
 
   /// 서버 본문(상세 API 또는 목록 폴백). null 이면 일반 안내 문구로 대체.
   final String? description;
@@ -348,24 +345,6 @@ class _ObservationCard extends StatelessWidget {
               bodyText,
               style: AppText.body.copyWith(color: c.text, height: 1.6),
             ),
-          const SizedBox(height: AppTokens.sp4),
-          Row(
-            children: [
-              Expanded(
-                child: _MetaCell(
-                  label: 'EVIDENCE ID',
-                  value: evidence.id.toUpperCase(),
-                ),
-              ),
-              const SizedBox(width: AppTokens.sp3),
-              Expanded(
-                child: _MetaCell(
-                  label: 'STATUS',
-                  value: statusLabel,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -410,45 +389,3 @@ class _TimelineEventRow extends StatelessWidget {
   }
 }
 
-// ── 메타 셀 ───────────────────────────────────────────────────────────────────
-
-class _MetaCell extends StatelessWidget {
-  const _MetaCell({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.sp3),
-      decoration: BoxDecoration(
-        color: c.bg,
-        border: Border.all(color: c.line),
-        borderRadius: BorderRadius.circular(AppTokens.r3),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: AppText.monoLabel.copyWith(
-              color: c.textMute,
-              fontSize: 9.5,
-            ),
-          ),
-          const SizedBox(height: AppTokens.sp1),
-          Text(
-            value,
-            style: AppText.bodySm.copyWith(
-              color: c.text,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
