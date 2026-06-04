@@ -113,52 +113,52 @@ class _EvidenceImageViewerState extends State<EvidenceImageViewer>
                         colors: [AppColors.ink950, Colors.transparent],
                       ),
                     ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTokens.sp4,
-                        vertical: AppTokens.sp3,
-                      ),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.close,
-                              color: AppColors.ink50,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppTokens.sp4,
+                          vertical: AppTokens.sp3,
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.close,
+                                color: AppColors.ink50,
+                              ),
+                              onPressed: () => Navigator.of(context).pop(),
                             ),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                          const SizedBox(width: AppTokens.sp2),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  widget.title,
-                                  style: AppText.titleM.copyWith(
-                                    color: AppColors.ink50,
-                                    fontSize: 15,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (widget.categoryLabel != null)
+                            const SizedBox(width: AppTokens.sp2),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
                                   Text(
-                                    widget.categoryLabel!.toUpperCase(),
-                                    style: AppText.monoLabel.copyWith(
-                                      color: AppColors.skyBase,
-                                      height: 1.2,
+                                    widget.title,
+                                    style: AppText.titleM.copyWith(
+                                      color: AppColors.ink50,
+                                      fontSize: 15,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                              ],
+                                  if (widget.categoryLabel != null)
+                                    Text(
+                                      widget.categoryLabel!.toUpperCase(),
+                                      style: AppText.monoLabel.copyWith(
+                                        color: AppColors.skyBase,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 ),
               ),
             ),
@@ -172,37 +172,37 @@ class _EvidenceImageViewerState extends State<EvidenceImageViewer>
                 child: FadeTransition(
                   opacity: _fadeAnim,
                   child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [AppColors.ink950, Colors.transparent],
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [AppColors.ink950, Colors.transparent],
+                      ),
                     ),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppTokens.sp4),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on_outlined,
-                            size: 14,
-                            color: AppColors.ink400,
-                          ),
-                          const SizedBox(width: AppTokens.sp1),
-                          Text(
-                            widget.location,
-                            style: AppText.monoLabel.copyWith(
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppTokens.sp4),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on_outlined,
+                              size: 14,
                               color: AppColors.ink400,
-                              height: 1.0,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: AppTokens.sp1),
+                            Text(
+                              widget.location,
+                              style: AppText.monoLabel.copyWith(
+                                color: AppColors.ink400,
+                                height: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 ),
               ),
             ),

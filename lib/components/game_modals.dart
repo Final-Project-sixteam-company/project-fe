@@ -1,6 +1,7 @@
 // lib/components/game_modals.dart
 import 'package:flutter/material.dart';
 import '../components/ms_button.dart';
+import '../components/ms_kicker.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
 import '../controllers/game_session_provider.dart';
@@ -172,9 +173,17 @@ class _HintSheetState extends State<_HintSheet> {
                   child: Center(child: MSSpinner(size: 20)),
                 )
               else if (_error != null)
-                Text(
-                  _error!,
-                  style: AppText.bodySm.copyWith(color: c.danger),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppTokens.sp6),
+                  child: MSEmpty(
+                    icon: Icons.cloud_off,
+                    title: '힌트를 불러오지 못했습니다',
+                    action: MSButton(
+                      label: '다시 시도',
+                      variant: MSButtonVariant.secondary,
+                      onPressed: _load,
+                    ),
+                  ),
                 )
               else
                 ..._hints.map(
@@ -268,7 +277,7 @@ class _HintTile extends StatelessWidget {
 
     // 사용 가능: 사용 버튼
     return MSButton(
-      label: busy ? '확인 중...' : '$label (-${hint.penaltyScore}점)',
+      label: busy ? '사용 중...' : '$label (-${hint.penaltyScore}점)',
       variant: hint.hintLevel >= 3
           ? MSButtonVariant.danger
           : MSButtonVariant.secondary,
@@ -389,8 +398,7 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
                         icon: Icon(Icons.close, color: c.textSub, size: 20),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                        // 기본 48dp 최소 터치 타깃 유지(별도 padding/constraints 억제 안 함).
                       ),
                     ],
                   ),
@@ -514,6 +522,150 @@ class _EvidencePickItem extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+// ── 사건 브리핑 재확인 모달 ───────────────────────────────────────────────────
+// 게임 진행 중 상단 HUD에서 사건 개요·피해자·목표를 다시 확인한다.
+// (브리핑 화면은 pushReplacement 로 진입해 스택에 없으므로 모달로 재노출)
+
+Future<void> showCaseBriefingModal(
+  BuildContext context, {
+  required DashboardInfo dashboard,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (_) => _BriefingSheet(dashboard: dashboard),
+  );
+}
+
+class _BriefingSheet extends StatelessWidget {
+  const _BriefingSheet({required this.dashboard});
+
+  final DashboardInfo dashboard;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final b = dashboard.briefing;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: c.bgElev,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(AppTokens.r6),
+          topRight: Radius.circular(AppTokens.r6),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(AppTokens.sp4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: AppTokens.sp4),
+                    decoration: BoxDecoration(
+                      color: c.line,
+                      borderRadius: BorderRadius.circular(AppTokens.rPill),
+                    ),
+                  ),
+                ),
+                Text('사건 브리핑', style: AppText.titleL.copyWith(color: c.text)),
+                if (dashboard.scenarioTitle.isNotEmpty) ...[
+                  const SizedBox(height: AppTokens.sp1),
+                  Text(
+                    dashboard.scenarioTitle,
+                    style: AppText.bodySm.copyWith(color: c.textSub),
+                  ),
+                ],
+                if (b.summary.isNotEmpty) ...[
+                  const SizedBox(height: AppTokens.sp5),
+                  const MSKicker('사건 개요'),
+                  const SizedBox(height: AppTokens.sp3),
+                  Text(
+                    b.summary,
+                    style: AppText.body.copyWith(color: c.text, height: 1.6),
+                  ),
+                ],
+                const SizedBox(height: AppTokens.sp5),
+                const MSKicker('피해자 정보'),
+                const SizedBox(height: AppTokens.sp3),
+                _BriefingInfoRow(label: '피해자', value: b.victimName),
+                const SizedBox(height: AppTokens.sp2),
+                _BriefingInfoRow(label: '발견 장소', value: b.foundLocation),
+                const SizedBox(height: AppTokens.sp5),
+                const MSKicker('탐정 목표'),
+                const SizedBox(height: AppTokens.sp3),
+                Container(
+                  padding: const EdgeInsets.all(AppTokens.sp4),
+                  decoration: BoxDecoration(
+                    color: c.dangerSoft,
+                    border: Border.all(color: c.danger),
+                    borderRadius: BorderRadius.circular(AppTokens.r4),
+                  ),
+                  child: Text(
+                    '1. 진범을 찾아라\n'
+                    '2. 살해 방법과 동기를 밝혀라\n'
+                    '3. 결정적 증거 3개를 수집하라',
+                    style: AppText.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: c.danger,
+                      height: 1.8,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppTokens.sp5),
+                MSButton(
+                  label: '닫기',
+                  variant: MSButtonVariant.secondary,
+                  expanded: true,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BriefingInfoRow extends StatelessWidget {
+  const _BriefingInfoRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 72,
+          child: Text(
+            label,
+            style: AppText.bodySm.copyWith(color: c.textMute),
+          ),
+        ),
+        Expanded(
+          child: Text(value, style: AppText.body.copyWith(color: c.text)),
+        ),
+      ],
     );
   }
 }

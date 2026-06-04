@@ -58,7 +58,7 @@ class AssetImageWidget extends StatelessWidget {
           return _Shimmer(width: width, height: height);
         },
         errorBuilder: (_, __, ___) =>
-            fallback ?? _DefaultFallback(width: width, height: height),
+        fallback ?? _DefaultFallback(width: width, height: height),
       );
     } else {
       // 로컬 assets 경로
@@ -68,7 +68,7 @@ class AssetImageWidget extends StatelessWidget {
         height: height,
         fit: fit,
         errorBuilder: (_, __, ___) =>
-            fallback ?? _DefaultFallback(width: width, height: height),
+        fallback ?? _DefaultFallback(width: width, height: height),
       );
     }
 
@@ -321,11 +321,11 @@ class ScenarioCoverImage extends StatelessWidget {
       aspectRatio: aspectRatio,
       child: assetKey != null && assetKey!.isNotEmpty
           ? AssetImageWidget(
-              assetKey: assetKey,
-              width: double.infinity,
-              height: double.infinity,
-              fallback: gradient,
-            )
+        assetKey: assetKey,
+        width: double.infinity,
+        height: double.infinity,
+        fallback: gradient,
+      )
           : gradient,
     );
   }

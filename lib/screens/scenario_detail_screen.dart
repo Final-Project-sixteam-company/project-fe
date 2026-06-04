@@ -449,7 +449,12 @@ class _ReviewWriteSheetState extends State<_ReviewWriteSheet> {
                   expanded: true,
                   onPressed: () {
                     final body = _bodyCtrl.text.trim();
-                    if (body.isEmpty) return;
+                    if (body.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('리뷰 내용을 입력해 주세요.')),
+                      );
+                      return;
+                    }
                     final review = ScenarioReview(
                       id: 'r_${DateTime.now().millisecondsSinceEpoch}',
                       scenarioId: widget.scenarioId,
@@ -521,11 +526,13 @@ class _MetaGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
 
+    // 백엔드가 suspectCount/evidenceCount 를 0으로 주는 경우(미집계)가 있어,
+    // "0명·0개"로 오인되지 않도록 0이면 "—"로 표시한다.
     final cells = [
       ('난이도', scenario.difficultyLabel),
       ('플레이시간', '${scenario.estimatedMinutes}분'),
-      ('용의자', '${scenario.suspectsCount}명'),
-      ('증거', '${scenario.evidenceCount}개'),
+      ('용의자', scenario.suspectsCount > 0 ? '${scenario.suspectsCount}명' : '—'),
+      ('증거', scenario.evidenceCount > 0 ? '${scenario.evidenceCount}개' : '—'),
     ];
 
     return Container(
@@ -749,8 +756,8 @@ class _BottomCta extends StatelessWidget {
                     const SizedBox(width: AppTokens.sp2),
                     Expanded(
                       child: Text(
-                        '${scenario.code} 시나리오 데이터가 준비 중입니다. '
-                        'CL-001만 현재 플레이 가능합니다.',
+                        '${scenario.code} 시나리오는 아직 준비 중입니다. '
+                        '곧 플레이할 수 있어요.',
                         style: AppText.bodySm.copyWith(
                           fontSize: 12,
                           color: c.textMute,
@@ -784,7 +791,8 @@ class _BottomCta extends StatelessWidget {
                     icon: isPlayable
                         ? Icons.play_arrow
                         : Icons.lock_clock_outlined,
-                    onPressed: onStart,
+                    // 플레이 불가 시 버튼을 비활성화(라벨만 '준비 중'이고 눌리던 문제 수정).
+                    onPressed: isPlayable ? onStart : null,
                   ),
                 ),
               ],

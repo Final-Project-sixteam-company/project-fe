@@ -1,5 +1,6 @@
 // lib/screens/case_screen.dart
 import 'package:flutter/material.dart';
+import '../components/game_modals.dart';
 import '../components/ms_bottom_nav.dart';
 import '../components/ms_button.dart';
 import '../components/states.dart';
@@ -66,8 +67,15 @@ class _CaseScreenState extends State<CaseScreen> {
   Future<void> _handlePop(bool didPop) async {
     if (didPop) return;
     final navigator = Navigator.of(context);
-    // 이미 제출 완료됐거나 서버 세션이 없으면 그대로 나간다(중단 대상 아님).
-    if (_session.isCompleted || _session.backendSessionId == null) {
+    // 이미 제출 완료된 경우만 그대로 나간다.
+    if (_session.isCompleted) {
+      navigator.pop();
+      return;
+    }
+    // 서버 세션이 없고 생성 중도 아니면(샘플 시나리오 등) 중단 대상이 아니다.
+    // 생성 중(isLoading)이면 다이얼로그를 거쳐 abandonSession 이 생성 완료를 기다린 뒤
+    // 정리하도록 한다(생성 직후 이탈 시 PLAYING 세션 잔류 → 409 레이스 방지).
+    if (_session.backendSessionId == null && !_session.isLoading) {
       navigator.pop();
       return;
     }
@@ -180,6 +188,28 @@ class _CaseScreenState extends State<CaseScreen> {
                   _caseCode,
                   style: AppText.monoLabel.copyWith(color: c.textMute),
                 ),
+                // 사건 브리핑 재확인(개요·피해자·목표). 데이터 로드 후에만 노출.
+                if (_session.dashboard != null) ...[
+                  const SizedBox(width: AppTokens.sp1),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => showCaseBriefingModal(
+                      context,
+                      dashboard: _session.dashboard!,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTokens.sp2,
+                        vertical: AppTokens.sp2,
+                      ),
+                      child: Icon(
+                        Icons.assignment_outlined,
+                        size: 16,
+                        color: c.textMute,
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 // 경과 시간
                 Icon(
