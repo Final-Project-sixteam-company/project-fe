@@ -109,6 +109,17 @@ class _InterrogationChatScreenState
     final sessionId = controller.backendSessionId;
     final suspectIdInt = int.tryParse(widget.suspect.id);
 
+    // 증거 제시 의도가 있었는데 증거 ID가 정수로 파싱되지 않으면, 조용히 일반(FREE)
+    // 질문으로 강등시키지 않고 명확히 차단한다(잘못된 증거 제시가 서버에 평문 질문으로
+    // 나가는 것 방지). 낙관적 버블을 추가하기 전에 검증한다.
+    final evidenceIdInt = evidenceId != null ? int.tryParse(evidenceId) : null;
+    if (evidenceId != null && evidenceIdInt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이 증거는 제시할 수 없습니다. 다시 시도해 주세요.')),
+      );
+      return;
+    }
+
     setState(() {
       _messages.add(_Message(
         text: trimmed,
@@ -137,7 +148,6 @@ class _InterrogationChatScreenState
       return;
     }
 
-    final evidenceIdInt = evidenceId != null ? int.tryParse(evidenceId) : null;
     // 증거 제시는 항상 EVIDENCE_PRESENTED로 강제하고, 그 외에는 호출자가 넘긴
     // 유형(추천 칩=RECOMMENDED, 자유 입력=FREE)을 그대로 사용한다.
     final resolvedType = evidenceIdInt != null
