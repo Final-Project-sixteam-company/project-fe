@@ -28,6 +28,10 @@ class Evidence {
   final bool isNew;
   final bool isAnalyzed;
   final bool isLocked;
+  // 목록 티저 한 줄 요약. 없으면 null.
+  final String? oneLine;
+  // 증거 썸네일 이미지 URL. null/빈값/로딩 실패 시 icon 폴백.
+  final String? imageUrl;
 
   const Evidence({
     required this.id,
@@ -37,6 +41,8 @@ class Evidence {
     this.isNew = false,
     this.isAnalyzed = false,
     this.isLocked = false,
+    this.oneLine,
+    this.imageUrl,
   });
 }
 

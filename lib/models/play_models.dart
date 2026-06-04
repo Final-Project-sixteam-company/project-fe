@@ -128,6 +128,8 @@ class PlayEvidence {
     required this.title,
     required this.importance,
     required this.isUnlocked,
+    this.oneLine,
+    this.imageUrl,
     this.description,
     this.locationName,
     this.unlockHint,
@@ -138,6 +140,13 @@ class PlayEvidence {
   final String title;
   final EvidenceImportance importance;
   final bool isUnlocked;
+
+  /// 한 줄 요약(목록 티저). 잠긴 증거는 보통 null.
+  final String? oneLine;
+
+  /// 증거 썸네일/이미지(S3 URL). 해금된 증거에만 존재하며 없으면 null → 아이콘 폴백.
+  final String? imageUrl;
+
   final String? description;
   final String? locationName;
   final String? unlockHint;
@@ -148,6 +157,8 @@ class PlayEvidence {
         title: j['title'] as String? ?? '',
         importance: evidenceImportanceFromApi(j['importance'] as String?),
         isUnlocked: j['isUnlocked'] as bool? ?? false,
+        oneLine: j['oneLine'] as String?,
+        imageUrl: j['imageUrl'] as String?,
         description: j['description'] as String?,
         locationName: j['locationName'] as String?,
         unlockHint: j['unlockHint'] as String?,

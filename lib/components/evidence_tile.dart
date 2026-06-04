@@ -131,6 +131,7 @@ class _Tile extends StatelessWidget {
                 color: isNewlyUnlocked
                     ? c.success
                     : (evidence.isAnalyzed ? c.success : c.primary),
+                imageUrl: evidence.imageUrl,
               ),
               const SizedBox(width: AppTokens.sp3),
               Expanded(
@@ -147,6 +148,21 @@ class _Tile extends StatelessWidget {
                         color: c.text,
                       ),
                     ),
+                    // 한 줄 요약 티저(있을 때만). 잠긴 증거는 보통 비어 있어 생략된다.
+                    if (evidence.oneLine != null &&
+                        evidence.oneLine!.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        evidence.oneLine!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.bodySm.copyWith(
+                          fontSize: 11,
+                          height: 1.3,
+                          color: c.textSub,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 3),
                     Text(
                       evidence.location,
@@ -178,25 +194,41 @@ class _Tile extends StatelessWidget {
 }
 
 class _IconThumb extends StatelessWidget {
-  const _IconThumb({required this.icon, required this.color});
+  const _IconThumb({required this.icon, required this.color, this.imageUrl});
 
   final IconData icon;
   final Color color;
+  // 증거 썸네일 URL. null/빈값/로딩 실패 시 importance 아이콘으로 폴백.
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final iconFallback = Icon(icon, size: 17, color: color);
+    final url = imageUrl;
+    final hasImage = url != null && url.isNotEmpty;
 
     return Container(
       width: 34,
       height: 34,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: c.bgHover,
         border: Border.all(color: c.line),
         borderRadius: BorderRadius.circular(AppTokens.r2),
       ),
       alignment: Alignment.center,
-      child: Icon(icon, size: 17, color: color),
+      child: hasImage
+          ? Image.network(
+              url,
+              width: 34,
+              height: 34,
+              fit: BoxFit.cover,
+              loadingBuilder: (_, child, progress) =>
+                  progress == null ? child : iconFallback,
+              errorBuilder: (_, _, _) => iconFallback,
+            )
+          : iconFallback,
     );
   }
 }
