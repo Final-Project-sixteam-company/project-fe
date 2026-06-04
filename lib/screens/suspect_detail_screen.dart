@@ -1,6 +1,8 @@
 // lib/screens/suspect_detail_screen.dart
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../components/evidence_item.dart';
+import '../components/image_viewer.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../controllers/game_session_controller.dart';
@@ -120,7 +122,10 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
                 children: [
                   Hero(
                     tag: widget.suspect.id,
-                    child: _LargeAvatar(name: widget.suspect.name),
+                    child: _LargeAvatar(
+                      name: widget.suspect.name,
+                      imageUrl: widget.suspect.portraitUrl,
+                    ),
                   ),
                   const SizedBox(height: AppTokens.sp3),
                   Text(
@@ -226,17 +231,31 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
 // ── 큰 아바타 ─────────────────────────────────────────────────────────────────
 
 class _LargeAvatar extends StatelessWidget {
-  const _LargeAvatar({required this.name});
+  const _LargeAvatar({required this.name, this.imageUrl});
 
   final String name;
+  // 공식 초상 URL. null/빈값/로딩 실패 시 이니셜 그라데이션으로 폴백(용의자 카드와 일관).
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
     final initial = name.isNotEmpty ? name.characters.first : '?';
+    final initialChild = Text(
+      initial,
+      style: AppText.titleL.copyWith(
+        fontSize: 32,
+        color: AppColors.ink950,
+        height: 1.0,
+      ),
+    );
 
-    return Container(
+    final url = imageUrl;
+    final hasImage = url != null && url.isNotEmpty;
+
+    final box = Container(
       width: 80,
       height: 80,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -247,13 +266,40 @@ class _LargeAvatar extends StatelessWidget {
         border: Border.all(color: const Color(0x24FFFFFF)),
       ),
       alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: AppText.titleL.copyWith(
-          fontSize: 32,
-          color: AppColors.ink950,
-          height: 1.0,
-        ),
+      child: hasImage
+          ? CachedNetworkImage(
+              imageUrl: url,
+              width: 80,
+              height: 80,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => initialChild,
+              errorWidget: (_, _, _) => initialChild,
+            )
+          : initialChild,
+    );
+
+    if (!hasImage) return box;
+
+    // 초상이 있으면 탭하여 전체화면으로 크게 볼 수 있음을 돋보기 배지로 알린다.
+    return GestureDetector(
+      onTap: () => showImageViewer(context, url),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          box,
+          Positioned(
+            right: 3,
+            bottom: 3,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: AppColors.ink950.withValues(alpha: .55),
+                borderRadius: BorderRadius.circular(AppTokens.r2),
+              ),
+              child: const Icon(Icons.zoom_in, size: 14, color: AppColors.ink0),
+            ),
+          ),
+        ],
       ),
     );
   }

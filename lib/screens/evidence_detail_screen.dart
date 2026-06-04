@@ -1,5 +1,7 @@
 // lib/screens/evidence_detail_screen.dart
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../components/image_viewer.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
@@ -130,9 +132,16 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
               children: [
                 const SizedBox(height: AppTokens.sp6),
                 // ── 썸네일(이미지 있으면 노출, 없으면 아이콘 플레이스홀더) ──
+                // 이미지가 있으면 탭하여 전체화면 확대 모달로 크게 볼 수 있다.
                 Center(child: _Thumbnail(
                   icon: widget.evidence.icon,
                   imageUrl: _effectiveLocked ? null : _imageUrl,
+                  onTap: () {
+                    final url = _effectiveLocked ? null : _imageUrl;
+                    if (url != null && url.isNotEmpty) {
+                      showImageViewer(context, url);
+                    }
+                  },
                 )),
                 const SizedBox(height: AppTokens.sp4),
                 // ── 이름 ────────────────────────────────────────────
@@ -221,14 +230,17 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
 // ── 썸네일 ────────────────────────────────────────────────────────────────────
 
 class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({required this.icon, this.imageUrl});
+  const _Thumbnail({required this.icon, this.imageUrl, this.onTap});
 
   final IconData icon;
   final String? imageUrl;
+  // 이미지가 있을 때 탭 콜백(전체화면 확대). 이미지가 없으면 무시된다.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final url = imageUrl;
+    final hasImage = url != null && url.isNotEmpty;
     final decoration = BoxDecoration(
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
@@ -241,25 +253,52 @@ class _Thumbnail extends StatelessWidget {
 
     final iconChild = Icon(icon, size: 34, color: AppColors.ink0);
 
-    return Container(
+    final box = Container(
       width: 86,
       height: 86,
       decoration: decoration,
       clipBehavior: Clip.hardEdge,
       alignment: Alignment.center,
-      child: (url != null && url.isNotEmpty)
-          ? Image.network(
-              url,
+      child: hasImage
+          ? CachedNetworkImage(
+              imageUrl: url,
               fit: BoxFit.cover,
               width: 86,
               height: 86,
               // 이미지 로드 실패 시 아이콘 플레이스홀더로 graceful 폴백(S3 키 조합 금지).
-              errorBuilder: (_, _, _) => iconChild,
+              placeholder: (_, _) => iconChild,
+              errorWidget: (_, _, _) => iconChild,
             )
           : iconChild,
     );
+
+    if (!hasImage) return box;
+
+    // 탭하면 크게 볼 수 있음을 알리는 돋보기 배지 + 제스처.
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          box,
+          Positioned(
+            right: 4,
+            bottom: 4,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: AppColors.ink950.withValues(alpha: .55),
+                borderRadius: BorderRadius.circular(AppTokens.r2),
+              ),
+              child: const Icon(Icons.zoom_in, size: 14, color: AppColors.ink0),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
+
 
 // ── 상태 필 ───────────────────────────────────────────────────────────────────
 
