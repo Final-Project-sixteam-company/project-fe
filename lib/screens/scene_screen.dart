@@ -1,8 +1,10 @@
+// lib/screens/scene_screen.dart
 import 'package:flutter/material.dart';
+import '../components/asset_image_widget.dart';
 import '../components/game_modals.dart';
 import '../components/ms_kicker.dart';
-import '../components/ms_pill.dart';
 import '../components/states.dart';
+import '../components/ms_pill.dart';
 import '../controllers/game_session_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
@@ -16,12 +18,14 @@ class _Location {
   final IconData icon;
   final int clueCount;
   final bool isIncident;
+  final String? imageAssetKey;
 
   const _Location({
     required this.name,
     required this.icon,
     required this.clueCount,
     this.isIncident = false,
+    this.imageAssetKey,
   });
 }
 
@@ -59,8 +63,6 @@ const _locations = [
   ),
 ];
 
-// ── 피해자 핀 위치 (비율 기준) ────────────────────────────────────────────────
-
 const _victimPinOffset = Offset(0.58, 0.42);
 
 // ── 화면 ──────────────────────────────────────────────────────────────────────
@@ -78,9 +80,6 @@ class _SceneScreenState extends State<SceneScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    // CL-001 외 시나리오(4·5 등)에서는 하드코딩 현장 데이터가 스포일러가 되므로
-    // 표시하지 않는다(백엔드 locations 엔드포인트 미구현). 구현 시 게이트 제거.
-    final showSample = context.sessionRead.usesCl001SampleCaseData;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -92,29 +91,36 @@ class _SceneScreenState extends State<SceneScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: AppTokens.sp4),
-            // ── 1. 현장 맵 ────────────────────────────────────────
-            // 경과 시간/해금 증거 수는 상단 HUD(CaseScreen)가 라이브로
-            // 표시하므로 여기서 중복 통계 헤더를 두지 않는다.
+            // ── 1. 현장 맵 ─────────────────────────────────────
             _SceneMap(selectedIndex: _selectedIndex),
             const SizedBox(height: AppTokens.sp6),
-            // ── 2. 주요 현장 정보 ─────────────────────────────────
-            if (showSample) ...[
+            // ── 2. 주요 현장 정보 ───────────────────────────────
+            // CL-001 외 시나리오에서는 하드코딩 장소 목록이 스포일러가 되므로
+            // usesCl001SampleCaseData 게이트로 숨긴다.
+            // 백엔드 locations 엔드포인트 구현 후 항상 서버 데이터로 교체한다.
+            if (context.sessionRead.usesCl001SampleCaseData) ...[
               const MSKicker('주요 현장 정보'),
               const SizedBox(height: AppTokens.sp3),
               _LocationList(
                 selectedIndex: _selectedIndex,
                 onTap: (i) => setState(
-                      () => _selectedIndex = _selectedIndex == i ? null : i,
-                ),
+                        () => _selectedIndex = _selectedIndex == i ? null : i),
               ),
-            ] else ...[
-              const Padding(
-                padding: EdgeInsets.only(top: AppTokens.sp8),
-                child: MSEmpty(
-                  icon: Icons.map_outlined,
-                  title: '현장 정보 준비 중',
-                  subtitle: '이 시나리오의 현장 데이터는 곧 제공될 예정입니다.',
+              // ── 3. 선택된 장소 이미지 ──────────────────────────
+              if (_selectedIndex != null &&
+                  _locations[_selectedIndex!].imageAssetKey != null) ...[
+                const SizedBox(height: AppTokens.sp4),
+                _LocationImageCard(
+                  location: _locations[_selectedIndex!],
                 ),
+              ],
+            ] else ...[
+              const MSKicker('현장 정보'),
+              const SizedBox(height: AppTokens.sp3),
+              const MSEmpty(
+                icon: Icons.map_outlined,
+                title: '현장 정보 준비 중',
+                subtitle: '이 시나리오의 현장 데이터는 곧 제공될 예정입니다.',
               ),
             ],
             const SizedBox(height: AppTokens.sp10),
@@ -126,7 +132,6 @@ class _SceneScreenState extends State<SceneScreen> {
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final c = context.c;
-
     return AppBar(
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -141,16 +146,12 @@ class _SceneScreenState extends State<SceneScreen> {
         Padding(
           padding: const EdgeInsets.only(right: AppTokens.sp2),
           child: IconButton(
-            // 48dp 최소 탭 타깃 유지(기본 IconButton 제약 사용).
             tooltip: '힌트 보기',
             onPressed: () {
-              // 힌트는 서버 세션 기반. 세션 미생성 시 안내.
               final sessionId = context.sessionRead.backendSessionId;
               if (sessionId == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.'),
-                  ),
+                  const SnackBar(content: Text('세션이 아직 준비되지 않았습니다.')),
                 );
                 return;
               }
@@ -165,11 +166,14 @@ class _SceneScreenState extends State<SceneScreen> {
 }
 
 // ── 현장 맵 ───────────────────────────────────────────────────────────────────
+// mapAssetKey가 연결되면 실제 이미지를, 아니면 플레이스홀더를 보여준다.
 
 class _SceneMap extends StatelessWidget {
   const _SceneMap({required this.selectedIndex});
-
   final int? selectedIndex;
+
+  // TODO(backend): 세션/시나리오 mapAssetKey를 받아 실제 이미지로 교체.
+  static const String? _mapAssetKey = null;
 
   @override
   Widget build(BuildContext context) {
@@ -185,27 +189,24 @@ class _SceneMap extends StatelessWidget {
         ),
         clipBehavior: Clip.hardEdge,
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            // ── 플레이스홀더 ─────────────────────────────────────
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.map_outlined, size: 48, color: c.textMute),
-                  const SizedBox(height: AppTokens.sp3),
-                  Text(
-                    '현장 지도',
-                    style: AppText.bodySm.copyWith(color: c.textMute),
-                  ),
-                ],
-              ),
-            ),
-            // ── 피해자 위치 핀 ───────────────────────────────────
+            // 맵 이미지 or 플레이스홀더
+            if (_mapAssetKey != null)
+              AssetImageWidget(
+                assetKey: _mapAssetKey,
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
+                fallback: _MapPlaceholder(),
+              )
+            else
+              _MapPlaceholder(),
+            // 피해자 위치 핀
             LayoutBuilder(
-              builder: (context, constraints) {
+              builder: (_, constraints) {
                 final dx = constraints.maxWidth * _victimPinOffset.dx;
                 final dy = constraints.maxHeight * _victimPinOffset.dy;
-
                 return Stack(
                   children: [
                     Positioned(
@@ -224,11 +225,30 @@ class _SceneMap extends StatelessWidget {
   }
 }
 
+class _MapPlaceholder extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.map_outlined, size: 48, color: c.textMute),
+          const SizedBox(height: AppTokens.sp3),
+          Text(
+            '건물 평면도 영역',
+            style: AppText.bodySm.copyWith(color: c.textMute),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _VictimPin extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -247,17 +267,11 @@ class _VictimPin extends StatelessWidget {
               ),
             ],
           ),
-          child: const Icon(
-            Icons.person,
-            size: 12,
-            color: AppColors.ink0,
-          ),
+          child: const Icon(Icons.person, size: 12, color: AppColors.ink0),
         ),
         CustomPaint(
           size: const Size(8, 6),
-          painter: _PinTailPainter(
-            color: context.c.danger,
-          ),
+          painter: _PinTailPainter(color: context.c.danger),
         ),
       ],
     );
@@ -266,7 +280,6 @@ class _VictimPin extends StatelessWidget {
 
 class _PinTailPainter extends CustomPainter {
   const _PinTailPainter({required this.color});
-
   final Color color;
 
   @override
@@ -282,6 +295,60 @@ class _PinTailPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_PinTailPainter old) => old.color != color;
+}
+
+// ── 장소 이미지 카드 ──────────────────────────────────────────────────────────
+
+class _LocationImageCard extends StatelessWidget {
+  const _LocationImageCard({required this.location});
+  final _Location location;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppTokens.r4),
+      child: Stack(
+        children: [
+          AssetImageWidget(
+            assetKey: location.imageAssetKey,
+            width: double.infinity,
+            height: 160,
+            fit: BoxFit.cover,
+            fallback: Container(
+              height: 160,
+              color: c.bgElev,
+              alignment: Alignment.center,
+              child: Icon(location.icon, size: 32, color: c.textMute),
+            ),
+          ),
+          // 장소명 오버레이
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(AppTokens.sp3),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [AppColors.ink950, Colors.transparent],
+                ),
+              ),
+              child: Text(
+                location.name,
+                style: AppText.bodySm.copyWith(
+                  color: AppColors.ink50,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── 장소 리스트 ───────────────────────────────────────────────────────────────
@@ -327,6 +394,7 @@ class _LocationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final bool hasImage = location.imageAssetKey != null;
 
     return AnimatedContainer(
       duration: AppMotion.dur2,
@@ -370,6 +438,15 @@ class _LocationCard extends StatelessWidget {
                       ? MSPillTone.danger
                       : MSPillTone.mute,
                 ),
+                // 이미지 있음 표시
+                if (hasImage) ...[
+                  const SizedBox(width: AppTokens.sp2),
+                  Icon(
+                    Icons.photo_outlined,
+                    size: 14,
+                    color: c.textMute,
+                  ),
+                ],
               ],
             ),
           ),

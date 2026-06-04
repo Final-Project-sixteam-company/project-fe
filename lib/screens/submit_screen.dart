@@ -17,7 +17,6 @@ import 'result_screen.dart';
 class SubmitScreen extends StatefulWidget {
   const SubmitScreen({this.initialSuspect, super.key});
 
-  /// 용의자 상세에서 '범인 지목'으로 진입할 때 미리 선택될 용의자.
   final Suspect? initialSuspect;
 
   @override
@@ -46,7 +45,9 @@ class _SubmitScreenState extends State<SubmitScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedSuspect = widget.initialSuspect;
+    // 증인이 초기값으로 전달된 경우 무시 (SuspectDetailScreen 경로 방어)
+    final initial = widget.initialSuspect;
+    _selectedSuspect = (initial != null && !initial.isWitness) ? initial : null;
   }
 
   @override
@@ -58,23 +59,21 @@ class _SubmitScreenState extends State<SubmitScreen> {
     super.dispose();
   }
 
-  /// 제출 충족 조건 목록(체크리스트 표시 + 버튼 활성 판단에 공용).
   List<_Requirement> get _requirements => [
-        _Requirement('진범을 지목했습니다', _selectedSuspect != null),
-        _Requirement(
-            '범행 동기를 $_minTextLen자 이상 입력', _motive.length >= _minTextLen),
-        _Requirement(
-            '범행 방법을 $_minTextLen자 이상 입력', _method.length >= _minTextLen),
-        _Requirement(
-            '은폐 방법을 $_minTextLen자 이상 입력', _conceal.length >= _minTextLen),
-        _Requirement('종합 추리를 $_minSummaryLen자 이상 입력',
-            _summary.length >= _minSummaryLen),
-        _Requirement('결정적 증거 $_maxEvidenceCount개 선택',
-            _selectedEvidences.length == _maxEvidenceCount),
-      ];
+    _Requirement('진범을 지목했습니다', _selectedSuspect != null),
+    _Requirement(
+        '범행 동기를 $_minTextLen자 이상 입력', _motive.length >= _minTextLen),
+    _Requirement(
+        '범행 방법을 $_minTextLen자 이상 입력', _method.length >= _minTextLen),
+    _Requirement(
+        '은폐 방법을 $_minTextLen자 이상 입력', _conceal.length >= _minTextLen),
+    _Requirement('종합 추리를 $_minSummaryLen자 이상 입력',
+        _summary.length >= _minSummaryLen),
+    _Requirement('결정적 증거 $_maxEvidenceCount개 선택',
+        _selectedEvidences.length == _maxEvidenceCount),
+  ];
 
   bool get _allRequirementsMet => _requirements.every((r) => r.met);
-
   bool get _canSubmit => !_submitting && _allRequirementsMet;
 
   void _toggleEvidence(Evidence e) {
@@ -105,7 +104,6 @@ class _SubmitScreenState extends State<SubmitScreen> {
       return;
     }
 
-    // 비가역 제출 — 확정 다이얼로그를 거친 경우에만 진행.
     final confirmed = await showDialog<bool>(
       context: context,
       barrierColor: context.c.scrim,
@@ -130,22 +128,17 @@ class _SubmitScreenState extends State<SubmitScreen> {
       );
 
       if (!mounted) return;
-      // 타이머 정지 + 세션 완료 표시(점수는 결과 화면에서 서버 값으로 표시).
       controller.completeSession();
-
-      // pushReplacement: 결과 화면에서 하드웨어 백으로 완료된 제출 화면에 되돌아가
-      // 재제출하는 것을 막는다(게임 화면을 스택에서 치우고 결과만 남긴다).
-      Navigator.of(context).pushReplacement(
+      await Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => ResultScreen(sessionId: sessionId),
         ),
       );
     } on ApiException catch (e) {
-      // 서버 오류 메시지(영문일 수 있음)를 그대로 노출하지 않고 한국어로 안내한다.
       final isServerError = (e.status ?? 0) >= 500;
       final message = isServerError
-          ? '채점 서버 오류로 제출하지 못했습니다.\n입력은 그대로 유지되니 잠시 후 다시 제출해 주세요.'
-          : '제출하지 못했습니다. 입력을 확인하고 다시 시도해 주세요.';
+          ? '채점 서버 오류로 제출하지 못했습니다. (${e.message})\n입력은 그대로 유지되니 잠시 후 다시 제출해 주세요.'
+          : '제출 실패: ${e.message}';
       if (mounted) _showSubmitError(message);
     } catch (_) {
       if (mounted) _showSubmitError('제출 중 오류가 발생했습니다. 입력은 유지되니 다시 시도해 주세요.');
@@ -154,7 +147,6 @@ class _SubmitScreenState extends State<SubmitScreen> {
     }
   }
 
-  /// 제출 실패 안내 — 놓치지 않도록 길게(5초) 띄운다.
   void _showSubmitError(String message) {
     final c = context.c;
     ScaffoldMessenger.of(context)
@@ -174,25 +166,33 @@ class _SubmitScreenState extends State<SubmitScreen> {
     final c = context.c;
     final controller = context.session;
 
+    // 증인(isWitness) 제외, 범인 지목 가능한 용의자만.
+    final accusableSuspects =
+    controller.suspects.where((s) => !s.isWitness).toList();
+
+    // controller.suspects 재빌드(retry/refresh) 후 _selectedSuspect가
+    // 이전 인스턴스를 가리키면 DropdownButton value mismatch → assert 크래시.
+    // id로 현재 목록에서 다시 찾아 항상 동일 인스턴스를 사용한다.
+    final selectedValue = _selectedSuspect == null
+        ? null
+        : accusableSuspects
+        .where((s) => s.id == _selectedSuspect!.id)
+        .firstOrNull;
+
     return Scaffold(
       backgroundColor: c.bg,
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.sp4),
+          padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: AppTokens.sp6),
-              // ── 경고 헤더 ───────────────────────────────────────
+              // ── 경고 헤더 ─────────────────────────────────────
               Column(
                 children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    size: 48,
-                    color: c.danger,
-                  ),
+                  Icon(Icons.warning_amber_rounded, size: 48, color: c.danger),
                   const SizedBox(height: AppTokens.sp4),
                   Text(
                     '사건 종결 및 추리 제출',
@@ -208,17 +208,32 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 ],
               ),
               const SizedBox(height: AppTokens.sp8),
-              // ── 1. 진범 지목 ────────────────────────────────────
-              const MSKicker('1. 진범 지목'),
+              // ── 1. 진범 지목 ───────────────────────────────────
+              const MSKicker('1. FINAL SUSPECT · 진범 지목'),
               const SizedBox(height: AppTokens.sp3),
-              _SuspectDropdown(
-                suspects: controller.suspects,
-                selected: _selectedSuspect,
-                onSelect: (s) =>
-                    setState(() => _selectedSuspect = s),
-              ),
+              // 증인만 있거나 목록이 비었을 때 안내
+              if (accusableSuspects.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(AppTokens.sp4),
+                  decoration: BoxDecoration(
+                    color: c.dangerSoft,
+                    border: Border.all(color: c.danger),
+                    borderRadius: BorderRadius.circular(AppTokens.r3),
+                  ),
+                  child: Text(
+                    '지목 가능한 용의자가 없습니다.',
+                    style: AppText.bodySm.copyWith(color: c.danger),
+                  ),
+                )
+              else
+                _SuspectDropdown(
+                  suspects: accusableSuspects,
+                  // id 재매핑된 값을 넘겨 인스턴스 mismatch 크래시 방지.
+                  selected: selectedValue,
+                  onSelect: (s) => setState(() => _selectedSuspect = s),
+                ),
               const SizedBox(height: AppTokens.sp6),
-              // ── 2. 범행 동기 및 방법 ────────────────────────────
+              // ── 2. 범행 동기 및 방법 ───────────────────────────
               const MSKicker('2. 범행 동기 및 방법'),
               const SizedBox(height: AppTokens.sp3),
               MSTextField(
@@ -242,7 +257,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: AppTokens.sp6),
-              // ── 3. 결정적 증거 선택 ─────────────────────────────
+              // ── 3. 결정적 증거 ─────────────────────────────────
               MSKicker(
                 '3. 결정적 증거 · ${_selectedEvidences.length}/$_maxEvidenceCount 선택',
               ),
@@ -264,7 +279,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: AppTokens.sp8),
-              // ── 5. 제출 버튼 ────────────────────────────────────
+              // ── 5. 제출 버튼 ───────────────────────────────────
               if (!_allRequirementsMet) ...[
                 _RequirementChecklist(requirements: _requirements),
                 const SizedBox(height: AppTokens.sp4),
@@ -283,7 +298,6 @@ class _SubmitScreenState extends State<SubmitScreen> {
     );
   }
 
-  /// 제시 가능한(해금된) 증거. 서버 연동 시 백엔드 정수 ID를 가진다.
   List<Evidence> _unlockedEvidences(GameSessionController controller) =>
       controller.evidences.where((e) => !e.isLocked).toList();
 }
@@ -292,22 +306,17 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
 class _Requirement {
   const _Requirement(this.label, this.met);
-
   final String label;
   final bool met;
 }
 
-// ── 미충족 항목 인라인 안내 체크리스트 ────────────────────────────────────────
-
 class _RequirementChecklist extends StatelessWidget {
   const _RequirementChecklist({required this.requirements});
-
   final List<_Requirement> requirements;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
     return Container(
       padding: const EdgeInsets.all(AppTokens.sp4),
       decoration: BoxDecoration(
@@ -325,13 +334,11 @@ class _RequirementChecklist extends StatelessWidget {
           const SizedBox(height: AppTokens.sp3),
           for (final r in requirements)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
               child: Row(
                 children: [
                   Icon(
-                    r.met
-                        ? Icons.check_circle
-                        : Icons.radio_button_unchecked,
+                    r.met ? Icons.check_circle : Icons.radio_button_unchecked,
                     size: 16,
                     color: r.met ? c.success : c.textMute,
                   ),
@@ -353,7 +360,7 @@ class _RequirementChecklist extends StatelessWidget {
   }
 }
 
-// ── 최종 제출 확인 다이얼로그 (비가역) ────────────────────────────────────────
+// ── 최종 제출 확인 다이얼로그 ─────────────────────────────────────────────────
 
 class _SubmitConfirmDialog extends StatelessWidget {
   const _SubmitConfirmDialog();
@@ -361,7 +368,6 @@ class _SubmitConfirmDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
     return Dialog(
       backgroundColor: c.bgElev,
       shape: RoundedRectangleBorder(
@@ -378,16 +384,13 @@ class _SubmitConfirmDialog extends StatelessWidget {
               children: [
                 Icon(Icons.warning_amber_rounded, size: 22, color: c.danger),
                 const SizedBox(width: AppTokens.sp2),
-                Text(
-                  '최종 추리 제출',
-                  style: AppText.titleM.copyWith(color: c.text),
-                ),
+                Text('최종 추리 제출',
+                    style: AppText.titleM.copyWith(color: c.text)),
               ],
             ),
             const SizedBox(height: AppTokens.sp3),
             Text(
-              '제출하면 사건이 종결되며 추리를 다시 수정할 수 없습니다.\n'
-              '정말 제출하시겠습니까?',
+              '제출하면 사건이 종결되며 추리를 다시 수정할 수 없습니다.\n정말 제출하시겠습니까?',
               style: AppText.body.copyWith(color: c.textSub, height: 1.6),
             ),
             const SizedBox(height: AppTokens.sp6),
@@ -428,6 +431,7 @@ class _SuspectDropdown extends StatelessWidget {
     required this.onSelect,
   });
 
+  /// 이미 증인이 제거된 목록만 받는다.
   final List<Suspect> suspects;
   final Suspect? selected;
   final ValueChanged<Suspect?> onSelect;
@@ -435,18 +439,6 @@ class _SuspectDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
-    // DropdownButton 의 value 는 items 중 정확히 0/1개와 == 일치해야 한다.
-    // selected 가 리스트 재생성으로 다른 인스턴스이거나 목록이 비면 assertion 크래시가
-    // 나므로, id 기준으로 현재 items 안의 인스턴스를 찾아 안전한 value 를 만든다.
-    Suspect? selectedValue;
-    for (final s in suspects) {
-      if (s.id == selected?.id) {
-        selectedValue = s;
-        break;
-      }
-    }
-
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppTokens.sp3,
@@ -459,27 +451,17 @@ class _SuspectDropdown extends StatelessWidget {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<Suspect>(
-          value: selectedValue,
+          value: selected,
           isExpanded: true,
           dropdownColor: c.bgElev,
-          icon: Icon(
-            Icons.keyboard_arrow_down,
-            color: c.textSub,
-            size: 20,
-          ),
-          hint: Text(
-            '범인 선택',
-            style: AppText.body.copyWith(color: c.textMute),
-          ),
+          icon: Icon(Icons.keyboard_arrow_down, color: c.textSub, size: 20),
+          hint: Text('범인 선택',
+              style: AppText.body.copyWith(color: c.textMute)),
           style: AppText.body.copyWith(color: c.text),
           items: suspects.map((s) {
             return DropdownMenuItem<Suspect>(
               value: s,
-              child: Text(
-                '${s.name} · ${s.role}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text('${s.name} · ${s.role}'),
             );
           }).toList(),
           onChanged: onSelect,
@@ -533,68 +515,64 @@ class _EvidenceSelector extends StatelessWidget {
           ),
           const SizedBox(height: AppTokens.sp3),
         ],
-        ...evidences.map(
-              (e) {
-            final bool isSelected = selected.contains(e);
-            final bool isDisabled =
-                !isSelected && selected.length >= maxCount;
+        ...evidences.map((e) {
+          final bool isSelected = selected.contains(e);
+          final bool isDisabled = !isSelected && selected.length >= maxCount;
 
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppTokens.sp2),
-              child: GestureDetector(
-                onTap: isDisabled ? null : () => onToggle(e),
-                child: AnimatedContainer(
-                  duration: AppMotion.dur2,
-                  curve: AppMotion.easeOut,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppTokens.sp3,
-                    vertical: 14, // ≈48dp 터치 타깃
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppTokens.sp2),
+            child: GestureDetector(
+              onTap: isDisabled ? null : () => onToggle(e),
+              child: AnimatedContainer(
+                duration: AppMotion.dur2,
+                curve: AppMotion.easeOut,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTokens.sp3,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? c.primarySoft : Colors.transparent,
+                  border: Border.all(
+                    color: isSelected ? c.primary : c.line,
                   ),
-                  decoration: BoxDecoration(
-                    color:
-                    isSelected ? c.primarySoft : Colors.transparent,
-                    border: Border.all(
-                      color: isSelected ? c.primary : c.line,
+                  borderRadius: BorderRadius.circular(AppTokens.r3),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isSelected
+                          ? Icons.check_circle_outline
+                          : Icons.radio_button_unchecked,
+                      size: 16,
+                      color: isSelected
+                          ? c.primary
+                          : isDisabled
+                          ? c.textMute
+                          : c.textSub,
                     ),
-                    borderRadius: BorderRadius.circular(AppTokens.r3),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isSelected
-                            ? Icons.check_circle_outline
-                            : Icons.radio_button_unchecked,
-                        size: 16,
-                        color: isSelected
-                            ? c.primary
-                            : isDisabled
-                            ? c.textMute
-                            : c.textSub,
-                      ),
-                      const SizedBox(width: AppTokens.sp3),
-                      Expanded(
-                        child: Text(
-                          e.name,
-                          style: AppText.body.copyWith(
-                            fontSize: 13,
-                            color: isDisabled ? c.textMute : c.text,
-                          ),
+                    const SizedBox(width: AppTokens.sp3),
+                    Expanded(
+                      child: Text(
+                        e.name,
+                        style: AppText.body.copyWith(
+                          fontSize: 13,
+                          color: isDisabled ? c.textMute : c.text,
                         ),
                       ),
-                      Text(
-                        e.location,
-                        style: AppText.monoLabel.copyWith(
-                          fontSize: 9.5,
-                          color: c.textMute,
-                        ),
+                    ),
+                    Text(
+                      e.location,
+                      style: AppText.monoLabel.copyWith(
+                        fontSize: 9.5,
+                        color: c.textMute,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        }),
       ],
     );
   }
