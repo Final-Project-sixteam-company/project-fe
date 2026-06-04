@@ -129,7 +129,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
       if (!mounted) return;
       controller.completeSession();
-      await Navigator.of(context).push(
+      await Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => ResultScreen(sessionId: sessionId),
         ),
