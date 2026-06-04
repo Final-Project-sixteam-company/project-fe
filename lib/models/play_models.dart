@@ -157,6 +157,64 @@ class PlayEvidence {
       );
 }
 
+/// 증거 상세 조회(`GET …/evidences/{evidenceId}`) 응답.
+/// 목록(PlayEvidence)보다 풍부한 본문(description)과 관련 타임라인 이벤트를 준다.
+/// location 은 목록의 `locationName`(문자열)과 달리 `{locationId,name}` 객체다.
+class EvidenceDetail {
+  const EvidenceDetail({
+    required this.evidenceId,
+    required this.title,
+    required this.importance,
+    this.description,
+    this.imageUrl,
+    this.locationName,
+    this.relatedSuspects = const [],
+    this.relatedTimelineEvents = const [],
+  });
+
+  final int evidenceId;
+  final String title;
+  final EvidenceImportance importance;
+  final String? description;
+  final String? imageUrl;
+  final String? locationName;
+  final List<RelatedSuspect> relatedSuspects;
+  final List<RelatedTimelineEvent> relatedTimelineEvents;
+
+  factory EvidenceDetail.fromJson(Map<String, dynamic> j) => EvidenceDetail(
+        evidenceId: (j['evidenceId'] as num).toInt(),
+        title: j['title'] as String? ?? '',
+        importance: evidenceImportanceFromApi(j['importance'] as String?),
+        description: j['description'] as String?,
+        imageUrl: j['imageUrl'] as String?,
+        // location 객체에서 표시용 이름만 추출(없으면 null).
+        locationName:
+            (j['location'] as Map<String, dynamic>?)?['name'] as String?,
+        relatedSuspects: ((j['relatedSuspects'] as List<dynamic>?) ?? const [])
+            .map((e) => RelatedSuspect.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        relatedTimelineEvents:
+            ((j['relatedTimelineEvents'] as List<dynamic>?) ?? const [])
+                .map((e) =>
+                    RelatedTimelineEvent.fromJson(e as Map<String, dynamic>))
+                .toList(),
+      );
+}
+
+/// 증거 상세의 관련 타임라인 이벤트(`{time, title}`).
+class RelatedTimelineEvent {
+  const RelatedTimelineEvent({required this.time, required this.title});
+
+  final String time;
+  final String title;
+
+  factory RelatedTimelineEvent.fromJson(Map<String, dynamic> j) =>
+      RelatedTimelineEvent(
+        time: j['time'] as String? ?? '',
+        title: j['title'] as String? ?? '',
+      );
+}
+
 class RelatedSuspect {
   const RelatedSuspect({required this.suspectId, required this.name});
 

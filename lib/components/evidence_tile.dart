@@ -62,6 +62,9 @@ class EvidenceTile extends StatelessWidget {
             MaterialPageRoute(
               builder: (_) => EvidenceDetailScreen(
                 evidence: evidence,
+                // 상세 API 호출용 세션 ID + 목록 폴백 데이터(이미 받아 둔 원본).
+                sessionId: session.backendSessionId,
+                listData: session.rawEvidence(evidence.id),
                 // isTimeLocked == false 이면서 evidence.isLocked == true
                 // 인 경우가 시간 해금 상태다.
                 isUnlocked: isNewlyUnlocked,

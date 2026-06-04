@@ -37,6 +37,14 @@ class PlaySessionRepository {
         .toList();
   }
 
+  /// 증거 상세 조회. 목록보다 풍부한 본문(description)·관련 타임라인을 준다.
+  /// 해금된 증거에 한해 호출한다(잠긴 증거 본문 누출 방지).
+  Future<EvidenceDetail> evidenceDetail(int sessionId, int evidenceId) async {
+    final data =
+        await _api.get('/api/play-sessions/$sessionId/evidences/$evidenceId');
+    return EvidenceDetail.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<List<PlaySuspect>> suspects(int sessionId) async {
     final data = await _api.get('/api/play-sessions/$sessionId/suspects');
     return (data as List<dynamic>)
