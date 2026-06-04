@@ -161,15 +161,14 @@ class _Tile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppTokens.sp2),
+              // 배지 어휘는 증거 탭 필터 칩·상세 상태 필과 일관: 확보됨/핵심 증거.
+              // '해금'은 이번 세션에 막 풀린 증거를 강조하는 실제 전이 상태다.
               if (isNewlyUnlocked)
                 const MSPill('해금', tone: MSPillTone.success)
               else if (evidence.isAnalyzed)
-                const MSPill('분석완료', tone: MSPillTone.success)
-              else if (evidence.isNew)
-                const MSPill('NEW', tone: MSPillTone.primary)
+                const MSPill('핵심 증거', tone: MSPillTone.success)
               else
-                // 배지 누락 시 상태 불명확 → '대기'로 통일(EvidenceItem과 동일).
-                const MSPill('대기', tone: MSPillTone.mute),
+                const MSPill('확보됨', tone: MSPillTone.primary),
             ],
           ),
         ),

@@ -53,11 +53,14 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
   bool get _effectiveLocked =>
       widget.evidence.isLocked && !widget.isUnlocked;
 
+  /// 상태 필 — 서버가 주는 라이프사이클이 아니라 증거의 성격을 알리는 라벨.
+  /// (과거 'PENDING'/'NEW'/'ANALYZED'는 트리거 없는 가짜 단계라 제거했다.)
+  /// 잠김(시간 해금 전) → 확보됨(일반) → 핵심 증거(CORE 중요도)의 3분류로,
+  /// 증거 탭 필터 칩·타일 배지와 동일한 어휘를 쓴다.
   String get _statusLabel {
-    if (widget.isUnlocked && widget.evidence.isLocked) return 'UNLOCKED';
-    if (_effectiveLocked) return 'LOCKED';
-    if (widget.evidence.isAnalyzed) return 'ANALYZED';
-    return widget.evidence.isNew ? 'NEW' : 'PENDING';
+    if (_effectiveLocked) return '시간 잠금';
+    if (widget.evidence.isAnalyzed) return '핵심 증거';
+    return '확보됨';
   }
 
   // ── 표시용 합성 데이터(상세 API > 목록 폴백 순) ──────────────────────────
@@ -268,11 +271,9 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = switch (statusLabel) {
-      'UNLOCKED' => MSPillTone.success,
-      'LOCKED' => MSPillTone.mute,
-      'ANALYZED' => MSPillTone.success,
-      'NEW' => MSPillTone.primary,
-      _ => MSPillTone.mute,
+      '핵심 증거' => MSPillTone.success,
+      '확보됨' => MSPillTone.primary,
+      _ => MSPillTone.mute, // 시간 잠금
     };
 
     return MSPill(statusLabel, tone: tone);
