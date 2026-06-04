@@ -1,6 +1,7 @@
 // lib/components/evidence_tile.dart
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'states.dart';
 import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
 import '../screens/evidence_detail_screen.dart';
@@ -225,7 +226,8 @@ class _IconThumb extends StatelessWidget {
               width: 34,
               height: 34,
               fit: BoxFit.cover,
-              placeholder: (_, _) => iconFallback,
+              placeholder: (_, _) =>
+                  const MSSkeleton(width: 34, height: 34, radius: AppTokens.r2),
               errorWidget: (_, _, _) => iconFallback,
             )
           : iconFallback,

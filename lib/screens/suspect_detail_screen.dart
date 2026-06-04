@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../components/evidence_item.dart';
 import '../components/image_viewer.dart';
 import '../components/ms_button.dart';
+import '../components/states.dart';
 import '../components/ms_kicker.dart';
 import '../controllers/game_session_controller.dart';
 import '../controllers/game_session_provider.dart';
@@ -272,7 +273,8 @@ class _LargeAvatar extends StatelessWidget {
               width: 80,
               height: 80,
               fit: BoxFit.cover,
-              placeholder: (_, _) => initialChild,
+              placeholder: (_, _) =>
+                  const MSSkeleton(width: 80, height: 80, radius: AppTokens.r5),
               errorWidget: (_, _, _) => initialChild,
             )
           : initialChild,

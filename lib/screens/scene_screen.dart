@@ -144,7 +144,8 @@ class _SceneMap extends StatelessWidget {
             ? CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => _mapPlaceholder(context),
+                placeholder: (_, _) =>
+                    const SizedBox.expand(child: MSSkeleton(radius: AppTokens.r4)),
                 errorWidget: (_, _, _) => _mapPlaceholder(context),
               )
             : _mapPlaceholder(context),

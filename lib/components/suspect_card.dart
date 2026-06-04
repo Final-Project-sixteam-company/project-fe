@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'states.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
 import '../theme/app_colors.dart';
@@ -167,8 +168,9 @@ class _Avatar extends StatelessWidget {
               width: 40,
               height: 40,
               fit: BoxFit.cover,
-              // 로딩 중/실패 시 이니셜 그라데이션을 그대로 노출.
-              placeholder: (_, _) => initialFallback,
+              // 로딩 중엔 스켈레톤, 실패 시 이니셜 그라데이션 폴백.
+              placeholder: (_, _) =>
+                  const MSSkeleton(width: 40, height: 40, radius: AppTokens.r3),
               errorWidget: (_, _, _) => initialFallback,
             )
           : initialFallback,

@@ -265,8 +265,9 @@ class _Thumbnail extends StatelessWidget {
               fit: BoxFit.cover,
               width: 86,
               height: 86,
-              // 이미지 로드 실패 시 아이콘 플레이스홀더로 graceful 폴백(S3 키 조합 금지).
-              placeholder: (_, _) => iconChild,
+              // 로딩 중엔 스켈레톤, 실패 시 아이콘 폴백(S3 키 조합 금지).
+              placeholder: (_, _) =>
+                  const MSSkeleton(width: 86, height: 86, radius: AppTokens.r6),
               errorWidget: (_, _, _) => iconChild,
             )
           : iconChild,
