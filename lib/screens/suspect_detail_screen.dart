@@ -423,6 +423,29 @@ class _LogCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 증거 제시 심문이면 어떤 증거를 제시했는지 마커로 표시(채팅 버블과 일관).
+          if (log.presentedEvidence != null) ...[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.description_outlined, size: 12, color: c.success),
+                const SizedBox(width: AppTokens.sp1),
+                Flexible(
+                  child: Text(
+                    '증거 제시 · ${log.presentedEvidence!.title}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.monoLabel.copyWith(
+                      fontSize: 10,
+                      color: c.success,
+                      height: 1.0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTokens.sp1),
+          ],
           Text(
             'Q. ${log.question}',
             style: AppText.bodySm.copyWith(

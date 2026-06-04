@@ -396,6 +396,8 @@ class InterrogationResult {
     required this.suspectName,
     required this.question,
     required this.answer,
+    this.questionType = QuestionType.free,
+    this.presentedEvidence,
     this.unlockedEvidences = const [],
     this.createdAt,
   });
@@ -405,6 +407,15 @@ class InterrogationResult {
   final String suspectName;
   final String question;
   final String answer;
+
+  /// 질문 유형(FREE/RECOMMENDED/EVIDENCE_PRESENTED). 심문 로그 조회 응답에만 존재하며
+  /// POST 응답에는 없어 기본 FREE로 처리한다.
+  final QuestionType questionType;
+
+  /// 증거 제시 심문일 때 제시된 증거(`{evidenceId, title}`). 그 외에는 null.
+  /// 로그 복원 시 증거 제시 마커를 되살리는 데 쓴다.
+  final RelatedEvidence? presentedEvidence;
+
   final List<RelatedEvidence> unlockedEvidences;
   final DateTime? createdAt;
 
@@ -415,6 +426,11 @@ class InterrogationResult {
         suspectName: j['suspectName'] as String? ?? '',
         question: j['question'] as String? ?? '',
         answer: j['answer'] as String? ?? '',
+        questionType: questionTypeFromApi(j['questionType'] as String?),
+        presentedEvidence: j['presentedEvidence'] == null
+            ? null
+            : RelatedEvidence.fromJson(
+                j['presentedEvidence'] as Map<String, dynamic>),
         unlockedEvidences: ((j['unlockedEvidences'] as List<dynamic>?) ?? const [])
             .map((e) => RelatedEvidence.fromJson(e as Map<String, dynamic>))
             .toList(),
