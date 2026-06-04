@@ -252,6 +252,7 @@ class PlaySuspect {
     this.relationToVictim,
     this.publicStatement,
     this.alibi,
+    this.portraitImageUrl,
   });
 
   final int suspectId;
@@ -263,6 +264,9 @@ class PlaySuspect {
   final String? publicStatement;
   final String? alibi;
 
+  /// 용의자 공식 초상 이미지(S3 URL). 없으면 null → UI는 이니셜 아바타로 폴백.
+  final String? portraitImageUrl;
+
   factory PlaySuspect.fromJson(Map<String, dynamic> j) => PlaySuspect(
         suspectId: (j['suspectId'] as num).toInt(),
         name: j['name'] as String? ?? '',
@@ -272,6 +276,7 @@ class PlaySuspect {
         relationToVictim: j['relationToVictim'] as String?,
         publicStatement: j['publicStatement'] as String?,
         alibi: j['alibi'] as String?,
+        portraitImageUrl: j['portraitImageUrl'] as String?,
       );
 }
 

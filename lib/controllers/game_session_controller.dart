@@ -249,6 +249,7 @@ class GameSessionController extends ChangeNotifier {
         role: s.role ?? '',
         suspicion: s.suspicionLevel,
         interrogationCount: s.interrogationCount,
+        portraitUrl: s.portraitImageUrl,
       );
 
   Evidence _toEvidence(PlayEvidence e) => Evidence(

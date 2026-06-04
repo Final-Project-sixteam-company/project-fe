@@ -43,7 +43,11 @@ class SuspectCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  _Avatar(initial: suspect.name.isNotEmpty ? suspect.name.characters.first : '?'),
+                  _Avatar(
+                    initial:
+                        suspect.name.isNotEmpty ? suspect.name.characters.first : '?',
+                    imageUrl: suspect.portraitUrl,
+                  ),
                   const SizedBox(width: AppTokens.sp3),
                   Expanded(
                     child: Column(
@@ -119,15 +123,30 @@ class _InterrogationChip extends StatelessWidget {
 // ── 아바타 ────────────────────────────────────────────────────────────────────
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initial});
+  const _Avatar({required this.initial, this.imageUrl});
 
   final String initial;
+  // 공식 초상 URL. null/빈값이거나 로딩 실패 시 이니셜 그라데이션으로 폴백.
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
+    final initialFallback = Text(
+      initial,
+      style: AppText.titleM.copyWith(
+        fontSize: 16,
+        color: AppColors.ink950,
+        height: 1.0,
+      ),
+    );
+
+    final url = imageUrl;
+    final hasImage = url != null && url.isNotEmpty;
+
     return Container(
       width: 40,
       height: 40,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -141,14 +160,18 @@ class _Avatar extends StatelessWidget {
         ),
       ),
       alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: AppText.titleM.copyWith(
-          fontSize: 16,
-          color: AppColors.ink950,
-          height: 1.0,
-        ),
-      ),
+      child: hasImage
+          ? Image.network(
+              url,
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+              // 로딩 중/실패 시 이니셜 그라데이션을 그대로 노출.
+              loadingBuilder: (_, child, progress) =>
+                  progress == null ? child : initialFallback,
+              errorBuilder: (_, _, _) => initialFallback,
+            )
+          : initialFallback,
     );
   }
 }

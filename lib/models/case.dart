@@ -7,6 +7,8 @@ class Suspect {
   final String role;
   final int suspicion;
   final int interrogationCount;
+  // 공식 초상 이미지 URL. null/빈값이면 이니셜 아바타로 폴백.
+  final String? portraitUrl;
 
   const Suspect({
     required this.id,
@@ -14,6 +16,7 @@ class Suspect {
     required this.role,
     required this.suspicion,
     this.interrogationCount = 0,
+    this.portraitUrl,
   });
 }
 
