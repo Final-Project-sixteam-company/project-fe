@@ -99,10 +99,7 @@ class _ScenarioDetailScreenState
             ),
             onPressed: _toggleBookmark,
           ),
-          IconButton(
-            icon: Icon(Icons.more_vert, color: c.textSub),
-            onPressed: () {},
-          ),
+          // 더보기(more_vert)는 연결할 메뉴가 없어 무동작이었으므로 제거.
         ],
       ),
       bottomNavigationBar: _BottomCta(

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../components/evidence_tile.dart';
 import '../components/filter_chip_widget.dart';
+import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
@@ -117,6 +118,19 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
                   Expanded(
                     child: ctrl.isLoading && ctrl.evidences.isEmpty
                         ? const MSListSkeleton(itemHeight: 76)
+                        // 로드 실패 + 증거 없음일 때 '검색 결과 없음'으로 오인되지
+                        // 않도록 오류 상태를 명시(용의자 탭과 동일 패턴).
+                        : ctrl.loadError != null && ctrl.evidences.isEmpty
+                        ? MSEmpty(
+                            icon: Icons.cloud_off,
+                            title: '불러오지 못했습니다',
+                            subtitle: ctrl.loadError,
+                            action: MSButton(
+                              label: '다시 시도',
+                              variant: MSButtonVariant.secondary,
+                              onPressed: () => ctrl.retry(),
+                            ),
+                          )
                         : results.isEmpty
                         ? const MSEmpty(
                             icon: Icons.search_off,

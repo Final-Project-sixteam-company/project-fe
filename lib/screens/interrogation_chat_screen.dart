@@ -74,10 +74,16 @@ class _InterrogationChatScreenState
     }
 
     if (_messages.isEmpty) {
-      _messages.add(const _Message(
-        text: '저는 할 말이 없습니다. 변호사를 불러주세요.',
-        sender: _Sender.suspect,
-      ));
+      // 첫 진입 기본 버블: 임의의 거부 대사(하드코딩)를 띄우면 모든 용의자가
+      // 동일하게 비협조적으로 보이고, 심문 전인데 진술을 거부한 것처럼 오인된다.
+      // 서버가 제공하는 용의자 공개 진술(publicStatement)을 출처로 쓰고,
+      // 없으면 특정 알리바이/태도를 단정하지 않는 중립 안내로 연다.
+      final raw = controller.rawSuspect(widget.suspect.id);
+      final statement = raw?.publicStatement?.trim();
+      final opening = (statement != null && statement.isNotEmpty)
+          ? statement
+          : '무엇이 궁금하신가요? 질문해 주세요.';
+      _messages.add(_Message(text: opening, sender: _Sender.suspect));
     }
     _scrollToBottom();
   }

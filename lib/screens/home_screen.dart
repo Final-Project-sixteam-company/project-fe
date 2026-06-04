@@ -9,13 +9,16 @@ import '../theme/app_theme.dart';
 // ── 화면 ──────────────────────────────────────────────────────────────────────
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({this.onBrowse, this.onCreate, super.key});
+  const HomeScreen({this.onBrowse, this.onCreate, this.onProfile, super.key});
 
   /// 라이브러리 탭으로 이동(앱 셸이 주입).
   final VoidCallback? onBrowse;
 
   /// 만들기 탭으로 이동(앱 셸이 주입).
   final VoidCallback? onCreate;
+
+  /// 내 정보 탭으로 이동(앱 셸이 주입).
+  final VoidCallback? onProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +35,7 @@ class HomeScreen extends StatelessWidget {
             children: [
               const SizedBox(height: AppTokens.sp4),
               // ── 1. 헤더 ─────────────────────────────────────────
-              _Header(),
+              _Header(onProfile: onProfile),
               const SizedBox(height: AppTokens.sp6),
               // ── 2. 수사 시작 배너 ─────────────────────────────
               _WelcomeBanner(onBrowse: onBrowse),
@@ -56,6 +59,11 @@ class HomeScreen extends StatelessWidget {
 // ── 헤더 ──────────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
+  const _Header({this.onProfile});
+
+  /// 내 정보 탭 이동 콜백. null이면 아이콘을 숨긴다.
+  final VoidCallback? onProfile;
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
@@ -71,16 +79,14 @@ class _Header extends StatelessWidget {
             ),
           ),
         ),
-        IconButton(
-          tooltip: '알림',
-          onPressed: () {},
-          icon: Icon(Icons.notifications_outlined, color: c.textSub),
-        ),
-        IconButton(
-          tooltip: '내 정보',
-          onPressed: () {},
-          icon: Icon(Icons.account_circle_outlined, color: c.textSub),
-        ),
+        // 알림(벨) 아이콘은 연결할 알림 기능이 없어 무동작이었으므로 제거한다.
+        // 알림 설정 진입점은 '내 정보' 탭(마이페이지)에 이미 존재.
+        if (onProfile != null)
+          IconButton(
+            tooltip: '내 정보',
+            onPressed: onProfile,
+            icon: Icon(Icons.account_circle_outlined, color: c.textSub),
+          ),
       ],
     );
   }
