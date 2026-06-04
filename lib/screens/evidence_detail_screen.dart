@@ -34,6 +34,10 @@ class EvidenceDetailScreen extends StatefulWidget {
     /// 확보된 증거에서 '용의자 심문하기' 다음 단계 경로를 제공할 때 전달한다.
     /// null 이면 CTA 를 표시하지 않는다(세션 외부에서 열람한 경우 등).
     this.onInterrogate,
+
+    /// 심문 중 증거 제시 플로우에서 상세를 먼저 보여줄 때 전달한다.
+    /// null 이 아니면 '이 증거 제시하기' CTA 를 노출한다(제시 확정 콜백).
+    this.onPresent,
     super.key,
   });
 
@@ -42,6 +46,7 @@ class EvidenceDetailScreen extends StatefulWidget {
   final int? sessionId;
   final bool isUnlocked;
   final VoidCallback? onInterrogate;
+  final VoidCallback? onPresent;
 
   @override
   State<EvidenceDetailScreen> createState() => _EvidenceDetailScreenState();
@@ -214,6 +219,22 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
                       // 상세를 닫고 용의자 탭으로 전환한다.
                       Navigator.of(context).pop();
                       widget.onInterrogate!();
+                    },
+                  ),
+                ],
+                // ── 증거 제시 CTA(심문 중 제시 플로우) ───────────────────
+                // 상세를 읽어본 뒤 이 버튼으로 제시를 확정한다.
+                if (!_effectiveLocked && widget.onPresent != null) ...[
+                  const SizedBox(height: AppTokens.sp6),
+                  MSButton(
+                    label: '이 증거 제시하기',
+                    icon: Icons.send,
+                    variant: MSButtonVariant.primary,
+                    expanded: true,
+                    onPressed: () {
+                      // 상세를 닫고 제시를 확정한다(콜백이 시트를 닫고 심문에 제시).
+                      Navigator.of(context).pop();
+                      widget.onPresent!();
                     },
                   ),
                 ],
