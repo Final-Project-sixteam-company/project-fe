@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../components/game_modals.dart';
 import '../components/ms_kicker.dart';
@@ -140,10 +141,11 @@ class _SceneMap extends StatelessWidget {
         ),
         clipBehavior: Clip.hardEdge,
         child: (url != null && url.isNotEmpty)
-            ? Image.network(
-                url,
+            ? CachedNetworkImage(
+                imageUrl: url,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => _mapPlaceholder(context),
+                placeholder: (_, _) => _mapPlaceholder(context),
+                errorWidget: (_, _, _) => _mapPlaceholder(context),
               )
             : _mapPlaceholder(context),
       ),

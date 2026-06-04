@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
@@ -161,15 +162,14 @@ class _Avatar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: hasImage
-          ? Image.network(
-              url,
+          ? CachedNetworkImage(
+              imageUrl: url,
               width: 40,
               height: 40,
               fit: BoxFit.cover,
               // 로딩 중/실패 시 이니셜 그라데이션을 그대로 노출.
-              loadingBuilder: (_, child, progress) =>
-                  progress == null ? child : initialFallback,
-              errorBuilder: (_, _, _) => initialFallback,
+              placeholder: (_, _) => initialFallback,
+              errorWidget: (_, _, _) => initialFallback,
             )
           : initialFallback,
     );

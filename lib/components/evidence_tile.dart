@@ -1,4 +1,5 @@
 // lib/components/evidence_tile.dart
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
@@ -219,14 +220,13 @@ class _IconThumb extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: hasImage
-          ? Image.network(
-              url,
+          ? CachedNetworkImage(
+              imageUrl: url,
               width: 34,
               height: 34,
               fit: BoxFit.cover,
-              loadingBuilder: (_, child, progress) =>
-                  progress == null ? child : iconFallback,
-              errorBuilder: (_, _, _) => iconFallback,
+              placeholder: (_, _) => iconFallback,
+              errorWidget: (_, _, _) => iconFallback,
             )
           : iconFallback,
     );
