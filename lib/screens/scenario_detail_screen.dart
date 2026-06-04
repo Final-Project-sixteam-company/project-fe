@@ -6,6 +6,7 @@ import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../models/review_models.dart';
 import '../models/scenario.dart';
+import '../repositories/scenario_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
@@ -32,12 +33,28 @@ class ScenarioDetailScreen extends StatefulWidget {
 class _ScenarioDetailScreenState
     extends State<ScenarioDetailScreen> {
   bool _bookmarked = false;
-  bool get _isPlayable => _kPlayableIds.contains(widget.scenario.id);
+  // 상세 진입 시 목록에서 전달받은 요약(synopsis=description, tags=[], creator 없음)을
+  // 우선 표시하고, GET /api/scenarios/{id} 로 풀데이터를 받아 교체한다(progressive).
+  late Scenario _scenario = widget.scenario;
+
+  // canPlay 백엔드 값은 신뢰 불가(스텁 3·정답 미시드 5도 canPlay=true) →
+  // 끝까지 플레이 가능한 화이트리스트로 게이트 유지. (백엔드 정리 후 제거)
+  bool get _isPlayable => _kPlayableIds.contains(_scenario.id);
 
   @override
   void initState() {
     super.initState();
     _loadBookmark();
+    _loadDetail();
+  }
+
+  Future<void> _loadDetail() async {
+    try {
+      final full = await scenarioRepo.detail(widget.scenario.id);
+      if (mounted) setState(() => _scenario = full);
+    } catch (_) {
+      // 상세 조회 실패 시 목록 요약 데이터를 그대로 사용(graceful)
+    }
   }
 
   Future<void> _loadBookmark() async {
@@ -57,7 +74,7 @@ class _ScenarioDetailScreenState
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final s = widget.scenario;
+    final s = _scenario;
     // CL-001처럼 같은 사건이 백엔드 id('1')와 샘플 id('demoday-eve')로 나뉘어도
     // 리뷰가 한 버킷으로 모이도록 정규화 키로 비교한다(작성·열람 경로 키 불일치 수정).
     final reviews = sampleReviews

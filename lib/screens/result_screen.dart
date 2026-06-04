@@ -12,79 +12,21 @@ import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 
-// ── 데이터 모델 (레거시 샘플 표시용) ──────────────────────────────────────────
-
-class ScoreItem {
-  final String label;
-  final int score;
-  final int maxScore;
-
-  const ScoreItem({
-    required this.label,
-    required this.score,
-    required this.maxScore,
-  });
-}
-
-class CaseResult {
-  final String grade;
-  final int totalScore;
-  final int maxScore;
-  final List<ScoreItem> scoreItems;
-  final String culpritName;
-  final String revelation;
-
-  const CaseResult({
-    required this.grade,
-    required this.totalScore,
-    required this.maxScore,
-    required this.scoreItems,
-    required this.culpritName,
-    required this.revelation,
-  });
-}
-
-// ── 샘플 결과 (sessionId 없이 호출되는 미리보기 경로) ─────────────────────────
-
-const _sampleResult = CaseResult(
-  grade: 'S',
-  totalScore: 95,
-  maxScore: 100,
-  scoreItems: [
-    ScoreItem(label: '진범 지목', score: 30, maxScore: 30),
-    ScoreItem(label: '범행 방법', score: 23, maxScore: 25),
-    ScoreItem(label: '범행 동기', score: 20, maxScore: 20),
-    ScoreItem(label: '은폐 방법', score: 10, maxScore: 10),
-    ScoreItem(label: '결정적 증거', score: 15, maxScore: 15),
-    ScoreItem(label: '힌트 감점', score: -3, maxScore: 0),
-  ],
-  culpritName: '박재민',
-  revelation:
-  '박재민 CTO는 투자 유치 실패와 공동창업자와의 지분 갈등으로 인해 범행을 계획했다. '
-      '그는 데모룸 행사 당일 밤 22시 이전 퇴장한 것처럼 기록을 조작한 뒤, '
-      '비상계단을 통해 서버실에 재진입해 핵심 계약 데이터가 담긴 USB를 파쇄했다. '
-      '아몬드라떼 컵에 남은 지문과 삭제된 슬랙 메시지 복원본이 결정적 증거가 됐으며, '
-      '출입 기록 로그의 시간 불일치가 알리바이 모순을 입증했다.',
-);
-
 // ── 화면 ──────────────────────────────────────────────────────────────────────
 
 class ResultScreen extends StatefulWidget {
   const ResultScreen({
-    this.sessionId,
+    required this.sessionId,
     this.scenarioId,
-    this.result = _sampleResult,
     super.key,
   });
 
-  /// 서버 플레이 세션 ID. 지정 시 서버에서 채점 결과를 조회한다.
+  /// 서버 플레이 세션 ID. 서버에서 채점 결과를 조회한다.
+  /// null이면 정답/해설을 노출하지 않고 오류 상태를 보여준다(스포일러 방지).
   final int? sessionId;
 
   /// 리뷰 작성 진입을 위한 시나리오 ID(완료 후 진입점). 없으면 리뷰 버튼 숨김.
   final String? scenarioId;
-
-  /// 레거시/미리보기용 샘플 결과(서버 미연동 경로).
-  final CaseResult result;
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
@@ -113,7 +55,9 @@ class _ResultScreenState extends State<ResultScreen>
     if (widget.sessionId != null) {
       _fetchResult(widget.sessionId!);
     } else {
-      _ctrl.forward();
+      // 세션 ID가 없으면 채점 결과를 알 수 없다. 과거엔 샘플(정답/해설 포함)을
+      // 노출했으나 스포일러가 되므로 오류 상태만 보여준다.
+      _error = '결과 정보를 불러올 수 없습니다.';
     }
   }
 
@@ -200,6 +144,23 @@ class _ResultScreenState extends State<ResultScreen>
     }
 
     final data = _data;
+    // 데이터도 오류도 없는 상태(이론상 도달하지 않음) — 정답 노출 대신 안내.
+    if (data == null) {
+      return Padding(
+        padding: const EdgeInsets.all(AppTokens.sp4),
+        child: MSEmpty(
+          icon: Icons.inbox_outlined,
+          title: '결과 정보가 없습니다',
+          subtitle: '채점 결과를 확인할 수 없습니다.',
+          action: MSButton(
+            label: '홈으로 돌아가기',
+            variant: MSButtonVariant.primary,
+            onPressed: () =>
+                Navigator.of(context).popUntil((route) => route.isFirst),
+          ),
+        ),
+      );
+    }
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
@@ -217,16 +178,13 @@ class _ResultScreenState extends State<ResultScreen>
                 child: child,
               ),
               child: _GradeHeader(
-                grade: data?.grade ?? widget.result.grade,
-                totalScore: data?.score ?? widget.result.totalScore,
+                grade: data.grade,
+                totalScore: data.score,
               ),
             ),
           ),
           const SizedBox(height: AppTokens.sp8),
-          if (data != null)
-            ..._buildServerSections(context, data)
-          else
-            ..._buildSampleSections(context),
+          ..._buildServerSections(context, data),
           const SizedBox(height: AppTokens.sp8),
           // ── 하단 액션 ───────────────────────────────────────────
           // 리뷰 작성 진입점 — 플레이를 마친 지금 시점에 노출(상세에서 이전).
@@ -292,26 +250,6 @@ class _ResultScreenState extends State<ResultScreen>
         const SizedBox(height: AppTokens.sp3),
         _PartsCard(matched: data.matchedParts, missed: data.missedParts),
       ],
-    ];
-  }
-
-  // ── 레거시 샘플 섹션 ────────────────────────────────────────────────────────
-
-  List<Widget> _buildSampleSections(BuildContext context) {
-    final result = widget.result;
-    return [
-      // 서버 경로와 동일하게 해설을 먼저, 상세 점수표를 뒤에 배치.
-      const MSKicker('사건의 진상 · 해설'),
-      const SizedBox(height: AppTokens.sp3),
-      _RevelationCard(
-        culpritName: result.culpritName,
-        feedback: result.revelation,
-        fullExplanation: '',
-      ),
-      const SizedBox(height: AppTokens.sp8),
-      const MSKicker('추리 채점 결과'),
-      const SizedBox(height: AppTokens.sp3),
-      _ScoreCard(items: result.scoreItems),
     ];
   }
 
@@ -515,58 +453,6 @@ class _PartRow extends StatelessWidget {
 }
 
 // ── 점수 카드 (레거시 샘플) ───────────────────────────────────────────────────
-
-class _ScoreCard extends StatelessWidget {
-  const _ScoreCard({required this.items});
-
-  final List<ScoreItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.sp4),
-      decoration: BoxDecoration(
-        color: c.bgElev,
-        border: Border.all(color: c.line),
-        borderRadius: BorderRadius.circular(AppTokens.r4),
-      ),
-      child: Column(
-        children: items.map((item) {
-          final bool isDeduc = item.score < 0;
-          final Color scoreColor =
-          isDeduc ? c.danger : c.success;
-
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    item.label,
-                    style: AppText.body.copyWith(color: c.textSub),
-                  ),
-                ),
-                Text(
-                  isDeduc
-                      ? '${item.score}점'
-                      : '+${item.score}점',
-                  style: AppText.monoNum.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: scoreColor,
-                    height: 1.0,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
 
 // ── 사건 해설 카드 ────────────────────────────────────────────────────────────
 

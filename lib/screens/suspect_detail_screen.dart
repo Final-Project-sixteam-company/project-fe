@@ -73,6 +73,21 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
     } catch (_) {}
   }
 
+  /// 심문 화면으로 이동하고, 돌아오면 심문 로그를 다시 불러와 최신 상태로 갱신한다.
+  /// (상세↔채팅 단일 소스화: 서버 로그가 진실 소스이며 복귀 시 재조회한다.)
+  Future<void> _openInterrogation() async {
+    final ctrl = context.sessionRead;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GameSessionProvider(
+          controller: ctrl,
+          child: InterrogationChatScreen(suspect: widget.suspect),
+        ),
+      ),
+    );
+    if (mounted) await _loadLogs();
+  }
+
   @override
   void dispose() {
     _ctrl.dispose();
@@ -88,7 +103,10 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
     return Scaffold(
       backgroundColor: c.bg,
       appBar: _buildAppBar(context),
-      bottomNavigationBar: _BottomBar(suspect: widget.suspect),
+      bottomNavigationBar: _BottomBar(
+        suspect: widget.suspect,
+        onInterrogate: _openInterrogation,
+      ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
@@ -427,9 +445,10 @@ class _LogCard extends StatelessWidget {
 // ── 하단 고정 버튼 바 ─────────────────────────────────────────────────────────
 
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.suspect});
+  const _BottomBar({required this.suspect, required this.onInterrogate});
 
   final Suspect suspect;
+  final VoidCallback onInterrogate;
 
   @override
   Widget build(BuildContext context) {
@@ -458,17 +477,7 @@ class _BottomBar extends StatelessWidget {
                 label: '심문하기',
                 variant: MSButtonVariant.primary,
                 expanded: true,
-                onPressed: () {
-                  final ctrl = context.sessionRead;
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => GameSessionProvider(
-                        controller: ctrl,
-                        child: InterrogationChatScreen(suspect: suspect),
-                      ),
-                    ),
-                  );
-                },
+                onPressed: onInterrogate,
               ),
             ),
             const SizedBox(width: AppTokens.sp3),
