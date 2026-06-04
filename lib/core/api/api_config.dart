@@ -9,7 +9,10 @@ class ApiConfig {
   ApiConfig._();
 
   static const String _prodBaseUrl = 'https://api.clueroom.xyz';
-  static const int _devPort = 8080;
+  // 로컬 docker 백엔드 호스트 포트. 기본 8080이지만 다른 프로젝트(theo-core)가
+  // 8080을 점유 중이라 ClueRoom 백엔드는 18080으로 띄워 연동한다.
+  // 8080이 비면 18080 → 8080으로 되돌린다.
+  static const int _devPort = 18080;
 
   /// 현재 빌드 환경에 맞는 API base URL.
   static String get baseUrl {

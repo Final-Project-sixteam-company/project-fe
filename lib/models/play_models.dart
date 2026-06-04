@@ -217,6 +217,65 @@ class PlaySuspect {
       );
 }
 
+// ── 현장(장소) ───────────────────────────────────────────────────────────────
+
+class PlayLocations {
+  const PlayLocations({
+    this.mapImageUrl,
+    this.locations = const [],
+  });
+
+  final String? mapImageUrl;
+  final List<PlayLocation> locations;
+
+  factory PlayLocations.fromJson(Map<String, dynamic> j) => PlayLocations(
+        mapImageUrl: j['mapImageUrl'] as String?,
+        locations: ((j['locations'] as List<dynamic>?) ?? const [])
+            .map((e) => PlayLocation.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class PlayLocation {
+  const PlayLocation({
+    required this.locationId,
+    required this.name,
+    required this.totalEvidenceCount,
+    required this.unlockedEvidenceCount,
+    this.locationCode,
+    this.floor,
+    this.description,
+    this.imageUrl,
+    this.mapX,
+    this.mapY,
+  });
+
+  final int locationId;
+  final String name;
+  final int totalEvidenceCount;
+  final int unlockedEvidenceCount;
+  final String? locationCode;
+  final String? floor;
+  final String? description;
+  final String? imageUrl;
+  final double? mapX;
+  final double? mapY;
+
+  factory PlayLocation.fromJson(Map<String, dynamic> j) => PlayLocation(
+        locationId: (j['locationId'] as num).toInt(),
+        name: j['name'] as String? ?? '',
+        totalEvidenceCount: (j['totalEvidenceCount'] as num?)?.toInt() ?? 0,
+        unlockedEvidenceCount:
+            (j['unlockedEvidenceCount'] as num?)?.toInt() ?? 0,
+        locationCode: j['locationCode'] as String?,
+        floor: j['floor']?.toString(),
+        description: j['description'] as String?,
+        imageUrl: j['imageUrl'] as String?,
+        mapX: (j['mapX'] as num?)?.toDouble(),
+        mapY: (j['mapY'] as num?)?.toDouble(),
+      );
+}
+
 // ── 힌트 ─────────────────────────────────────────────────────────────────────
 
 class PlayHint {

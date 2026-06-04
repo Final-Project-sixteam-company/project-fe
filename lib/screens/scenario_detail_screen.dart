@@ -12,9 +12,11 @@ import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'case_briefing_screen.dart';
 
-// 현재 백엔드에 플레이 데이터(용의자/증거/정답)가 시드된 시나리오.
-// 데모 시나리오는 scenarioId=1 ("CL-001"), 4·5는 정식 씨드 시나리오.
-const _kPlayableIds = {'1', '4', '5'};
+// 현재 백엔드에 플레이 데이터(용의자/증거/정답)가 완전히 시드돼 끝까지 플레이 가능한 시나리오.
+// 1 = 데모데이 전야, 4 = 서월채의 마지막 처방.
+// 5(studio9)는 정답(solution) 미시드로 최종추리에서 AI011이 떠 제외. 백엔드 seed 후 재추가.
+// (백엔드 목록 응답에 canPlay가 채워지면 이 하드코딩을 제거하고 detail.canPlay로 대체)
+const _kPlayableIds = {'1', '4'};
 const _kBookmarkPrefix = 'bookmark_';
 
 class ScenarioDetailScreen extends StatefulWidget {

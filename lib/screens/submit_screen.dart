@@ -8,6 +8,7 @@ import '../controllers/game_session_controller.dart';
 import '../controllers/game_session_provider.dart';
 import '../core/api/api_exception.dart';
 import '../models/case.dart';
+import '../models/play_models.dart';
 import '../repositories/play_session_repository.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
@@ -34,7 +35,6 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
   static const int _maxEvidenceCount = 3;
   static const int _minTextLen = 5;
-  static const int _minSummaryLen = 10;
 
   bool _submitting = false;
 
@@ -45,7 +45,6 @@ class _SubmitScreenState extends State<SubmitScreen> {
   String get _motive => _motiveCtrl.text.trim();
   String get _method => _methodCtrl.text.trim();
   String get _conceal => _concealCtrl.text.trim();
-  String get _summary => _summaryCtrl.text.trim();
 
   @override
   void initState() {
@@ -71,8 +70,6 @@ class _SubmitScreenState extends State<SubmitScreen> {
             '범행 방법을 $_minTextLen자 이상 입력', _method.length >= _minTextLen),
         _Requirement(
             '은폐 방법을 $_minTextLen자 이상 입력', _conceal.length >= _minTextLen),
-        _Requirement('종합 추리를 $_minSummaryLen자 이상 입력',
-            _summary.length >= _minSummaryLen),
         _Requirement('결정적 증거 $_maxEvidenceCount개 선택',
             _selectedEvidences.length == _maxEvidenceCount),
       ];
@@ -95,14 +92,20 @@ class _SubmitScreenState extends State<SubmitScreen> {
     final controller = context.sessionRead;
     final sessionId = controller.backendSessionId;
     final culpritId = int.tryParse(_selectedSuspect?.id ?? '');
+    // 진행 중(PLAYING) 세션에서만 제출 가능. 이미 제출/종료된 세션은 차단한다.
+    final status = controller.dashboard?.status;
+    final notPlaying =
+        status != null && status != PlaySessionStatus.playing;
 
-    if (!_canSubmit || sessionId == null || culpritId == null) {
+    if (!_canSubmit || sessionId == null || culpritId == null || notPlaying) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            sessionId == null
-                ? '세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.'
-                : '모든 항목을 입력해주세요.',
+            notPlaying
+                ? '이미 종결된 사건입니다. 다시 제출할 수 없습니다.'
+                : sessionId == null
+                    ? '세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.'
+                    : '모든 항목을 입력해주세요.',
           ),
         ),
       );
@@ -262,12 +265,17 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 maxCount: _maxEvidenceCount,
               ),
               const SizedBox(height: AppTokens.sp6),
-              // ── 4. 종합 추리 설명 ───────────────────────────────
-              const MSKicker('4. 종합 추리 설명'),
+              // ── 4. 종합 추리 설명 (본인 정리용 · 제출 미반영) ────
+              const MSKicker('4. 종합 추리 설명 · 선택'),
+              const SizedBox(height: AppTokens.sp2),
+              Text(
+                '생각을 정리하기 위한 메모입니다. 채점에는 반영되지 않습니다.',
+                style: AppText.bodySm.copyWith(color: c.textMute),
+              ),
               const SizedBox(height: AppTokens.sp3),
               MSTextField(
                 controller: _summaryCtrl,
-                hintText: '사건의 전말을 상세히 기록해주세요.',
+                hintText: '사건의 전말을 자유롭게 정리해보세요. (선택)',
                 maxLines: 5,
                 onChanged: (_) => setState(() {}),
               ),
@@ -281,7 +289,12 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 label: _submitting ? '제출 중...' : '최종 추리 제출',
                 variant: MSButtonVariant.danger,
                 expanded: true,
-                onPressed: _canSubmit ? _onSubmit : null,
+                // 진행 중(PLAYING) 세션 + 모든 항목 충족 시에만 활성화.
+                onPressed: (_canSubmit &&
+                        controller.dashboard?.status ==
+                            PlaySessionStatus.playing)
+                    ? _onSubmit
+                    : null,
               ),
               const SizedBox(height: AppTokens.sp10),
             ],

@@ -6,10 +6,12 @@ import '../components/ms_button.dart';
 import '../components/states.dart';
 import '../controllers/game_session_controller.dart';
 import '../controllers/game_session_provider.dart';
+import '../models/play_models.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'evidence_screen.dart';
+import 'result_screen.dart';
 import 'scene_screen.dart';
 import 'submit_screen.dart';
 import 'suspects_screen.dart';
@@ -137,6 +139,15 @@ class _CaseScreenState extends State<CaseScreen> {
                 return _buildLoadError(context);
               }
             }
+            // 정답 누출 런타임 가드: 이미 종료된(PLAYING 아님) 세션이 어떤 경로로든
+            // 케이스 화면에 노출되면 증거/용의자/타임라인 탭(정답성 데이터 포함)을
+            // 띄우지 않고 종결 상태를 안내한다. (정상 제출은 ResultScreen으로 대체됨)
+            final status = _session.dashboard?.status;
+            if (!_session.isCompleted &&
+                status != null &&
+                status != PlaySessionStatus.playing) {
+              return _buildClosedSession(context);
+            }
             return IndexedStack(
               index: _navIndex,
               children: _kScreens,
@@ -152,16 +163,19 @@ class _CaseScreenState extends State<CaseScreen> {
   Widget _buildLoadError(BuildContext context) {
     final conflict = _session.sessionConflict;
 
-    // 409 충돌은 '다시 시도'로 해소되지 않는다(이미 진행 중인 세션이 점유 중).
-    // 이 경우 '나가기'를 주 액션(primary)으로 올려 탈출 경로를 분명히 한다.
+    // 409 충돌은 단순 '다시 시도'로 해소되지 않는다(이미 진행 중인 세션이 점유 중).
+    // 이 경우 '기존 세션 포기 후 새로 시작'을 주 액션으로 올려 복구 경로를 제공한다.
+    // (이 기기에서 시작한 세션이면 abandon 으로 정리 후 재시작)
     final retryButton = MSButton(
-      label: '다시 시도',
-      variant: conflict ? MSButtonVariant.ghost : MSButtonVariant.secondary,
-      onPressed: () => _session.retry(),
+      label: conflict ? '기존 세션 포기 후 새로 시작' : '다시 시도',
+      variant: conflict ? MSButtonVariant.primary : MSButtonVariant.secondary,
+      onPressed: () => conflict
+          ? _session.abandonConflictAndRestart()
+          : _session.retry(),
     );
     final exitButton = MSButton(
       label: '나가기',
-      variant: conflict ? MSButtonVariant.primary : MSButtonVariant.ghost,
+      variant: MSButtonVariant.ghost,
       onPressed: () => Navigator.of(context).pop(),
     );
 
@@ -175,9 +189,57 @@ class _CaseScreenState extends State<CaseScreen> {
             (conflict
                 ? '다른 기기나 창에서 이미 이 사건을 수사 중입니다. 나가서 기존 수사를 마치거나 중단한 뒤 다시 시작하세요.'
                 : '네트워크 상태를 확인한 뒤 다시 시도해 주세요.'),
-        // 회복 불가(409)일 때 '나가기'를 주 액션으로, 그 외에는 '다시 시도'를 주 액션으로.
-        action: conflict ? exitButton : retryButton,
-        secondaryAction: conflict ? retryButton : exitButton,
+        // 충돌(409)이든 일반 오류든 복구 액션('포기 후 재시작'/'다시 시도')을 주 액션으로,
+        // '나가기'를 보조 액션으로 둔다.
+        action: retryButton,
+        secondaryAction: exitButton,
+      ),
+    );
+  }
+
+  // ── 이미 종결된 세션 안내(정답 누출 방지) ────────────────────────────────
+  Widget _buildClosedSession(BuildContext context) {
+    final status = _session.dashboard?.status;
+    // 채점이 끝난(SUBMITTED/COMPLETED) 세션이면 결과 화면으로 보낼 수 있다.
+    final scored = status == PlaySessionStatus.submitted ||
+        status == PlaySessionStatus.completed;
+    final sessionId = _session.backendSessionId;
+
+    return Padding(
+      padding: const EdgeInsets.all(AppTokens.sp6),
+      child: MSEmpty(
+        icon: Icons.gavel_outlined,
+        title: '이미 종결된 사건입니다',
+        subtitle: scored
+            ? '이 수사는 이미 제출이 완료되었습니다. 결과를 확인하세요.'
+            : '이 수사는 더 이상 진행할 수 없습니다.',
+        action: (scored && sessionId != null)
+            ? MSButton(
+                label: '결과 보기',
+                variant: MSButtonVariant.primary,
+                onPressed: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => ResultScreen(
+                      sessionId: sessionId,
+                      scenarioId: _session.scenarioId,
+                    ),
+                  ),
+                ),
+              )
+            : MSButton(
+                label: '홈으로 돌아가기',
+                variant: MSButtonVariant.primary,
+                onPressed: () =>
+                    Navigator.of(context).popUntil((route) => route.isFirst),
+              ),
+        secondaryAction: (scored && sessionId != null)
+            ? MSButton(
+                label: '홈으로 돌아가기',
+                variant: MSButtonVariant.ghost,
+                onPressed: () =>
+                    Navigator.of(context).popUntil((route) => route.isFirst),
+              )
+            : null,
       ),
     );
   }

@@ -4,64 +4,10 @@ import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../components/states.dart';
 import '../controllers/game_session_provider.dart';
-import '../theme/app_colors.dart';
+import '../models/play_models.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
-
-// ── 로컬 데이터 ───────────────────────────────────────────────────────────────
-
-class _Location {
-  final String name;
-  final IconData icon;
-  final int clueCount;
-  final bool isIncident;
-
-  const _Location({
-    required this.name,
-    required this.icon,
-    required this.clueCount,
-    this.isIncident = false,
-  });
-}
-
-const _locations = [
-  _Location(
-    name: '데모룸 (사건 발생지)',
-    icon: Icons.meeting_room_outlined,
-    clueCount: 3,
-    isIncident: true,
-  ),
-  _Location(
-    name: '재무팀 사무실',
-    icon: Icons.business_outlined,
-    clueCount: 2,
-  ),
-  _Location(
-    name: '서버실',
-    icon: Icons.storage_outlined,
-    clueCount: 2,
-  ),
-  _Location(
-    name: '카페',
-    icon: Icons.local_cafe_outlined,
-    clueCount: 1,
-  ),
-  _Location(
-    name: '비상계단',
-    icon: Icons.stairs_outlined,
-    clueCount: 1,
-  ),
-  _Location(
-    name: '보안실',
-    icon: Icons.security_outlined,
-    clueCount: 1,
-  ),
-];
-
-// ── 피해자 핀 위치 (비율 기준) ────────────────────────────────────────────────
-
-const _victimPinOffset = Offset(0.58, 0.42);
 
 // ── 화면 ──────────────────────────────────────────────────────────────────────
 
@@ -78,9 +24,10 @@ class _SceneScreenState extends State<SceneScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    // CL-001 외 시나리오(4·5 등)에서는 하드코딩 현장 데이터가 스포일러가 되므로
-    // 표시하지 않는다(백엔드 locations 엔드포인트 미구현). 구현 시 게이트 제거.
-    final showSample = context.sessionRead.usesCl001SampleCaseData;
+    // 컨트롤러 변경(현장 로딩 완료 등)에 반응해 리빌드한다.
+    final session = context.session;
+    final locations = session.locations;
+    final items = locations?.locations ?? const <PlayLocation>[];
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -95,29 +42,31 @@ class _SceneScreenState extends State<SceneScreen> {
             // ── 1. 현장 맵 ────────────────────────────────────────
             // 경과 시간/해금 증거 수는 상단 HUD(CaseScreen)가 라이브로
             // 표시하므로 여기서 중복 통계 헤더를 두지 않는다.
-            // CL-001 외 시나리오는 현장 데이터 미제공 → 맵을 '준비 중'으로 명시.
-            _SceneMap(
-              selectedIndex: _selectedIndex,
-              disabled: !showSample,
-            ),
+            _SceneMap(mapImageUrl: locations?.mapImageUrl),
             const SizedBox(height: AppTokens.sp6),
             // ── 2. 주요 현장 정보 ─────────────────────────────────
-            if (showSample) ...[
+            if (items.isNotEmpty) ...[
               const MSKicker('주요 현장 정보'),
               const SizedBox(height: AppTokens.sp3),
               _LocationList(
+                locations: items,
                 selectedIndex: _selectedIndex,
                 onTap: (i) => setState(
-                      () => _selectedIndex = _selectedIndex == i ? null : i,
+                  () => _selectedIndex = _selectedIndex == i ? null : i,
                 ),
+              ),
+            ] else if (session.isLoading) ...[
+              const Padding(
+                padding: EdgeInsets.only(top: AppTokens.sp6),
+                child: MSListSkeleton(itemCount: 4),
               ),
             ] else ...[
               const Padding(
                 padding: EdgeInsets.only(top: AppTokens.sp8),
                 child: MSEmpty(
                   icon: Icons.map_outlined,
-                  title: '현장 정보 준비 중',
-                  subtitle: '이 시나리오의 현장 데이터는 곧 제공될 예정입니다.',
+                  title: '현장 정보 없음',
+                  subtitle: '이 시나리오에는 표시할 현장 정보가 없습니다.',
                 ),
               ),
             ],
@@ -171,20 +120,15 @@ class _SceneScreenState extends State<SceneScreen> {
 // ── 현장 맵 ───────────────────────────────────────────────────────────────────
 
 class _SceneMap extends StatelessWidget {
-  const _SceneMap({
-    required this.selectedIndex,
-    this.disabled = false,
-  });
+  const _SceneMap({this.mapImageUrl});
 
-  final int? selectedIndex;
-
-  /// 현장 데이터가 제공되지 않는 시나리오(CL-001 외)에서 true.
-  /// 맵을 '준비 중'으로 명시하고 CL-001 전용 피해자 핀을 숨긴다.
-  final bool disabled;
+  /// 현장 지도 이미지 URL. null이면 플레이스홀더를 표시한다(S3 키 조합 금지).
+  final String? mapImageUrl;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final url = mapImageUrl;
 
     return AspectRatio(
       aspectRatio: 4 / 3,
@@ -195,122 +139,45 @@ class _SceneMap extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppTokens.r4),
         ),
         clipBehavior: Clip.hardEdge,
-        child: Stack(
-          children: [
-            // ── 플레이스홀더 ─────────────────────────────────────
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.map_outlined, size: 48, color: c.textMute),
-                  const SizedBox(height: AppTokens.sp3),
-                  Text(
-                    disabled ? '현장 지도 준비 중' : '현장 지도',
-                    style: AppText.bodySm.copyWith(color: c.textMute),
-                  ),
-                ],
-              ),
-            ),
-            // ── 피해자 위치 핀 (CL-001 전용) ─────────────────────
-            if (!disabled)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final dx = constraints.maxWidth * _victimPinOffset.dx;
-                  final dy = constraints.maxHeight * _victimPinOffset.dy;
-
-                  return Stack(
-                    children: [
-                      Positioned(
-                        left: dx - 12,
-                        top: dy - 28,
-                        child: _VictimPin(),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            // ── 비활성 안내 배지 ─────────────────────────────────
-            if (disabled)
-              Positioned(
-                top: AppTokens.sp2,
-                right: AppTokens.sp2,
-                child: MSPill('준비 중', tone: MSPillTone.mute),
-              ),
-          ],
-        ),
+        child: (url != null && url.isNotEmpty)
+            ? Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _mapPlaceholder(context),
+              )
+            : _mapPlaceholder(context),
       ),
     );
   }
-}
 
-class _VictimPin extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
+  Widget _mapPlaceholder(BuildContext context) {
     final c = context.c;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: c.danger,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.ink0, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: c.danger.withValues(alpha: .4),
-                blurRadius: 6,
-                spreadRadius: 1,
-              ),
-            ],
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.map_outlined, size: 48, color: c.textMute),
+          const SizedBox(height: AppTokens.sp3),
+          Text(
+            '현장 지도',
+            style: AppText.bodySm.copyWith(color: c.textMute),
           ),
-          child: const Icon(
-            Icons.person,
-            size: 12,
-            color: AppColors.ink0,
-          ),
-        ),
-        CustomPaint(
-          size: const Size(8, 6),
-          painter: _PinTailPainter(
-            color: context.c.danger,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
-}
-
-class _PinTailPainter extends CustomPainter {
-  const _PinTailPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width / 2, size.height)
-      ..lineTo(size.width, 0)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_PinTailPainter old) => old.color != color;
 }
 
 // ── 장소 리스트 ───────────────────────────────────────────────────────────────
 
 class _LocationList extends StatelessWidget {
   const _LocationList({
+    required this.locations,
     required this.selectedIndex,
     required this.onTap,
   });
 
+  final List<PlayLocation> locations;
   final int? selectedIndex;
   final ValueChanged<int> onTap;
 
@@ -318,14 +185,13 @@ class _LocationList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        for (int i = 0; i < _locations.length; i++) ...[
+        for (int i = 0; i < locations.length; i++) ...[
           _LocationCard(
-            location: _locations[i],
+            location: locations[i],
             selected: selectedIndex == i,
             onTap: () => onTap(i),
           ),
-          if (i < _locations.length - 1)
-            const SizedBox(height: AppTokens.sp2),
+          if (i < locations.length - 1) const SizedBox(height: AppTokens.sp2),
         ],
       ],
     );
@@ -339,13 +205,14 @@ class _LocationCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final _Location location;
+  final PlayLocation location;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final floor = location.floor;
 
     return AnimatedContainer(
       duration: AppMotion.dur2,
@@ -368,26 +235,38 @@ class _LocationCard extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  location.icon,
+                  Icons.place_outlined,
                   size: 18,
-                  color: location.isIncident ? c.danger : c.primary,
+                  color: c.primary,
                 ),
                 const SizedBox(width: AppTokens.sp3),
                 Expanded(
-                  child: Text(
-                    location.name,
-                    style: AppText.body.copyWith(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: c.text,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        location.name,
+                        style: AppText.body.copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: c.text,
+                        ),
+                      ),
+                      if (floor != null && floor.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          floor,
+                          style: AppText.bodySm.copyWith(color: c.textMute),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
+                const SizedBox(width: AppTokens.sp2),
                 MSPill(
-                  '단서 ${location.clueCount}개',
-                  tone: location.isIncident
-                      ? MSPillTone.danger
-                      : MSPillTone.mute,
+                  '해금 ${location.unlockedEvidenceCount}/${location.totalEvidenceCount}',
+                  tone: MSPillTone.mute,
                 ),
               ],
             ),

@@ -44,6 +44,11 @@ class PlaySessionRepository {
         .toList();
   }
 
+  Future<PlayLocations> locations(int sessionId) async {
+    final data = await _api.get('/api/play-sessions/$sessionId/locations');
+    return PlayLocations.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<List<PlayHint>> hints(int sessionId) async {
     final data = await _api.get('/api/play-sessions/$sessionId/hints');
     return (data as List<dynamic>)

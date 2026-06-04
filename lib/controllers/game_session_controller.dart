@@ -43,6 +43,10 @@ class GameSessionController extends ChangeNotifier {
   final Map<String, PlayEvidence> _evidenceRaw = {};
   PlayEvidence? rawEvidence(String id) => _evidenceRaw[id];
 
+  /// 현장(장소) 정보. 비핵심 데이터라 로딩 실패해도 무시(null 유지).
+  PlayLocations? _locations;
+  PlayLocations? get locations => _locations;
+
   /// 시나리오 식별자를 정수 백엔드 ID로 변환. 변환 불가(샘플 시나리오) 시 null.
   int? get _backendScenarioId {
     final parsed = int.tryParse(scenarioId);
@@ -147,6 +151,29 @@ class GameSessionController extends ChangeNotifier {
   /// 로딩 실패 후 재시도(에러 화면의 '다시 시도').
   Future<void> retry() => loadFromServer();
 
+  /// 409(이미 진행 중 세션) 복구: 이 기기에 저장된 세션 ID가 있으면 abandon 으로
+  /// 정리한 뒤 새로 시작한다. 저장 ID가 없으면(다른 기기/창에서 점유 중) 서버가
+  /// 활성 세션 ID를 돌려주지 않아 FE 단독 정리가 불가하므로 안내만 갱신한다.
+  Future<void> abandonConflictAndRestart() async {
+    final sid = _backendScenarioId;
+    if (sid == null) return;
+    final saved = await _readSavedSession(sid);
+    if (saved != null) {
+      try {
+        await _repo.abandon(saved);
+      } catch (_) {
+        // 정리 실패(이미 종료/네트워크 등)는 무시 — 아래에서 신규 생성을 시도한다.
+      }
+      await _clearSavedSession(sid);
+      await loadFromServer();
+      return;
+    }
+    // 저장된 세션이 없으면 자동 복구 불가 — 안내 문구를 명확히 갱신한다.
+    _loadError = '이 기기에서 시작한 세션 기록이 없어 자동으로 정리할 수 없습니다. '
+        '다른 기기/창에서 진행 중인 수사를 마치거나 중단한 뒤 다시 시도해 주세요.';
+    notifyListeners();
+  }
+
   Future<void> _refreshAll() async {
     final id = backendSessionId;
     if (id == null) return;
@@ -170,9 +197,16 @@ class GameSessionController extends ChangeNotifier {
           rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)));
     _evidences = rawEvidences.map(_toEvidence).toList();
     _syncUnlockedFromServer(rawEvidences);
+
+    // 현장 정보는 비핵심 — 실패해도 핵심 로딩 결과를 깨뜨리지 않도록 분리 호출.
+    try {
+      _locations = await _repo.locations(id);
+    } catch (_) {
+      // 미제공/오류 시 null 유지(화면은 '현장 정보 없음'으로 표시).
+    }
   }
 
-  /// 증거/대시보드만 다시 로드(심문으로 증거 해금 후, 시간 경과 후 등).
+  /// 증거/대시보드(+현장)만 다시 로드(심문으로 증거 해금 후, 시간 경과 후 등).
   Future<void> refreshEvidences() async {
     final id = backendSessionId;
     if (id == null) return;
@@ -189,6 +223,13 @@ class GameSessionController extends ChangeNotifier {
             rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)));
       _evidences = rawEvidences.map(_toEvidence).toList();
       _syncUnlockedFromServer(rawEvidences);
+      // 현장 탭의 장소별 해금 카운트도 HUD 총합과 어긋나지 않도록 함께 갱신한다.
+      // 비핵심 데이터라 실패해도 증거 갱신 결과는 유지한다.
+      try {
+        _locations = await _repo.locations(id);
+      } catch (_) {
+        // 미제공/오류 시 기존 현장 정보 유지
+      }
       notifyListeners();
     } catch (_) {
       // 새로고침 실패는 조용히 무시(기존 데이터 유지)
@@ -285,11 +326,22 @@ class GameSessionController extends ChangeNotifier {
     _loadFuture = loadFromServer();
   }
 
+  /// 시간 기반(TIME) 증거 해금 자동 반영을 위한 폴링 주기.
+  /// 백엔드는 경과 시간(예: 2/3/5분)에 따라 증거를 해금하지만 별도 푸시가 없어,
+  /// 주기적으로 다시 불러와야 새로 풀린 증거가 화면에 나타난다.
+  static const int _evidencePollSeconds = 30;
+
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       _elapsed += const Duration(seconds: 1);
       notifyListeners();
+      // 30초마다 증거/대시보드 폴링 — 진행 중(PLAYING) 세션에서만.
+      if (backendSessionId != null &&
+          _dashboard?.status == PlaySessionStatus.playing &&
+          _elapsed.inSeconds % _evidencePollSeconds == 0) {
+        refreshEvidences();
+      }
     });
   }
 
