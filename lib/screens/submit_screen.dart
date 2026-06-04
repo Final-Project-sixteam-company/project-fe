@@ -166,9 +166,18 @@ class _SubmitScreenState extends State<SubmitScreen> {
     final c = context.c;
     final controller = context.session;
 
-    // ── 핵심 수정: 증인(isWitness)을 드롭다운 후보에서 제외 ──────────
+    // 증인(isWitness) 제외, 범인 지목 가능한 용의자만.
     final accusableSuspects =
     controller.suspects.where((s) => !s.isWitness).toList();
+
+    // controller.suspects 재빌드(retry/refresh) 후 _selectedSuspect가
+    // 이전 인스턴스를 가리키면 DropdownButton value mismatch → assert 크래시.
+    // id로 현재 목록에서 다시 찾아 항상 동일 인스턴스를 사용한다.
+    final selectedValue = _selectedSuspect == null
+        ? null
+        : accusableSuspects
+        .where((s) => s.id == _selectedSuspect!.id)
+        .firstOrNull;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -219,7 +228,8 @@ class _SubmitScreenState extends State<SubmitScreen> {
               else
                 _SuspectDropdown(
                   suspects: accusableSuspects,
-                  selected: _selectedSuspect,
+                  // id 재매핑된 값을 넘겨 인스턴스 mismatch 크래시 방지.
+                  selected: selectedValue,
                   onSelect: (s) => setState(() => _selectedSuspect = s),
                 ),
               const SizedBox(height: AppTokens.sp6),

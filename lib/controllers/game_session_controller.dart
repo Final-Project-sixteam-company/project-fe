@@ -241,6 +241,10 @@ class GameSessionController extends ChangeNotifier {
   List<InterrogationLog> get interrogationLogs => List.unmodifiable(_logs);
 
   // ── 세션 상태 ─────────────────────────────────────────────────────────────
+  /// loadFromServer() 의 진행 중인 Future.
+  /// abandonSession()이 세션 생성 완료를 기다렸다가 /abandon을 호출할 수 있도록 보관.
+  Future<void>? _loadFuture;
+
   bool _isStarted = false;
   bool _isCompleted = false;
   bool get isStarted => _isStarted;
@@ -251,7 +255,8 @@ class GameSessionController extends ChangeNotifier {
     _isStarted = true;
     _startTimer();
     notifyListeners();
-    loadFromServer();
+    // Future를 보관해 abandon 시 완료 대기가 가능하도록 한다.
+    _loadFuture = loadFromServer();
   }
 
   void _startTimer() {
@@ -284,6 +289,13 @@ class GameSessionController extends ChangeNotifier {
 
   Future<void> abandonSession() async {
     if (_isCompleted) return;
+    // 세션 생성이 진행 중이면 완료를 기다린 후 abandon을 실행한다.
+    // fire-and-forget으로 두면 backendSessionId가 아직 null인 채로
+    // abandon이 실행되어 /abandon 호출을 건너뛰고, 이후 in-flight load가
+    // PLAYING 세션을 저장해 dispose된 컨트롤러에 notify하는 race가 생긴다.
+    if (_loadFuture != null) {
+      await _loadFuture!.catchError((_) {});
+    }
     _timer?.cancel();
     final id = backendSessionId;
     final sid = _backendScenarioId;
