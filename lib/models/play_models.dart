@@ -165,7 +165,13 @@ class PlayEvidence {
         .map((e) =>
         RelatedSuspect.fromJson(e as Map<String, dynamic>))
         .toList(),
-    imageAssetKey: j['imageAssetKey'] as String?,
+    // imageUrl(API spec 명칭) 또는 imageAssetKey(로컬/레거시) 우선순위 적용.
+    // 백엔드가 어느 키로 내려줘도 thumbnail/viewer UI가 동작한다.
+    imageAssetKey: (() {
+      final url = j['imageUrl'] as String?;
+      if (url != null && url.isNotEmpty) return url;
+      return j['imageAssetKey'] as String?;
+    })(),
     categoryLabel: j['categoryLabel'] as String?,
   );
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../components/asset_image_widget.dart';
 import '../components/game_modals.dart';
 import '../components/ms_kicker.dart';
+import '../components/states.dart';
 import '../components/ms_pill.dart';
 import '../controllers/game_session_provider.dart';
 import '../theme/app_colors.dart';
@@ -94,19 +95,32 @@ class _SceneScreenState extends State<SceneScreen> {
             _SceneMap(selectedIndex: _selectedIndex),
             const SizedBox(height: AppTokens.sp6),
             // ── 2. 주요 현장 정보 ───────────────────────────────
-            const MSKicker('주요 현장 정보'),
-            const SizedBox(height: AppTokens.sp3),
-            _LocationList(
-              selectedIndex: _selectedIndex,
-              onTap: (i) =>
-                  setState(() => _selectedIndex = _selectedIndex == i ? null : i),
-            ),
-            // ── 3. 선택된 장소 이미지 ────────────────────────────
-            if (_selectedIndex != null &&
-                _locations[_selectedIndex!].imageAssetKey != null) ...[
-              const SizedBox(height: AppTokens.sp4),
-              _LocationImageCard(
-                location: _locations[_selectedIndex!],
+            // CL-001 외 시나리오에서는 하드코딩 장소 목록이 스포일러가 되므로
+            // usesCl001SampleCaseData 게이트로 숨긴다.
+            // 백엔드 locations 엔드포인트 구현 후 항상 서버 데이터로 교체한다.
+            if (context.sessionRead.usesCl001SampleCaseData) ...[
+              const MSKicker('주요 현장 정보'),
+              const SizedBox(height: AppTokens.sp3),
+              _LocationList(
+                selectedIndex: _selectedIndex,
+                onTap: (i) => setState(
+                        () => _selectedIndex = _selectedIndex == i ? null : i),
+              ),
+              // ── 3. 선택된 장소 이미지 ──────────────────────────
+              if (_selectedIndex != null &&
+                  _locations[_selectedIndex!].imageAssetKey != null) ...[
+                const SizedBox(height: AppTokens.sp4),
+                _LocationImageCard(
+                  location: _locations[_selectedIndex!],
+                ),
+              ],
+            ] else ...[
+              const MSKicker('현장 정보'),
+              const SizedBox(height: AppTokens.sp3),
+              const MSEmpty(
+                icon: Icons.map_outlined,
+                title: '현장 정보 준비 중',
+                subtitle: '이 시나리오의 현장 데이터는 곧 제공될 예정입니다.',
               ),
             ],
             const SizedBox(height: AppTokens.sp10),

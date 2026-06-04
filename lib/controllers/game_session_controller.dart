@@ -286,14 +286,25 @@ class GameSessionController extends ChangeNotifier {
     if (_isCompleted) return;
     _timer?.cancel();
     final id = backendSessionId;
+    final sid = _backendScenarioId;
+
     if (id != null) {
       try {
         await _repo.abandon(id);
-      } catch (_) {}
+        // abandon 성공 시에만 로컬 세션 키를 삭제한다.
+        // 실패하면 백엔드 세션이 PLAYING으로 남으므로 키를 보존해
+        // 다음 진입 시 _tryResume 경로로 재개할 수 있게 한다.
+        // 키를 지우면 createSession → 409 + 복구 불가 상태가 된다.
+        backendSessionId = null;
+        if (sid != null) await _clearSavedSession(sid);
+      } catch (_) {
+        // best-effort: 서버 정리 실패 → 키 보존, 타이머만 정리.
+        backendSessionId = null;
+        // sid 키는 의도적으로 유지.
+      }
+    } else {
+      backendSessionId = null;
     }
-    backendSessionId = null;
-    final sid = _backendScenarioId;
-    if (sid != null) await _clearSavedSession(sid);
   }
 
   @override
