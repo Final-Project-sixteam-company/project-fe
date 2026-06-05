@@ -90,6 +90,11 @@ class _SubmitScreenState extends State<SubmitScreen> {
   Future<void> _onSubmit() async {
     final controller = context.sessionRead;
     final sessionId = controller.backendSessionId;
+    // 갱신으로 선택 용의자가 더 이상 지목 가능(culpritEligible)하지 않으면 선택 해제 → stale 선택의 검증 통과 방지.
+    if (_selectedSuspect != null &&
+        !controller.accusableSuspects.any((s) => s.id == _selectedSuspect!.id)) {
+      setState(() => _selectedSuspect = null);
+    }
     final culpritId = int.tryParse(_selectedSuspect?.id ?? '');
     // 진행 중(PLAYING) 세션에서만 제출 가능. 이미 제출/종료된 세션은 차단한다.
     final status = controller.dashboard?.status;
@@ -156,8 +161,8 @@ class _SubmitScreenState extends State<SubmitScreen> {
         await _goToResult(sessionId, controller.scenarioId);
         return;
       }
-      // 타임아웃/네트워크 → 제출 성공 여부 불확실 → /result 탐침으로 확인.
-      if (e.isNetwork) {
+      // 타임아웃/네트워크만 "제출 성공 여부 불확실"로 보고 /result 탐침. (PARSE_ERROR 등은 실제 오류로 처리)
+      if (e.code == 'TIMEOUT' || e.code == 'NETWORK_ERROR') {
         await _recoverFromUncertainSubmit(sessionId);
         return;
       }
@@ -188,17 +193,32 @@ class _SubmitScreenState extends State<SubmitScreen> {
     );
   }
 
-  /// 타임아웃/네트워크로 제출 성공 여부가 불확실할 때, /result가 이미 있으면 제출 성공으로 간주한다.
+  /// 타임아웃/네트워크로 제출 성공 여부가 불확실할 때 /result로 상태를 확인해 분기한다.
+  /// - 200(채점 완료)·AI015(채점 진행 중=접수됨) → 결과화면(폴링)으로 이동
+  /// - 404/타임아웃/네트워크 → 아직 불확실 → 입력 보존 + 재확인 CTA
+  /// - 그 외(PARSE_ERROR/401/403/400/500 등) → 실제 오류 노출(불확실로 가리지 않음)
   Future<void> _recoverFromUncertainSubmit(int sessionId) async {
+    final controller = context.sessionRead;
     try {
       await playSessionRepo.result(sessionId);
       if (!mounted) return;
-      final controller = context.sessionRead;
       controller.completeSession();
       await _goToResult(sessionId, controller.scenarioId);
-    } on ApiException {
-      // 아직 결과 없음(미제출/채점 전) → 입력 보존 + 재확인 CTA.
-      if (mounted) _showUncertainSubmit(sessionId);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      // 채점 진행 중 = 제출이 접수된 상태 → 결과화면이 폴링하도록 이동.
+      if (e.code == 'AI015') {
+        controller.completeSession();
+        await _goToResult(sessionId, controller.scenarioId);
+        return;
+      }
+      // 아직 결과 없음(404)·네트워크 불확실 → 입력 보존 + 재확인 CTA.
+      if (e.status == 404 || e.code == 'TIMEOUT' || e.code == 'NETWORK_ERROR') {
+        _showUncertainSubmit(sessionId);
+        return;
+      }
+      // 그 외는 실제 오류로 노출.
+      _showSubmitError('제출 확인 중 오류가 발생했습니다: ${e.message}');
     }
   }
 
