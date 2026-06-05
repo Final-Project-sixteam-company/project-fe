@@ -229,6 +229,12 @@ class _SceneMap extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final url = mapImageUrl;
+    final hasLiveMap = url != null && url.isNotEmpty;
+    // 피해자 핀 좌표(_victimPinOffset)는 CL-001 평면도 전용이다.
+    // 라이브 서버 맵이나 다른 시나리오엔 좌표가 맞지 않아(스포일러/오표시),
+    // CL-001 샘플 + 라이브 맵 부재일 때만 핀을 띄운다.
+    final showVictimPin =
+        context.sessionRead.usesCl001SampleCaseData && !hasLiveMap;
 
     return AspectRatio(
       aspectRatio: 4 / 3,
@@ -243,7 +249,7 @@ class _SceneMap extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             // 맵 이미지: 서버 mapImageUrl > 로컬 assetKey > 플레이스홀더
-            if (url != null && url.isNotEmpty)
+            if (hasLiveMap)
               CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
@@ -261,22 +267,23 @@ class _SceneMap extends StatelessWidget {
               )
             else
               _MapPlaceholder(),
-            // 피해자 위치 핀
-            LayoutBuilder(
-              builder: (_, constraints) {
-                final dx = constraints.maxWidth * _victimPinOffset.dx;
-                final dy = constraints.maxHeight * _victimPinOffset.dy;
-                return Stack(
-                  children: [
-                    Positioned(
-                      left: dx - 12,
-                      top: dy - 28,
-                      child: _VictimPin(),
-                    ),
-                  ],
-                );
-              },
-            ),
+            // 피해자 위치 핀 — CL-001 평면도 전용 좌표라 해당 컨텍스트에서만 표시.
+            if (showVictimPin)
+              LayoutBuilder(
+                builder: (_, constraints) {
+                  final dx = constraints.maxWidth * _victimPinOffset.dx;
+                  final dy = constraints.maxHeight * _victimPinOffset.dy;
+                  return Stack(
+                    children: [
+                      Positioned(
+                        left: dx - 12,
+                        top: dy - 28,
+                        child: _VictimPin(),
+                      ),
+                    ],
+                  );
+                },
+              ),
           ],
         ),
       ),
