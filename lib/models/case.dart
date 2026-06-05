@@ -17,6 +17,10 @@ class Suspect {
   /// NEUTRAL_WITNESS 등 용의자가 아닌 증인 여부.
   final bool isWitness;
 
+  /// 최종 범인 지목 가능 여부(서버 culpritEligible). 증인 + 레드헤링 등 지목불가 캐릭터 제외용.
+  /// 서버 미제공 시 !isWitness 로 폴백(PlaySuspect.fromJson에서 결정).
+  final bool culpritEligible;
+
   const Suspect({
     required this.id,
     required this.name,
@@ -26,6 +30,7 @@ class Suspect {
     this.portraitUrl,
     this.portraitAssetKey,
     this.isWitness = false,
+    this.culpritEligible = true,
   });
 }
 
