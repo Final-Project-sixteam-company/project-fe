@@ -38,6 +38,14 @@ class ScenarioFilter {
 /// 비동기(API) 기반 — UI는 로딩/에러/빈 상태를 함께 처리해야 한다.
 abstract class ScenarioRepository {
   Future<List<Scenario>> query(ScenarioFilter filter);
+
+  /// 페이지 단위 조회(더보기 페이지네이션용). [Page.hasNext] 로 추가 로드 여부 판단.
+  Future<Page<Scenario>> queryPage(
+    ScenarioFilter filter, {
+    int page,
+    int size,
+  });
+
   Future<List<Scenario>> popular({int limit = 5});
   Future<Scenario> detail(String scenarioId);
 }
@@ -50,7 +58,11 @@ class ApiScenarioRepository implements ScenarioRepository {
   ApiClient get _api => _client ?? ApiClient.instance;
 
   @override
-  Future<List<Scenario>> query(ScenarioFilter filter) async {
+  Future<Page<Scenario>> queryPage(
+    ScenarioFilter filter, {
+    int page = 0,
+    int size = 20,
+  }) async {
     final data = await _api.get(
       '/api/scenarios',
       query: {
@@ -59,16 +71,19 @@ class ApiScenarioRepository implements ScenarioRepository {
         if (filter.difficulty != null)
           'difficulty': _difficultyToApi(filter.difficulty!),
         'sort': _sortToApi(filter.sort),
-        'page': 0,
-        'size': 50,
+        'page': page,
+        'size': size,
       },
     );
-    final page = Page<Scenario>.fromJson(
+    return Page<Scenario>.fromJson(
       data as Map<String, dynamic>,
       _fromSummaryJson,
     );
-    return page.content;
   }
+
+  @override
+  Future<List<Scenario>> query(ScenarioFilter filter) async =>
+      (await queryPage(filter, page: 0, size: 50)).content;
 
   @override
   Future<List<Scenario>> popular({int limit = 5}) async {

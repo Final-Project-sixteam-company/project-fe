@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../components/asset_image_widget.dart';
 import '../components/evidence_item.dart';
+import '../components/image_viewer.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
@@ -70,6 +71,21 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
     } catch (_) {}
   }
 
+  /// 심문 화면으로 이동하고, 돌아오면 심문 로그를 다시 불러와 최신 상태로 갱신한다.
+  /// (상세↔채팅 단일 소스화: 서버 로그가 진실 소스이며 복귀 시 재조회한다.)
+  Future<void> _openInterrogation() async {
+    final ctrl = context.sessionRead;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GameSessionProvider(
+          controller: ctrl,
+          child: InterrogationChatScreen(suspect: widget.suspect),
+        ),
+      ),
+    );
+    if (mounted) await _loadLogs();
+  }
+
   @override
   void dispose() {
     _ctrl.dispose();
@@ -85,7 +101,10 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
     return Scaffold(
       backgroundColor: c.bg,
       appBar: _buildAppBar(context),
-      bottomNavigationBar: _BottomBar(suspect: widget.suspect),
+      bottomNavigationBar: _BottomBar(
+        suspect: widget.suspect,
+        onInterrogate: _openInterrogation,
+      ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
@@ -99,12 +118,17 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
                 children: [
                   Hero(
                     tag: widget.suspect.id,
-                    child: CharacterPortrait(
-                      name: widget.suspect.name,
-                      size: 80,
-                      assetKey: widget.suspect.portraitAssetKey,
-                      borderRadius: AppTokens.r5,
-                      isWitness: widget.suspect.isWitness,
+                    // develop의 에셋키 기반 초상 렌더링을 유지하고,
+                    // 그 위에 PR#13의 탭하여 크게 보기(돋보기 배지)를 레이어한다.
+                    child: _ZoomablePortrait(
+                      imageUrl: widget.suspect.portraitUrl,
+                      child: CharacterPortrait(
+                        name: widget.suspect.name,
+                        size: 80,
+                        assetKey: widget.suspect.portraitAssetKey,
+                        borderRadius: AppTokens.r5,
+                        isWitness: widget.suspect.isWitness,
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppTokens.sp3),
@@ -206,6 +230,51 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
       title: Text(
         widget.suspect.isWitness ? 'WITNESS' : 'SUSPECT',
         style: AppText.monoLabel.copyWith(color: c.textMute),
+      ),
+    );
+  }
+}
+
+// ── 확대 가능한 초상 ──────────────────────────────────────────────────────────
+//
+// develop의 에셋키 기반 [CharacterPortrait]를 child로 받아 그대로 렌더링하고,
+// 공식 초상 URL이 있으면 PR#13의 탭하여 전체화면 보기(돋보기 배지)를 레이어한다.
+// URL이 없으면 child를 그대로 반환해 폴백(이니셜) 동작을 보존한다.
+
+class _ZoomablePortrait extends StatelessWidget {
+  const _ZoomablePortrait({required this.child, this.imageUrl});
+
+  final Widget child;
+  // 공식 초상 URL. null/빈값이면 확대 배지를 노출하지 않는다.
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl;
+    final hasImage = url != null && url.isNotEmpty;
+
+    if (!hasImage) return child;
+
+    // 초상이 있으면 탭하여 전체화면으로 크게 볼 수 있음을 돋보기 배지로 알린다.
+    return GestureDetector(
+      onTap: () => showImageViewer(context, url),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          child,
+          Positioned(
+            right: 3,
+            bottom: 3,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: AppColors.ink950.withValues(alpha: .55),
+                borderRadius: BorderRadius.circular(AppTokens.r2),
+              ),
+              child: const Icon(Icons.zoom_in, size: 14, color: AppColors.ink0),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -354,11 +423,37 @@ class _LogCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Q. ${log.question}',
-              style: AppText.bodySm.copyWith(
-                  color: c.primary,
-                  fontWeight: FontWeight.w600,
-                  height: 1.5)),
+          // 증거 제시 심문이면 어떤 증거를 제시했는지 마커로 표시(채팅 버블과 일관).
+          if (log.presentedEvidence != null) ...[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.description_outlined, size: 12, color: c.success),
+                const SizedBox(width: AppTokens.sp1),
+                Flexible(
+                  child: Text(
+                    '증거 제시 · ${log.presentedEvidence!.title}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.monoLabel.copyWith(
+                      fontSize: 10,
+                      color: c.success,
+                      height: 1.0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTokens.sp1),
+          ],
+          Text(
+            'Q. ${log.question}',
+            style: AppText.bodySm.copyWith(
+              color: c.primary,
+              fontWeight: FontWeight.w600,
+              height: 1.5,
+            ),
+          ),
           const SizedBox(height: AppTokens.sp1),
           Text('A. ${log.answer}',
               style:
@@ -372,8 +467,10 @@ class _LogCard extends StatelessWidget {
 // ── 하단 고정 버튼 바 ─────────────────────────────────────────────────────────
 
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.suspect});
+  const _BottomBar({required this.suspect, required this.onInterrogate});
+
   final Suspect suspect;
+  final VoidCallback onInterrogate;
 
   @override
   Widget build(BuildContext context) {
@@ -401,18 +498,9 @@ class _BottomBar extends StatelessWidget {
                 label: '심문하기',
                 variant: MSButtonVariant.primary,
                 expanded: true,
-                onPressed: () {
-                  final ctrl = context.sessionRead;
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => GameSessionProvider(
-                        controller: ctrl,
-                        child:
-                        InterrogationChatScreen(suspect: suspect),
-                      ),
-                    ),
-                  );
-                },
+                // PR#13의 콜백 방식 유지: 심문 후 복귀 시 _loadLogs로 재조회한다
+                // (develop의 인라인 네비게이션 동작을 포함하는 상위 집합).
+                onPressed: onInterrogate,
               ),
             ),
             // 증인은 범인 지목 불가

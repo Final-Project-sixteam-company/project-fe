@@ -128,6 +128,8 @@ class PlayEvidence {
     required this.title,
     required this.importance,
     required this.isUnlocked,
+    this.oneLine,
+    this.imageUrl,
     this.description,
     this.locationName,
     this.unlockHint,
@@ -141,6 +143,13 @@ class PlayEvidence {
   final String title;
   final EvidenceImportance importance;
   final bool isUnlocked;
+
+  /// 한 줄 요약(목록 티저). 잠긴 증거는 보통 null.
+  final String? oneLine;
+
+  /// 증거 썸네일/이미지(S3 URL). 해금된 증거에만 존재하며 없으면 null → 아이콘 폴백.
+  final String? imageUrl;
+
   final String? description;
   final String? locationName;
   final String? unlockHint;
@@ -153,27 +162,85 @@ class PlayEvidence {
   final String? categoryLabel;
 
   factory PlayEvidence.fromJson(Map<String, dynamic> j) => PlayEvidence(
-    evidenceId: (j['evidenceId'] as num).toInt(),
-    title: j['title'] as String? ?? '',
-    importance: evidenceImportanceFromApi(j['importance'] as String?),
-    isUnlocked: j['isUnlocked'] as bool? ?? false,
-    description: j['description'] as String?,
-    locationName: j['locationName'] as String?,
-    unlockHint: j['unlockHint'] as String?,
-    relatedSuspects:
-    ((j['relatedSuspects'] as List<dynamic>?) ?? const [])
-        .map((e) =>
-        RelatedSuspect.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    // imageUrl(API spec 명칭) 또는 imageAssetKey(로컬/레거시) 우선순위 적용.
-    // 백엔드가 어느 키로 내려줘도 thumbnail/viewer UI가 동작한다.
-    imageAssetKey: (() {
-      final url = j['imageUrl'] as String?;
-      if (url != null && url.isNotEmpty) return url;
-      return j['imageAssetKey'] as String?;
-    })(),
-    categoryLabel: j['categoryLabel'] as String?,
-  );
+        evidenceId: (j['evidenceId'] as num).toInt(),
+        title: j['title'] as String? ?? '',
+        importance: evidenceImportanceFromApi(j['importance'] as String?),
+        isUnlocked: j['isUnlocked'] as bool? ?? false,
+        oneLine: j['oneLine'] as String?,
+        imageUrl: j['imageUrl'] as String?,
+        description: j['description'] as String?,
+        locationName: j['locationName'] as String?,
+        unlockHint: j['unlockHint'] as String?,
+        relatedSuspects: ((j['relatedSuspects'] as List<dynamic>?) ?? const [])
+            .map((e) => RelatedSuspect.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        // imageUrl(API spec 명칭) 또는 imageAssetKey(로컬/레거시) 우선순위 적용.
+        // 백엔드가 어느 키로 내려줘도 thumbnail/viewer UI가 동작한다.
+        imageAssetKey: (() {
+          final url = j['imageUrl'] as String?;
+          if (url != null && url.isNotEmpty) return url;
+          return j['imageAssetKey'] as String?;
+        })(),
+        categoryLabel: j['categoryLabel'] as String?,
+      );
+}
+
+/// 증거 상세 조회(`GET …/evidences/{evidenceId}`) 응답.
+/// 목록(PlayEvidence)보다 풍부한 본문(description)과 관련 타임라인 이벤트를 준다.
+/// location 은 목록의 `locationName`(문자열)과 달리 `{locationId,name}` 객체다.
+class EvidenceDetail {
+  const EvidenceDetail({
+    required this.evidenceId,
+    required this.title,
+    required this.importance,
+    this.description,
+    this.imageUrl,
+    this.locationName,
+    this.relatedSuspects = const [],
+    this.relatedTimelineEvents = const [],
+  });
+
+  final int evidenceId;
+  final String title;
+  final EvidenceImportance importance;
+  final String? description;
+  final String? imageUrl;
+  final String? locationName;
+  final List<RelatedSuspect> relatedSuspects;
+  final List<RelatedTimelineEvent> relatedTimelineEvents;
+
+  factory EvidenceDetail.fromJson(Map<String, dynamic> j) => EvidenceDetail(
+        evidenceId: (j['evidenceId'] as num).toInt(),
+        title: j['title'] as String? ?? '',
+        importance: evidenceImportanceFromApi(j['importance'] as String?),
+        description: j['description'] as String?,
+        imageUrl: j['imageUrl'] as String?,
+        // location 객체에서 표시용 이름만 추출(없으면 null).
+        locationName:
+            (j['location'] as Map<String, dynamic>?)?['name'] as String?,
+        relatedSuspects: ((j['relatedSuspects'] as List<dynamic>?) ?? const [])
+            .map((e) => RelatedSuspect.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        relatedTimelineEvents:
+            ((j['relatedTimelineEvents'] as List<dynamic>?) ?? const [])
+                .map((e) =>
+                    RelatedTimelineEvent.fromJson(e as Map<String, dynamic>))
+                .toList(),
+      );
+}
+
+/// 증거 상세의 관련 타임라인 이벤트(`{time, title}`).
+class RelatedTimelineEvent {
+  const RelatedTimelineEvent({required this.time, required this.title});
+
+  final String time;
+  final String title;
+
+  factory RelatedTimelineEvent.fromJson(Map<String, dynamic> j) =>
+      RelatedTimelineEvent(
+        time: j['time'] as String? ?? '',
+        title: j['title'] as String? ?? '',
+      );
 }
 
 class RelatedSuspect {
@@ -213,6 +280,7 @@ class PlaySuspect {
     this.relationToVictim,
     this.publicStatement,
     this.alibi,
+    this.portraitImageUrl,
     // 이미지/캐릭터 타입
     this.portraitAssetKey,
     this.characterType,
@@ -227,6 +295,10 @@ class PlaySuspect {
   final String? relationToVictim;
   final String? publicStatement;
   final String? alibi;
+
+  /// 용의자 공식 초상 이미지(S3 URL). 없으면 null → UI는 이니셜 아바타로 폴백.
+  /// portraitAssetKey 와 동일 값으로 채워지는 레거시 별칭(기존 뷰어/소비처 호환).
+  final String? portraitImageUrl;
 
   /// 프로필 사진 URL 또는 로컬 assetKey.
   /// 백엔드가 'portraitImageUrl' 또는 'portraitAssetKey' 중 어느 키로 내려줘도
@@ -262,11 +334,72 @@ class PlaySuspect {
       relationToVictim: j['relationToVictim'] as String?,
       publicStatement: j['publicStatement'] as String?,
       alibi: j['alibi'] as String?,
+      // 동일 값으로 두 필드를 모두 채워 asset-key/URL 양쪽 소비처 호환.
+      portraitImageUrl: portrait,
       portraitAssetKey: portrait,
       characterType: characterType,
       isWitness: isWitness,
     );
   }
+}
+
+// ── 현장(장소) ───────────────────────────────────────────────────────────────
+
+class PlayLocations {
+  const PlayLocations({
+    this.mapImageUrl,
+    this.locations = const [],
+  });
+
+  final String? mapImageUrl;
+  final List<PlayLocation> locations;
+
+  factory PlayLocations.fromJson(Map<String, dynamic> j) => PlayLocations(
+        mapImageUrl: j['mapImageUrl'] as String?,
+        locations: ((j['locations'] as List<dynamic>?) ?? const [])
+            .map((e) => PlayLocation.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class PlayLocation {
+  const PlayLocation({
+    required this.locationId,
+    required this.name,
+    required this.totalEvidenceCount,
+    required this.unlockedEvidenceCount,
+    this.locationCode,
+    this.floor,
+    this.description,
+    this.imageUrl,
+    this.mapX,
+    this.mapY,
+  });
+
+  final int locationId;
+  final String name;
+  final int totalEvidenceCount;
+  final int unlockedEvidenceCount;
+  final String? locationCode;
+  final String? floor;
+  final String? description;
+  final String? imageUrl;
+  final double? mapX;
+  final double? mapY;
+
+  factory PlayLocation.fromJson(Map<String, dynamic> j) => PlayLocation(
+        locationId: (j['locationId'] as num).toInt(),
+        name: j['name'] as String? ?? '',
+        totalEvidenceCount: (j['totalEvidenceCount'] as num?)?.toInt() ?? 0,
+        unlockedEvidenceCount:
+            (j['unlockedEvidenceCount'] as num?)?.toInt() ?? 0,
+        locationCode: j['locationCode'] as String?,
+        floor: j['floor']?.toString(),
+        description: j['description'] as String?,
+        imageUrl: j['imageUrl'] as String?,
+        mapX: (j['mapX'] as num?)?.toDouble(),
+        mapY: (j['mapY'] as num?)?.toDouble(),
+      );
 }
 
 // ── 힌트 ─────────────────────────────────────────────────────────────────────
@@ -331,6 +464,8 @@ class InterrogationResult {
     required this.suspectName,
     required this.question,
     required this.answer,
+    this.questionType = QuestionType.free,
+    this.presentedEvidence,
     this.unlockedEvidences = const [],
     this.createdAt,
   });
@@ -340,6 +475,15 @@ class InterrogationResult {
   final String suspectName;
   final String question;
   final String answer;
+
+  /// 질문 유형(FREE/RECOMMENDED/EVIDENCE_PRESENTED). 심문 로그 조회 응답에만 존재하며
+  /// POST 응답에는 없어 기본 FREE로 처리한다.
+  final QuestionType questionType;
+
+  /// 증거 제시 심문일 때 제시된 증거(`{evidenceId, title}`). 그 외에는 null.
+  /// 로그 복원 시 증거 제시 마커를 되살리는 데 쓴다.
+  final RelatedEvidence? presentedEvidence;
+
   final List<RelatedEvidence> unlockedEvidences;
   final DateTime? createdAt;
 
@@ -350,10 +494,13 @@ class InterrogationResult {
         suspectName: j['suspectName'] as String? ?? '',
         question: j['question'] as String? ?? '',
         answer: j['answer'] as String? ?? '',
-        unlockedEvidences:
-        ((j['unlockedEvidences'] as List<dynamic>?) ?? const [])
-            .map((e) =>
-            RelatedEvidence.fromJson(e as Map<String, dynamic>))
+        questionType: questionTypeFromApi(j['questionType'] as String?),
+        presentedEvidence: j['presentedEvidence'] == null
+            ? null
+            : RelatedEvidence.fromJson(
+                j['presentedEvidence'] as Map<String, dynamic>),
+        unlockedEvidences: ((j['unlockedEvidences'] as List<dynamic>?) ?? const [])
+            .map((e) => RelatedEvidence.fromJson(e as Map<String, dynamic>))
             .toList(),
         createdAt: _parseDate(j['createdAt']),
       );

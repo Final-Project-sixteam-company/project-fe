@@ -6,15 +6,19 @@ import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../models/review_models.dart';
 import '../models/scenario.dart';
+import '../repositories/scenario_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'case_briefing_screen.dart';
 
-// 현재 백엔드에 플레이 데이터(용의자/증거/정답)가 시드된 시나리오.
-// 데모 시나리오는 scenarioId=1 ("CL-001"), 4·5는 정식 씨드 시나리오.
-const _kPlayableIds = {'1', '4', '5'};
+// 현재 백엔드에 플레이 데이터(용의자/증거/정답)가 완전히 시드돼 끝까지 플레이 가능한 시나리오.
+// 배포 백엔드(api.clueroom.xyz) 기준 ID:
+//   1 = 데모데이 전야(CL-001 데모), 10 = 서월채의 마지막 처방.
+// 11(studio9)은 정답(solution) 시드/채점이 미검증이라 제외. 백엔드 검증 후 재추가.
+// canPlay 백엔드 값은 신뢰 불가(studio9도 canPlay=true로 내려옴) → 화이트리스트 게이트 유지.
+const _kPlayableIds = {'1', '10'};
 const _kBookmarkPrefix = 'bookmark_';
 
 class ScenarioDetailScreen extends StatefulWidget {
@@ -30,12 +34,27 @@ class ScenarioDetailScreen extends StatefulWidget {
 class _ScenarioDetailScreenState
     extends State<ScenarioDetailScreen> {
   bool _bookmarked = false;
-  bool get _isPlayable => _kPlayableIds.contains(widget.scenario.id);
+  // 상세 진입 시 목록에서 전달받은 요약(synopsis=description, tags=[], creator 없음)을
+  // 우선 표시하고, GET /api/scenarios/{id} 로 풀데이터를 받아 교체한다(progressive).
+  late Scenario _scenario = widget.scenario;
+
+  // 끝까지 플레이 가능한 화이트리스트로 게이트 유지(_kPlayableIds 주석 참고).
+  bool get _isPlayable => _kPlayableIds.contains(_scenario.id);
 
   @override
   void initState() {
     super.initState();
     _loadBookmark();
+    _loadDetail();
+  }
+
+  Future<void> _loadDetail() async {
+    try {
+      final full = await scenarioRepo.detail(widget.scenario.id);
+      if (mounted) setState(() => _scenario = full);
+    } catch (_) {
+      // 상세 조회 실패 시 목록 요약 데이터를 그대로 사용(graceful)
+    }
   }
 
   Future<void> _loadBookmark() async {
@@ -55,9 +74,11 @@ class _ScenarioDetailScreenState
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final s = widget.scenario;
+    final s = _scenario;
+    // CL-001처럼 같은 사건이 백엔드 id('1')와 샘플 id('demoday-eve')로 나뉘어도
+    // 리뷰가 한 버킷으로 모이도록 정규화 키로 비교한다(작성·열람 경로 키 불일치 수정).
     final reviews = sampleReviews
-        .where((r) => r.scenarioId == s.id)
+        .where((r) => canonicalScenarioId(r.scenarioId) == canonicalScenarioId(s.id))
         .toList();
 
     return Scaffold(
@@ -78,10 +99,7 @@ class _ScenarioDetailScreenState
             ),
             onPressed: _toggleBookmark,
           ),
-          IconButton(
-            icon: Icon(Icons.more_vert, color: c.textSub),
-            onPressed: () {},
-          ),
+          // 더보기(more_vert)는 연결할 메뉴가 없어 무동작이었으므로 제거.
         ],
       ),
       bottomNavigationBar: _BottomCta(
@@ -177,6 +195,8 @@ class _ScenarioDetailScreenState
                   _RatingSection(scenario: s),
                   const SizedBox(height: AppTokens.sp4),
                   // ── 리뷰 목록 ──────────────────────────────────
+                  // 리뷰 '작성'은 플레이 완료 후(결과 화면)로 이전했다.
+                  // 여기서는 기존 리뷰 열람만 제공한다.
                   if (reviews.isNotEmpty) ...[
                     ...reviews.map(
                       (r) => Padding(
@@ -186,14 +206,6 @@ class _ScenarioDetailScreenState
                       ),
                     ),
                   ],
-                  // ── 리뷰 작성 버튼 ──────────────────────────────
-                  MSButton(
-                    label: '리뷰 작성하기',
-                    variant: MSButtonVariant.secondary,
-                    expanded: true,
-                    icon: Icons.rate_review_outlined,
-                    onPressed: () => _showReviewSheet(context),
-                  ),
                   const SizedBox(height: AppTokens.sp10),
                 ],
               ),
@@ -204,17 +216,6 @@ class _ScenarioDetailScreenState
     );
   }
 
-  Future<void> _showReviewSheet(BuildContext context) async {
-    final review = await showModalBottomSheet<ScenarioReview>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ReviewWriteSheet(scenarioId: widget.scenario.id),
-    );
-    if (review != null && mounted) {
-      setState(() => sampleReviews.insert(0, review));
-    }
-  }
 }
 
 // ── 리뷰 카드 ─────────────────────────────────────────────────────────────────
@@ -305,172 +306,6 @@ class _ReviewCardState extends State<_ReviewCard> {
                   .copyWith(color: c.textSub, height: 1.6),
             ),
         ],
-      ),
-    );
-  }
-}
-
-// ── 리뷰 작성 시트 ────────────────────────────────────────────────────────────
-
-class _ReviewWriteSheet extends StatefulWidget {
-  const _ReviewWriteSheet({required this.scenarioId});
-
-  final String scenarioId;
-
-  @override
-  State<_ReviewWriteSheet> createState() => _ReviewWriteSheetState();
-}
-
-class _ReviewWriteSheetState extends State<_ReviewWriteSheet> {
-  double _rating = 5.0;
-  final TextEditingController _bodyCtrl = TextEditingController();
-  bool _isSpoiler = false;
-
-  @override
-  void dispose() {
-    _bodyCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: c.bgElev,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(AppTokens.r6),
-            topRight: Radius.circular(AppTokens.r6),
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(AppTokens.sp4),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    margin:
-                        const EdgeInsets.only(bottom: AppTokens.sp4),
-                    decoration: BoxDecoration(
-                      color: c.line,
-                      borderRadius:
-                          BorderRadius.circular(AppTokens.rPill),
-                    ),
-                  ),
-                ),
-                Text(
-                  '리뷰 작성',
-                  style: AppText.titleM.copyWith(color: c.text),
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                // 별점 슬라이더
-                Row(
-                  children: [
-                    Text(
-                      '평점',
-                      style: AppText.body.copyWith(color: c.textSub),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '★ ${_rating.toStringAsFixed(1)}',
-                      style: AppText.monoNum.copyWith(
-                        fontSize: 16,
-                        color: c.primary,
-                        height: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
-                Slider(
-                  value: _rating,
-                  min: 1.0,
-                  max: 5.0,
-                  divisions: 8,
-                  activeColor: c.primary,
-                  inactiveColor: c.bgHover,
-                  onChanged: (v) => setState(() => _rating = v),
-                ),
-                const SizedBox(height: AppTokens.sp3),
-                // 리뷰 본문
-                Container(
-                  decoration: BoxDecoration(
-                    color: c.bg,
-                    border: Border.all(color: c.line),
-                    borderRadius: BorderRadius.circular(AppTokens.r3),
-                  ),
-                  child: TextField(
-                    controller: _bodyCtrl,
-                    maxLines: 4,
-                    style: AppText.body.copyWith(color: c.text),
-                    cursorColor: c.primary,
-                    decoration: InputDecoration(
-                      hintText: '이 사건은 어떠셨나요?',
-                      hintStyle: AppText.body.copyWith(color: c.textMute),
-                      border: InputBorder.none,
-                      contentPadding:
-                          const EdgeInsets.all(AppTokens.sp3),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppTokens.sp3),
-                // 스포일러 토글
-                Row(
-                  children: [
-                    Switch(
-                      value: _isSpoiler,
-                      activeThumbColor: c.danger,
-                      onChanged: (v) =>
-                          setState(() => _isSpoiler = v),
-                    ),
-                    const SizedBox(width: AppTokens.sp2),
-                    Text(
-                      '스포일러 포함',
-                      style: AppText.body.copyWith(
-                        color: _isSpoiler ? c.danger : c.textSub,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppTokens.sp4),
-                MSButton(
-                  label: '리뷰 등록',
-                  variant: MSButtonVariant.primary,
-                  expanded: true,
-                  onPressed: () {
-                    final body = _bodyCtrl.text.trim();
-                    if (body.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('리뷰 내용을 입력해 주세요.')),
-                      );
-                      return;
-                    }
-                    final review = ScenarioReview(
-                      id: 'r_${DateTime.now().millisecondsSinceEpoch}',
-                      scenarioId: widget.scenarioId,
-                      authorName: '나',
-                      rating: _rating,
-                      body: body,
-                      createdAt: DateTime.now(),
-                      isSpoiler: _isSpoiler,
-                    );
-                    Navigator.of(context).pop(review);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

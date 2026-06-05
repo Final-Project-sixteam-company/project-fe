@@ -74,10 +74,16 @@ class _InterrogationChatScreenState
     }
 
     if (_messages.isEmpty) {
-      _messages.add(const _Message(
-        text: '저는 할 말이 없습니다. 변호사를 불러주세요.',
-        sender: _Sender.suspect,
-      ));
+      // 첫 진입 기본 버블: 임의의 거부 대사(하드코딩)를 띄우면 모든 용의자가
+      // 동일하게 비협조적으로 보이고, 심문 전인데 진술을 거부한 것처럼 오인된다.
+      // 서버가 제공하는 용의자 공개 진술(publicStatement)을 출처로 쓰고,
+      // 없으면 특정 알리바이/태도를 단정하지 않는 중립 안내로 연다.
+      final raw = controller.rawSuspect(widget.suspect.id);
+      final statement = raw?.publicStatement?.trim();
+      final opening = (statement != null && statement.isNotEmpty)
+          ? statement
+          : '무엇이 궁금하신가요? 질문해 주세요.';
+      _messages.add(_Message(text: opening, sender: _Sender.suspect));
     }
     _scrollToBottom();
   }
@@ -92,6 +98,9 @@ class _InterrogationChatScreenState
   Future<void> _sendMessage(
       String text, {
         String? evidenceId,
+        // 발신 질문 유형 힌트. 증거가 제시되면 EVIDENCE_PRESENTED가 항상 우선한다.
+        // 추천 질문 칩은 RECOMMENDED를, 자유 입력은 기본 FREE를 넘긴다.
+        QuestionType questionType = QuestionType.free,
       }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isWaiting) return;
@@ -99,6 +108,17 @@ class _InterrogationChatScreenState
     final controller = context.sessionRead;
     final sessionId = controller.backendSessionId;
     final suspectIdInt = int.tryParse(widget.suspect.id);
+
+    // 증거 제시 의도가 있었는데 증거 ID가 정수로 파싱되지 않으면, 조용히 일반(FREE)
+    // 질문으로 강등시키지 않고 명확히 차단한다(잘못된 증거 제시가 서버에 평문 질문으로
+    // 나가는 것 방지). 낙관적 버블을 추가하기 전에 검증한다.
+    final evidenceIdInt = evidenceId != null ? int.tryParse(evidenceId) : null;
+    if (evidenceId != null && evidenceIdInt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이 증거는 제시할 수 없습니다. 다시 시도해 주세요.')),
+      );
+      return;
+    }
 
     setState(() {
       _messages.add(_Message(
@@ -128,10 +148,11 @@ class _InterrogationChatScreenState
       return;
     }
 
-    final evidenceIdInt = evidenceId != null ? int.tryParse(evidenceId) : null;
-    final questionType = evidenceIdInt != null
+    // 증거 제시는 항상 EVIDENCE_PRESENTED로 강제하고, 그 외에는 호출자가 넘긴
+    // 유형(추천 칩=RECOMMENDED, 자유 입력=FREE)을 그대로 사용한다.
+    final resolvedType = evidenceIdInt != null
         ? QuestionType.evidencePresented
-        : QuestionType.free;
+        : questionType;
 
     String answer = '...대답을 거부하고 있습니다.';
     // 서버/네트워크 오류 메시지(영문일 수 있음)를 용의자 대사처럼 노출하지 않고,
@@ -142,7 +163,7 @@ class _InterrogationChatScreenState
       final result = await playSessionRepo.interrogate(
         sessionId,
         suspectId: suspectIdInt,
-        questionType: questionType,
+        questionType: resolvedType,
         question: trimmed,
         presentedEvidenceId: evidenceIdInt,
       );
@@ -192,6 +213,17 @@ class _InterrogationChatScreenState
           SnackBar(content: Text('새로운 증거 확보: $names')),
         );
       }
+    }
+  }
+
+  // 증거 제시 진입점(AppBar·입력창 양쪽에서 재사용).
+  Future<void> _presentEvidence() async {
+    final evidence = await showEvidencePresentModal(context);
+    if (evidence != null && mounted) {
+      await _sendMessage(
+        '이 증거를 제시합니다: ${evidence.name}',
+        evidenceId: evidence.id,
+      );
     }
   }
 
@@ -246,12 +278,17 @@ class _InterrogationChatScreenState
             ),
           ),
           _SuggestedQuestions(
-            onSelect: _sendMessage,
+            // 추천 질문 칩은 RECOMMENDED 유형으로 전송(자유 입력 FREE와 구분).
+            onSelect: (q) =>
+                _sendMessage(q, questionType: QuestionType.recommended),
             disabled: _isWaiting,
           ),
+          // 추천 질문 배지와 입력창 사이 간격 — 오탭 방지.
+          const SizedBox(height: AppTokens.sp3),
           _InputBar(
             controller: _inputCtrl,
             onSend: () => _sendMessage(_inputCtrl.text),
+            onPresentEvidence: _isWaiting ? null : _presentEvidence,
             disabled: _isWaiting,
           ),
         ],
@@ -305,24 +342,14 @@ class _InterrogationChatScreenState
           },
           icon: Icon(Icons.lightbulb_outline, color: c.primary),
         ),
+        // 증거 제시 보조 진입점(주 진입점은 입력창 위 강조 버튼).
+        // AI 응답 대기 중 중복 전송(동시 요청) 방지.
         Padding(
-          padding: const EdgeInsets.only(right: AppTokens.sp4),
-          child: MSButton(
-            label: '증거',
-            variant: MSButtonVariant.ghost,
-            icon: Icons.description_outlined,
-            // AI 응답 대기 중 중복 전송(동시 요청) 방지.
-            onPressed: _isWaiting
-                ? null
-                : () async {
-                    final evidence = await showEvidencePresentModal(context);
-                    if (evidence != null && mounted) {
-                      await _sendMessage(
-                        '이 증거를 제시합니다: ${evidence.name}',
-                        evidenceId: evidence.id,
-                      );
-                    }
-                  },
+          padding: const EdgeInsets.only(right: AppTokens.sp2),
+          child: IconButton(
+            tooltip: '증거 제시',
+            onPressed: _isWaiting ? null : _presentEvidence,
+            icon: Icon(Icons.description_outlined, color: c.primary),
           ),
         ),
       ],
@@ -412,6 +439,7 @@ class _DetectiveBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final isEvidence = evidenceId != null;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -424,9 +452,10 @@ class _DetectiveBubble extends StatelessWidget {
               vertical: AppTokens.sp2,
             ),
             decoration: BoxDecoration(
-              color: c.primarySoft,
+              // 증거 제시는 배경까지 success 계열로 강조해 일반 질문과 구분.
+              color: isEvidence ? c.successSoft : c.primarySoft,
               border: Border.all(
-                color: evidenceId != null ? c.success : c.primary,
+                color: isEvidence ? c.success : c.primary,
               ),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(AppTokens.r4),
@@ -435,13 +464,40 @@ class _DetectiveBubble extends StatelessWidget {
                 bottomRight: Radius.circular(AppTokens.r4),
               ),
             ),
-            child: Text(
-              text,
-              style: AppText.body.copyWith(
-                fontSize: 13,
-                color: c.primary,
-                height: 1.55,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isEvidence) ...[
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.description_outlined,
+                        size: 12,
+                        color: c.success,
+                      ),
+                      const SizedBox(width: AppTokens.sp1),
+                      Text(
+                        '증거 제시',
+                        style: AppText.monoLabel.copyWith(
+                          fontSize: 10,
+                          color: c.success,
+                          height: 1.0,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppTokens.sp1),
+                ],
+                Text(
+                  text,
+                  style: AppText.body.copyWith(
+                    fontSize: 13,
+                    color: isEvidence ? c.text : c.primary,
+                    height: 1.55,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -546,11 +602,14 @@ class _InputBar extends StatelessWidget {
   const _InputBar({
     required this.controller,
     required this.onSend,
+    required this.onPresentEvidence,
     required this.disabled,
   });
 
   final TextEditingController controller;
   final VoidCallback onSend;
+  // null 이면 비활성(응답 대기 중).
+  final VoidCallback? onPresentEvidence;
   final bool disabled;
 
   @override
@@ -565,21 +624,36 @@ class _InputBar extends StatelessWidget {
       padding: const EdgeInsets.all(AppTokens.sp3),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: MSTextField(
-                controller: controller,
-                hintText: '질문을 입력하세요...',
-                onChanged: (_) {},
-              ),
-            ),
-            const SizedBox(width: AppTokens.sp2),
+            // 핵심 메커닉 — 증거 제시 강조 액션(입력창 바로 위, 발견성 확보).
             MSButton(
-              label: '',
-              variant: MSButtonVariant.primary,
-              icon: Icons.send,
-              onPressed: disabled ? null : onSend,
+              label: '증거 제시',
+              variant: MSButtonVariant.secondary,
+              icon: Icons.description_outlined,
+              onPressed: onPresentEvidence,
+            ),
+            const SizedBox(height: AppTokens.sp2),
+            Row(
+              children: [
+                Expanded(
+                  child: MSTextField(
+                    controller: controller,
+                    hintText: '질문을 입력하세요...',
+                    // 백엔드 question 계약(maxLength 500)을 입력 단계에서 하드캡.
+                    maxLength: 500,
+                    onChanged: (_) {},
+                  ),
+                ),
+                const SizedBox(width: AppTokens.sp2),
+                MSButton(
+                  label: '',
+                  variant: MSButtonVariant.primary,
+                  icon: Icons.send,
+                  onPressed: disabled ? null : onSend,
+                ),
+              ],
             ),
           ],
         ),

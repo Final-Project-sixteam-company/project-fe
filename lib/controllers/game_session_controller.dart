@@ -48,6 +48,11 @@ class GameSessionController extends ChangeNotifier {
   final Map<String, PlayEvidence> _evidenceRaw = {};
   PlayEvidence? rawEvidence(String id) => _evidenceRaw[id];
 
+  /// 현장(장소) 정보. 비핵심 데이터라 로딩 실패해도 무시(null 유지).
+  PlayLocations? _locations;
+  PlayLocations? get locations => _locations;
+
+  /// 시나리오 식별자를 정수 백엔드 ID로 변환. 변환 불가(샘플 시나리오) 시 null.
   int? get _backendScenarioId {
     final parsed = int.tryParse(scenarioId);
     if (parsed != null) return parsed;
@@ -129,6 +134,29 @@ class GameSessionController extends ChangeNotifier {
 
   Future<void> retry() => loadFromServer();
 
+  /// 409(이미 진행 중 세션) 복구: 이 기기에 저장된 세션 ID가 있으면 abandon 으로
+  /// 정리한 뒤 새로 시작한다. 저장 ID가 없으면(다른 기기/창에서 점유 중) 서버가
+  /// 활성 세션 ID를 돌려주지 않아 FE 단독 정리가 불가하므로 안내만 갱신한다.
+  Future<void> abandonConflictAndRestart() async {
+    final sid = _backendScenarioId;
+    if (sid == null) return;
+    final saved = await _readSavedSession(sid);
+    if (saved != null) {
+      try {
+        await _repo.abandon(saved);
+      } catch (_) {
+        // 정리 실패(이미 종료/네트워크 등)는 무시 — 아래에서 신규 생성을 시도한다.
+      }
+      await _clearSavedSession(sid);
+      await loadFromServer();
+      return;
+    }
+    // 저장된 세션이 없으면 자동 복구 불가 — 안내 문구를 명확히 갱신한다.
+    _loadError = '이 기기에서 시작한 세션 기록이 없어 자동으로 정리할 수 없습니다. '
+        '다른 기기/창에서 진행 중인 수사를 마치거나 중단한 뒤 다시 시도해 주세요.';
+    notifyListeners();
+  }
+
   Future<void> _refreshAll() async {
     final id = backendSessionId;
     if (id == null) return;
@@ -153,8 +181,16 @@ class GameSessionController extends ChangeNotifier {
           rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)));
     _evidences = rawEvidences.map(_toEvidence).toList();
     _syncUnlockedFromServer(rawEvidences);
+
+    // 현장 정보는 비핵심 — 실패해도 핵심 로딩 결과를 깨뜨리지 않도록 분리 호출.
+    try {
+      _locations = await _repo.locations(id);
+    } catch (_) {
+      // 미제공/오류 시 null 유지(화면은 '현장 정보 없음'으로 표시).
+    }
   }
 
+  /// 증거/대시보드(+현장)만 다시 로드(심문으로 증거 해금 후, 시간 경과 후 등).
   Future<void> refreshEvidences() async {
     final id = backendSessionId;
     if (id == null) return;
@@ -171,6 +207,13 @@ class GameSessionController extends ChangeNotifier {
             rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)));
       _evidences = rawEvidences.map(_toEvidence).toList();
       _syncUnlockedFromServer(rawEvidences);
+      // 현장 탭의 장소별 해금 카운트도 HUD 총합과 어긋나지 않도록 함께 갱신한다.
+      // 비핵심 데이터라 실패해도 증거 갱신 결과는 유지한다.
+      try {
+        _locations = await _repo.locations(id);
+      } catch (_) {
+        // 미제공/오류 시 기존 현장 정보 유지
+      }
       notifyListeners();
     } catch (_) {}
   }
@@ -186,27 +229,31 @@ class GameSessionController extends ChangeNotifier {
   // ── 모델 변환 ─────────────────────────────────────────────────────────────
 
   Suspect _toSuspect(PlaySuspect s) => Suspect(
-    id: s.suspectId.toString(),
-    name: s.name,
-    role: s.role ?? '',
-    suspicion: s.suspicionLevel,
-    interrogationCount: s.interrogationCount,
-    portraitAssetKey: s.portraitAssetKey,
-    // isWitness는 PlaySuspect.fromJson에서 이미 결정됨.
-    // (서버 boolean > characterType 문자열 순으로 폴백)
-    isWitness: s.isWitness,
-  );
+        id: s.suspectId.toString(),
+        name: s.name,
+        role: s.role ?? '',
+        suspicion: s.suspicionLevel,
+        interrogationCount: s.interrogationCount,
+        portraitUrl: s.portraitImageUrl,
+        portraitAssetKey: s.portraitAssetKey,
+        // isWitness는 PlaySuspect.fromJson에서 이미 결정됨.
+        // (서버 boolean > characterType 문자열 순으로 폴백)
+        isWitness: s.isWitness,
+      );
 
   Evidence _toEvidence(PlayEvidence e) => Evidence(
-    id: e.evidenceId.toString(),
-    name: e.title,
-    location: e.locationName ?? (e.isUnlocked ? '미상' : '???'),
-    icon: _iconForImportance(e.importance),
-    isLocked: !e.isUnlocked,
-    isAnalyzed: e.importance == EvidenceImportance.core,
-    imageAssetKey: e.imageAssetKey,
-    categoryLabel: e.categoryLabel,
-  );
+        id: e.evidenceId.toString(),
+        name: e.title,
+        location: e.locationName ?? (e.isUnlocked ? '미상' : '???'),
+        icon: _iconForImportance(e.importance),
+        isLocked: !e.isUnlocked,
+        // 핵심(CORE) 증거는 '핵심 증거' 필터에 노출되도록 표시
+        isAnalyzed: e.importance == EvidenceImportance.core,
+        oneLine: e.oneLine,
+        imageUrl: e.imageUrl,
+        imageAssetKey: e.imageAssetKey,
+        categoryLabel: e.categoryLabel,
+      );
 
   static IconData _iconForImportance(EvidenceImportance imp) => switch (imp) {
     EvidenceImportance.core => Icons.gpp_maybe_outlined,
@@ -250,6 +297,25 @@ class GameSessionController extends ChangeNotifier {
   bool get isStarted => _isStarted;
   bool get isCompleted => _isCompleted;
 
+  // ── 탭 전환 인텐트 ────────────────────────────────────────────────────────
+  // 증거 상세(별도 push 라우트)는 CaseScreen 의 GameSessionProvider 하위가 아니라
+  // 바텀 탭 인덱스를 직접 바꿀 수 없다. 그래서 공유 컨트롤러를 인텐트 버스로 써서
+  // 원하는 탭 인덱스를 올려두면 CaseScreen 이 이를 소비해 탭을 전환한다.
+  int? _tabRequest;
+  int? get tabRequest => _tabRequest;
+
+  /// 특정 탭으로 전환 요청(예: 증거 상세 → 용의자 심문 탭 2).
+  void requestTab(int index) {
+    _tabRequest = index;
+    notifyListeners();
+  }
+
+  /// CaseScreen 이 전환을 처리한 뒤 인텐트를 비운다(재알림 없음 → 루프 방지).
+  void consumeTabRequest() {
+    _tabRequest = null;
+  }
+
+  // ── 세션 시작 ─────────────────────────────────────────────────────────────
   void startSession() {
     if (_isStarted) return;
     _isStarted = true;
@@ -259,11 +325,22 @@ class GameSessionController extends ChangeNotifier {
     _loadFuture = loadFromServer();
   }
 
+  /// 시간 기반(TIME) 증거 해금 자동 반영을 위한 폴링 주기.
+  /// 백엔드는 경과 시간(예: 2/3/5분)에 따라 증거를 해금하지만 별도 푸시가 없어,
+  /// 주기적으로 다시 불러와야 새로 풀린 증거가 화면에 나타난다.
+  static const int _evidencePollSeconds = 30;
+
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       _elapsed += const Duration(seconds: 1);
       notifyListeners();
+      // 30초마다 증거/대시보드 폴링 — 진행 중(PLAYING) 세션에서만.
+      if (backendSessionId != null &&
+          _dashboard?.status == PlaySessionStatus.playing &&
+          _elapsed.inSeconds % _evidencePollSeconds == 0) {
+        refreshEvidences();
+      }
     });
   }
 

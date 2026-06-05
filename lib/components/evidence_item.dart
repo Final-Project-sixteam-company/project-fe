@@ -75,13 +75,13 @@ class EvidenceItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppTokens.sp2),
+              // 확보됨/핵심 증거 — 증거 탭 필터 칩·상세 상태 필과 동일 어휘.
+              // (트리거 없는 'NEW'/'대기' 가짜 단계 라벨 제거.)
               MSPill(
-                evidence.isAnalyzed
-                    ? '분석완료'
-                    : (evidence.isNew ? 'NEW' : '대기'),
+                evidence.isAnalyzed ? '핵심 증거' : '확보됨',
                 tone: evidence.isAnalyzed
                     ? MSPillTone.success
-                    : (evidence.isNew ? MSPillTone.primary : MSPillTone.mute),
+                    : MSPillTone.primary,
               ),
             ],
           ),

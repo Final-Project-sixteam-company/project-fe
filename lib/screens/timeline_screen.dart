@@ -18,6 +18,20 @@ extension _TimelineFilterLabel on _TimelineFilter {
     _TimelineFilter.conflict => '⚠ 모순 발견',
     _TimelineFilter.suspect => '용의자 주장',
   };
+
+  /// 필터별 빈 상태 제목 — 범용 문구 대신 문맥을 반영한다.
+  String get emptyTitle => switch (this) {
+    _TimelineFilter.all => '아직 기록된 타임라인이 없습니다',
+    _TimelineFilter.conflict => '발견된 모순이 없습니다',
+    _TimelineFilter.suspect => '용의자 주장 기록이 없습니다',
+  };
+
+  /// 필터별 빈 상태 보조 안내(없으면 null).
+  String? get emptySubtitle => switch (this) {
+    _TimelineFilter.all => null,
+    _TimelineFilter.conflict => '진술을 교차 검토하면 모순이 드러납니다.',
+    _TimelineFilter.suspect => '용의자를 심문하면 주장이 여기에 정리됩니다.',
+  };
 }
 
 class TimelineScreen extends StatefulWidget {
@@ -102,11 +116,14 @@ class _TimelineScreenState extends State<TimelineScreen> {
             const SizedBox(height: AppTokens.sp3),
             // ── 타임라인 ───────────────────────────────────────────
             entries.isEmpty
-                ? const Padding(
-              padding: EdgeInsets.only(top: AppTokens.sp8),
+                ? Padding(
+              padding: const EdgeInsets.only(top: AppTokens.sp8),
               child: MSEmpty(
-                icon: Icons.schedule,
-                title: '아직 기록된 타임라인이 없습니다',
+                icon: _filter == _TimelineFilter.conflict
+                    ? Icons.report_gmailerrorred_outlined
+                    : Icons.schedule,
+                title: _filter.emptyTitle,
+                subtitle: _filter.emptySubtitle,
               ),
             )
                 : TimelineList(entries),

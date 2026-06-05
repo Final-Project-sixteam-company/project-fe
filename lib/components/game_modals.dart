@@ -10,6 +10,7 @@ import '../models/case.dart';
 import '../models/play_models.dart';
 import '../models/sample_case.dart';
 import '../repositories/play_session_repository.dart';
+import '../screens/evidence_detail_screen.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
@@ -297,11 +298,18 @@ Future<Evidence?> showEvidencePresentModal(BuildContext context) {
   // 서버 연동 세션의 evidence는 백엔드 정수 ID를 가지므로(증거 제시 API에 필요)
   // controller.evidences 를 우선 사용하고, 비어 있거나 없으면 sampleCase로 폴백한다.
   List<Evidence> accessible;
+  // 증거 상세를 띄워 읽어본 뒤 제시할 수 있도록 세션 정보를 함께 넘긴다.
+  // (Sheet는 새 루트라 provider를 못 찾으므로 여기서 미리 캡처한다.)
+  int? sessionId;
+  PlayEvidence? Function(String)? rawResolver;
   try {
-    final serverEvidences = GameSessionProvider.read(context).evidences;
+    final controller = GameSessionProvider.read(context);
+    final serverEvidences = controller.evidences;
     accessible = serverEvidences.isNotEmpty
         ? serverEvidences.where((e) => !e.isLocked).toList()
         : sampleCase.evidences.where((e) => !e.isLocked).toList();
+    sessionId = controller.backendSessionId;
+    rawResolver = controller.rawEvidence;
   } catch (_) {
     // GameSessionProvider가 없는 컨텍스트(미리보기 등)에서는 샘플로 폴백
     accessible = sampleCase.evidences.where((e) => !e.isLocked).toList();
@@ -311,15 +319,29 @@ Future<Evidence?> showEvidencePresentModal(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => _EvidencePresentSheet(evidences: accessible),
+    builder: (_) => _EvidencePresentSheet(
+      evidences: accessible,
+      sessionId: sessionId,
+      rawResolver: rawResolver,
+    ),
   );
 }
 
 class _EvidencePresentSheet extends StatefulWidget {
-  const _EvidencePresentSheet({required this.evidences});
+  const _EvidencePresentSheet({
+    required this.evidences,
+    this.sessionId,
+    this.rawResolver,
+  });
 
   /// 제시 가능한(해금된) 증거 목록. 서버 연동 시 백엔드 정수 ID를 가진다.
   final List<Evidence> evidences;
+
+  /// 증거 상세 API 호출용 세션 ID(없으면 목록 폴백 데이터로만 상세 표시).
+  final int? sessionId;
+
+  /// 증거 ID로 목록 원본(PlayEvidence)을 찾아 상세 폴백 데이터로 쓰는 리졸버.
+  final PlayEvidence? Function(String)? rawResolver;
 
   @override
   State<_EvidencePresentSheet> createState() =>
@@ -427,8 +449,24 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                       const SizedBox(height: AppTokens.sp2),
                       itemBuilder: (_, i) => _EvidencePickItem(
                         evidence: results[i],
-                        onTap: () =>
-                            Navigator.of(context).pop(results[i]),
+                        // 바로 제시하지 않고 증거 상세를 먼저 띄운다. 상세에서
+                        // '이 증거 제시하기'를 누르면 시트를 닫고 제시를 확정한다.
+                        onTap: () {
+                          final picked = results[i];
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => EvidenceDetailScreen(
+                                evidence: picked,
+                                sessionId: widget.sessionId,
+                                listData:
+                                    widget.rawResolver?.call(picked.id),
+                                isUnlocked: !picked.isLocked,
+                                onPresent: () =>
+                                    Navigator.of(context).pop(picked),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       padding: const EdgeInsets.only(
                         bottom: AppTokens.sp6,

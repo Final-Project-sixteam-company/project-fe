@@ -25,7 +25,11 @@ class _AppShellState extends State<AppShell> {
     final c = context.c;
 
     final screens = <Widget>[
-      HomeScreen(onBrowse: () => _goTo(1), onCreate: () => _goTo(3)),
+      HomeScreen(
+        onBrowse: () => _goTo(1),
+        onCreate: () => _goTo(3),
+        onProfile: () => _goTo(4),
+      ),
       const ScenarioLibraryScreen(),
       const MyRecordsScreen(),
       const _BuilderPlaceholder(),

@@ -20,6 +20,15 @@ class ScenarioReview {
   final bool isSpoiler;
 }
 
+/// CL-001은 백엔드 시나리오 id('1')와 샘플 id('demoday-eve')가 같은 사건을 가리킨다.
+/// (controller.usesCl001SampleCaseData 와 동일한 이중-id 사실)
+/// 리뷰는 작성 경로(결과 화면 = controller.scenarioId)와 열람 경로(상세 = scenario.id)가
+/// 서로 다른 id를 쓸 수 있어, 같은 사건의 리뷰가 갈라지지 않도록 키를 정규화한다.
+const _cl001ScenarioAliases = {'demoday-eve', '1'};
+
+String canonicalScenarioId(String id) =>
+    _cl001ScenarioAliases.contains(id) ? 'demoday-eve' : id;
+
 // 샘플 리뷰 데이터
 final sampleReviews = <ScenarioReview>[
   ScenarioReview(

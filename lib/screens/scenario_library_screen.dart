@@ -93,6 +93,12 @@ class _ScenarioLibraryScreenState
   bool _loading = true;
   String? _error;
 
+  // ── 페이지네이션 ──────────────────────────────────────────────────────────
+  static const int _pageSize = 20;
+  int _page = 0;
+  bool _hasNext = false;
+  bool _loadingMore = false;
+
   /// 검색어 입력 디바운스
   Timer? _debounce;
 
@@ -119,10 +125,16 @@ class _ScenarioLibraryScreenState
       _error = null;
     });
     try {
-      final results = await scenarioRepo.query(_tab.toFilter(_query));
+      final page = await scenarioRepo.queryPage(
+        _tab.toFilter(_query),
+        page: 0,
+        size: _pageSize,
+      );
       if (!mounted || seq != _requestSeq) return;
       setState(() {
-        _results = results;
+        _results = page.content;
+        _page = 0;
+        _hasNext = page.hasNext;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -137,6 +149,31 @@ class _ScenarioLibraryScreenState
         _error = '시나리오를 불러오지 못했습니다.';
         _loading = false;
       });
+    }
+  }
+
+  /// 다음 페이지를 이어서 로드해 기존 결과에 덧붙인다('더보기').
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasNext) return;
+    final seq = _requestSeq; // 필터/검색이 바뀌면 seq 가 달라져 결과를 버린다.
+    setState(() => _loadingMore = true);
+    try {
+      final page = await scenarioRepo.queryPage(
+        _tab.toFilter(_query),
+        page: _page + 1,
+        size: _pageSize,
+      );
+      if (!mounted || seq != _requestSeq) return;
+      setState(() {
+        _results = [..._results, ...page.content];
+        _page = page.page;
+        _hasNext = page.hasNext;
+        _loadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted || seq != _requestSeq) return;
+      // 추가 로드 실패는 기존 목록 유지 + 더보기 버튼 재노출(조용히 복구 가능).
+      setState(() => _loadingMore = false);
     }
   }
 
@@ -192,23 +229,25 @@ class _ScenarioLibraryScreenState
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: _LibraryTab.values.map((tab) {
-                        final active = _tab == tab;
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            right: tab != _LibraryTab.values.last
-                                ? AppTokens.sp2
-                                : 0,
+                      children: [
+                        // 첫 칩 좌측 여백(끝 칩 우측 여백과 대칭) + 끝 칩 터치 여유.
+                        const SizedBox(width: AppTokens.sp2),
+                        for (final tab in _LibraryTab.values)
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(right: AppTokens.sp2),
+                            child: _FilterChip(
+                              label: tab.label,
+                              active: _tab == tab,
+                              onTap: () => _onTabChanged(tab),
+                            ),
                           ),
-                          child: _FilterChip(
-                            label: tab.label,
-                            active: active,
-                            onTap: () => _onTabChanged(tab),
-                          ),
-                        );
-                      }).toList(),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: AppTokens.sp4),
+                  // 필터 영역 ↔ 결과 목록 경계 구분.
+                  Divider(height: 1, thickness: 1, color: c.line),
                   const SizedBox(height: AppTokens.sp4),
                   Row(
                     children: [
@@ -253,19 +292,40 @@ class _ScenarioLibraryScreenState
                         AppTokens.sp4,
                         AppTokens.sp10,
                       ),
-                      itemCount: results.length,
+                      itemCount: results.length + (_hasNext ? 1 : 0),
                       separatorBuilder: (_, _) =>
                           const SizedBox(height: AppTokens.sp3),
-                      itemBuilder: (_, i) => _ScenarioRow(
-                        scenario: results[i],
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ScenarioDetailScreen(
-                              scenario: results[i],
+                      itemBuilder: (_, i) {
+                        // 마지막 행: 더보기 버튼(페이지네이션)
+                        if (i == results.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: AppTokens.sp2),
+                            child: _loadingMore
+                                ? const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(AppTokens.sp3),
+                                      child: MSSpinner(size: 20),
+                                    ),
+                                  )
+                                : MSButton(
+                                    label: '더보기',
+                                    variant: MSButtonVariant.secondary,
+                                    expanded: true,
+                                    onPressed: _loadMore,
+                                  ),
+                          );
+                        }
+                        return _ScenarioRow(
+                          scenario: results[i],
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ScenarioDetailScreen(
+                                scenario: results[i],
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
             ),
           ],

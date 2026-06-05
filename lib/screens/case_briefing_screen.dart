@@ -1,5 +1,6 @@
 // lib/screens/case_briefing_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../models/scenario.dart';
@@ -29,6 +30,9 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
   final List<Animation<Offset>> _slides = [];
 
   static const int _sectionCount = 5;
+
+  /// 수사 시작 전환 진행 중 플래그(버튼 로딩 표시 + 이중 탭 방지).
+  bool _starting = false;
 
   @override
   void initState() {
@@ -69,6 +73,22 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
       ctrl.dispose();
     }
     super.dispose();
+  }
+
+  /// 수사 시작: 버튼 로딩 상태를 한 프레임 노출한 뒤 CaseScreen으로 전환.
+  /// (CaseScreen 진입 직후 세션 시작 로딩이 이어지므로 즉시 피드백을 보장한다.)
+  void _startInvestigation() {
+    if (_starting) return;
+    setState(() => _starting = true);
+    HapticFeedback.selectionClick();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => CaseScreen(scenarioId: _scenario.id),
+        ),
+      );
+    });
   }
 
   Widget _animated(int index, Widget child) {
@@ -191,11 +211,8 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
                   label: '수사 시작하기',
                   variant: MSButtonVariant.primary,
                   expanded: true,
-                  onPressed: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => CaseScreen(scenarioId: _scenario.id),
-                    ),
-                  ),
+                  loading: _starting,
+                  onPressed: _starting ? null : _startInvestigation,
                 ),
               ),
               const SizedBox(height: AppTokens.sp6),
@@ -233,12 +250,13 @@ class _VictimRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
 
-    // CL-001 전용 피해자 정보. 추후 Scenario 모델에 victim 필드 추가 시 교체.
-    final bool isDemoDay = scenario.id == 'demoday-eve';
-    final String victimInitial = isDemoDay ? '강' : '?';
-    final String victimName = isDemoDay ? '강도현' : '미상';
-    final String victimRole = isDemoDay ? 'CEO · AI 스타트업 대표' : '피해자 정보 준비 중';
-    final String locationLabel = isDemoDay ? '데모룸' : scenario.tags.firstOrNull ?? '현장';
+    // 피해자 상세(이름/직책/발견 현장)는 세션 시작 후 dashboard.briefing 으로만
+    // 제공된다. 세션 전 브리핑에서는 알 수 없으므로 하드코딩하지 않고
+    // graceful 플레이스홀더를 표시한다(스포일러 방지).
+    const String victimInitial = '?';
+    const String victimName = '미상';
+    const String victimRole = '피해자 정보는 수사 시작 후 공개됩니다';
+    final String locationLabel = scenario.tags.firstOrNull ?? '현장';
 
     return Row(
       children: [

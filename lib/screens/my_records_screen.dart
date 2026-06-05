@@ -19,6 +19,26 @@ extension _RecordsFilterLabel on _RecordsFilter {
     _RecordsFilter.inProgress => '진행 중',
     _RecordsFilter.mine => '내 시나리오',
   };
+
+  // 빈 상태를 필터 문맥에 맞춰 안내한다.
+  IconData get emptyIcon => switch (this) {
+    _RecordsFilter.mine => Icons.edit_note_outlined,
+    _ => Icons.assignment_outlined,
+  };
+
+  String get emptyTitle => switch (this) {
+    _RecordsFilter.all => '아직 기록이 없습니다',
+    _RecordsFilter.completed => '완료된 사건이 없습니다',
+    _RecordsFilter.inProgress => '진행 중인 사건이 없습니다',
+    _RecordsFilter.mine => '제작한 시나리오가 없습니다',
+  };
+
+  String get emptySubtitle => switch (this) {
+    _RecordsFilter.all => '사건을 해결하면 여기에 기록이 남아요',
+    _RecordsFilter.completed => '사건을 끝까지 해결해 보세요',
+    _RecordsFilter.inProgress => '새 사건을 시작하면 여기에 표시돼요',
+    _RecordsFilter.mine => '시나리오를 만들면 여기에 표시돼요',
+  };
 }
 
 class MyRecordsScreen extends StatefulWidget {
@@ -120,11 +140,12 @@ class _MyRecordsScreenState extends State<MyRecordsScreen> {
               const SizedBox(height: AppTokens.sp3),
               // ── 기록 목록 ────────────────────────────────────────
               if (sessions.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: AppTokens.sp8),
+                Padding(
+                  padding: const EdgeInsets.only(top: AppTokens.sp8),
                   child: MSEmpty(
-                    icon: Icons.assignment_outlined,
-                    title: '아직 기록이 없습니다',
+                    icon: _filter.emptyIcon,
+                    title: _filter.emptyTitle,
+                    subtitle: _filter.emptySubtitle,
                   ),
                 )
               else

@@ -1,5 +1,6 @@
 // lib/screens/onboarding_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../components/ms_button.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
@@ -18,6 +19,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageCtrl = PageController();
   int _page = 0;
+  bool _navigating = false;
 
   static const _slides = [
     _Slide(
@@ -54,6 +56,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _goHome() async {
+    if (_navigating) return; // 이중 탭 방지
+    setState(() => _navigating = true);
+    HapticFeedback.selectionClick();
     await OnboardingFlag.markComplete();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
@@ -87,15 +92,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               alignment: Alignment.centerRight,
               child: Padding(
                 padding: const EdgeInsets.only(
-                  top: AppTokens.sp3,
-                  right: AppTokens.sp4,
+                  top: AppTokens.sp2,
+                  right: AppTokens.sp2,
                 ),
-                child: TextButton(
-                  onPressed: _goHome,
-                  child: Text(
-                    '건너뛰기',
-                    style: AppText.bodySm.copyWith(color: c.textMute),
-                  ),
+                // MSButton(ghost): fg=textSub 로 대비 상향 + 높이 48dp 터치 타깃 확보.
+                child: MSButton(
+                  label: '건너뛰기',
+                  variant: MSButtonVariant.ghost,
+                  onPressed: _navigating ? null : _goHome,
                 ),
               ),
             ),
@@ -131,12 +135,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       );
                     }),
                   ),
-                  const SizedBox(height: AppTokens.sp4),
+                  const SizedBox(height: AppTokens.sp6),
                   MSButton(
                     label: isLast ? '시작하기' : '다음',
                     variant: MSButtonVariant.primary,
                     expanded: true,
-                    onPressed: _next,
+                    // 시작하기 비동기 동안 잠금(스피너) → 이중 탭 방지
+                    loading: isLast && _navigating,
+                    onPressed: _navigating ? null : _next,
                   ),
                 ],
               ),
@@ -171,8 +177,9 @@ class _SlideView extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp8),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        // flex Spacer 로 상하 여백을 비율 고정 → 작은 폰~태블릿에서 동일 위치 유지(부유 방지)
         children: [
+          const Spacer(flex: 2),
           Container(
             width: 80,
             height: 80,
@@ -199,6 +206,7 @@ class _SlideView extends StatelessWidget {
             style: AppText.body.copyWith(color: c.textSub, height: 1.65),
             textAlign: TextAlign.center,
           ),
+          const Spacer(flex: 3),
         ],
       ),
     );

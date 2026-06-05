@@ -8,6 +8,7 @@ import '../controllers/game_session_controller.dart';
 import '../controllers/game_session_provider.dart';
 import '../core/api/api_exception.dart';
 import '../models/case.dart';
+import '../models/play_models.dart';
 import '../repositories/play_session_repository.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
@@ -33,14 +34,16 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
   static const int _maxEvidenceCount = 3;
   static const int _minTextLen = 5;
-  static const int _minSummaryLen = 10;
 
   bool _submitting = false;
+
+  /// 서버 제출 실패 메시지. SnackBar(5초 소멸) 대신 입력 영역 상단에 지속 표시해
+  /// '입력이 보존됐다'는 안심을 유지한다. 재제출 시작 시 해제.
+  String? _submitError;
 
   String get _motive => _motiveCtrl.text.trim();
   String get _method => _methodCtrl.text.trim();
   String get _conceal => _concealCtrl.text.trim();
-  String get _summary => _summaryCtrl.text.trim();
 
   @override
   void initState() {
@@ -60,18 +63,16 @@ class _SubmitScreenState extends State<SubmitScreen> {
   }
 
   List<_Requirement> get _requirements => [
-    _Requirement('진범을 지목했습니다', _selectedSuspect != null),
-    _Requirement(
-        '범행 동기를 $_minTextLen자 이상 입력', _motive.length >= _minTextLen),
-    _Requirement(
-        '범행 방법을 $_minTextLen자 이상 입력', _method.length >= _minTextLen),
-    _Requirement(
-        '은폐 방법을 $_minTextLen자 이상 입력', _conceal.length >= _minTextLen),
-    _Requirement('종합 추리를 $_minSummaryLen자 이상 입력',
-        _summary.length >= _minSummaryLen),
-    _Requirement('결정적 증거 $_maxEvidenceCount개 선택',
-        _selectedEvidences.length == _maxEvidenceCount),
-  ];
+        _Requirement('진범을 지목했습니다', _selectedSuspect != null),
+        _Requirement(
+            '범행 동기를 $_minTextLen자 이상 입력', _motive.length >= _minTextLen),
+        _Requirement(
+            '범행 방법을 $_minTextLen자 이상 입력', _method.length >= _minTextLen),
+        _Requirement(
+            '은폐 방법을 $_minTextLen자 이상 입력', _conceal.length >= _minTextLen),
+        _Requirement('결정적 증거 $_maxEvidenceCount개 선택',
+            _selectedEvidences.length == _maxEvidenceCount),
+      ];
 
   bool get _allRequirementsMet => _requirements.every((r) => r.met);
   bool get _canSubmit => !_submitting && _allRequirementsMet;
@@ -90,14 +91,20 @@ class _SubmitScreenState extends State<SubmitScreen> {
     final controller = context.sessionRead;
     final sessionId = controller.backendSessionId;
     final culpritId = int.tryParse(_selectedSuspect?.id ?? '');
+    // 진행 중(PLAYING) 세션에서만 제출 가능. 이미 제출/종료된 세션은 차단한다.
+    final status = controller.dashboard?.status;
+    final notPlaying =
+        status != null && status != PlaySessionStatus.playing;
 
-    if (!_canSubmit || sessionId == null || culpritId == null) {
+    if (!_canSubmit || sessionId == null || culpritId == null || notPlaying) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            sessionId == null
-                ? '세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.'
-                : '모든 항목을 입력해주세요.',
+            notPlaying
+                ? '이미 종결된 사건입니다. 다시 제출할 수 없습니다.'
+                : sessionId == null
+                    ? '세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.'
+                    : '모든 항목을 입력해주세요.',
           ),
         ),
       );
@@ -116,7 +123,10 @@ class _SubmitScreenState extends State<SubmitScreen> {
         .whereType<int>()
         .toList();
 
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _submitError = null; // 재시도 시작 → 이전 오류 배너 해제
+    });
     try {
       await playSessionRepo.submitFinalDeduction(
         sessionId,
@@ -131,7 +141,10 @@ class _SubmitScreenState extends State<SubmitScreen> {
       controller.completeSession();
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => ResultScreen(sessionId: sessionId),
+          builder: (_) => ResultScreen(
+            sessionId: sessionId,
+            scenarioId: controller.scenarioId,
+          ),
         ),
       );
     } on ApiException catch (e) {
@@ -147,18 +160,9 @@ class _SubmitScreenState extends State<SubmitScreen> {
     }
   }
 
+  /// 제출 실패 안내 — 입력 영역 상단에 지속 표시되는 배너로 노출(소멸 없음).
   void _showSubmitError(String message) {
-    final c = context.c;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 5),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: c.danger,
-        ),
-      );
+    setState(() => _submitError = message);
   }
 
   @override
@@ -207,6 +211,14 @@ class _SubmitScreenState extends State<SubmitScreen> {
                   ),
                 ],
               ),
+              // ── 제출 실패 보존 배너(지속) ───────────────────────
+              if (_submitError != null) ...[
+                const SizedBox(height: AppTokens.sp6),
+                _SubmitErrorBanner(
+                  message: _submitError!,
+                  onDismiss: () => setState(() => _submitError = null),
+                ),
+              ],
               const SizedBox(height: AppTokens.sp8),
               // ── 1. 진범 지목 ───────────────────────────────────
               const MSKicker('1. FINAL SUSPECT · 진범 지목'),
@@ -269,12 +281,17 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 maxCount: _maxEvidenceCount,
               ),
               const SizedBox(height: AppTokens.sp6),
-              // ── 4. 종합 추리 설명 ───────────────────────────────
-              const MSKicker('4. 종합 추리 설명'),
+              // ── 4. 종합 추리 설명 (본인 정리용 · 제출 미반영) ────
+              const MSKicker('4. 종합 추리 설명 · 선택'),
+              const SizedBox(height: AppTokens.sp2),
+              Text(
+                '생각을 정리하기 위한 메모입니다. 채점에는 반영되지 않습니다.',
+                style: AppText.bodySm.copyWith(color: c.textMute),
+              ),
               const SizedBox(height: AppTokens.sp3),
               MSTextField(
                 controller: _summaryCtrl,
-                hintText: '사건의 전말을 상세히 기록해주세요.',
+                hintText: '사건의 전말을 자유롭게 정리해보세요. (선택)',
                 maxLines: 5,
                 onChanged: (_) => setState(() {}),
               ),
@@ -288,7 +305,12 @@ class _SubmitScreenState extends State<SubmitScreen> {
                 label: _submitting ? '제출 중...' : '최종 추리 제출',
                 variant: MSButtonVariant.danger,
                 expanded: true,
-                onPressed: _canSubmit ? _onSubmit : null,
+                // 진행 중(PLAYING) 세션 + 모든 항목 충족 시에만 활성화.
+                onPressed: (_canSubmit &&
+                        controller.dashboard?.status ==
+                            PlaySessionStatus.playing)
+                    ? _onSubmit
+                    : null,
               ),
               const SizedBox(height: AppTokens.sp10),
             ],
@@ -317,43 +339,115 @@ class _RequirementChecklist extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+
+    // 미충족 안내는 제출 차단의 핵심 정보 → dangerSoft 배경 + 좌측 accent bar 로
+    // 일반 카드(bgElev) 대비 우선순위를 끌어올린다.
     return Container(
-      padding: const EdgeInsets.all(AppTokens.sp4),
       decoration: BoxDecoration(
-        color: c.bgElev,
-        border: Border.all(color: c.line),
+        color: c.dangerSoft,
         borderRadius: BorderRadius.circular(AppTokens.r4),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '제출하려면 아래 항목을 완료해 주세요',
-            style: AppText.monoLabel.copyWith(color: c.textSub),
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          for (final r in requirements)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppTokens.sp1),
-              child: Row(
-                children: [
-                  Icon(
-                    r.met ? Icons.check_circle : Icons.radio_button_unchecked,
-                    size: 16,
-                    color: r.met ? c.success : c.textMute,
-                  ),
-                  const SizedBox(width: AppTokens.sp3),
-                  Expanded(
-                    child: Text(
-                      r.label,
-                      style: AppText.bodySm.copyWith(
-                        color: r.met ? c.textMute : c.text,
-                      ),
+      clipBehavior: Clip.hardEdge,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 좌측 강조 바
+            Container(width: 4, color: c.danger),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(AppTokens.sp4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.error_outline,
+                            size: 16, color: c.danger),
+                        const SizedBox(width: AppTokens.sp2),
+                        Expanded(
+                          child: Text(
+                            '제출하려면 아래 항목을 완료해 주세요',
+                            style: AppText.monoLabel.copyWith(
+                              color: c.danger,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: AppTokens.sp3),
+                    for (final r in requirements)
+                      Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              r.met
+                                  ? Icons.check_circle
+                                  : Icons.radio_button_unchecked,
+                              size: 16,
+                              color: r.met ? c.success : c.danger,
+                            ),
+                            const SizedBox(width: AppTokens.sp3),
+                            Expanded(
+                              child: Text(
+                                r.label,
+                                style: AppText.bodySm.copyWith(
+                                  color: r.met ? c.textMute : c.text,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── 제출 실패 보존 배너 (지속 표시) ───────────────────────────────────────────
+
+class _SubmitErrorBanner extends StatelessWidget {
+  const _SubmitErrorBanner({required this.message, required this.onDismiss});
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.sp3),
+      decoration: BoxDecoration(
+        color: c.dangerSoft,
+        border: Border.all(color: c.danger),
+        borderRadius: BorderRadius.circular(AppTokens.r4),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, size: 18, color: c.danger),
+          const SizedBox(width: AppTokens.sp3),
+          Expanded(
+            child: Text(
+              message,
+              style: AppText.bodySm.copyWith(color: c.text, height: 1.5),
+            ),
+          ),
+          const SizedBox(width: AppTokens.sp2),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onDismiss,
+            child: Icon(Icons.close, size: 18, color: c.textSub),
+          ),
         ],
       ),
     );
@@ -519,59 +613,66 @@ class _EvidenceSelector extends StatelessWidget {
           final bool isSelected = selected.contains(e);
           final bool isDisabled = !isSelected && selected.length >= maxCount;
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppTokens.sp2),
-            child: GestureDetector(
-              onTap: isDisabled ? null : () => onToggle(e),
-              child: AnimatedContainer(
-                duration: AppMotion.dur2,
-                curve: AppMotion.easeOut,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTokens.sp3,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected ? c.primarySoft : Colors.transparent,
-                  border: Border.all(
-                    color: isSelected ? c.primary : c.line,
-                  ),
-                  borderRadius: BorderRadius.circular(AppTokens.r3),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      isSelected
-                          ? Icons.check_circle_outline
-                          : Icons.radio_button_unchecked,
-                      size: 16,
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppTokens.sp2),
+              child: GestureDetector(
+                onTap: isDisabled ? null : () => onToggle(e),
+                // 최대(3개) 도달로 더 못 고르는 항목은 bgHover 배경 + 0.5 불투명도로
+                // '지금은 선택 불가' 상태를 또렷이 구분한다.
+                child: Opacity(
+                  opacity: isDisabled ? 0.5 : 1.0,
+                  child: AnimatedContainer(
+                    duration: AppMotion.dur2,
+                    curve: AppMotion.easeOut,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTokens.sp3,
+                      vertical: 14, // ≈48dp 터치 타깃
+                    ),
+                    decoration: BoxDecoration(
                       color: isSelected
-                          ? c.primary
-                          : isDisabled
-                          ? c.textMute
-                          : c.textSub,
+                          ? c.primarySoft
+                          : (isDisabled ? c.bgHover : Colors.transparent),
+                      border: Border.all(
+                        color: isSelected ? c.primary : c.line,
+                      ),
+                      borderRadius: BorderRadius.circular(AppTokens.r3),
                     ),
-                    const SizedBox(width: AppTokens.sp3),
-                    Expanded(
-                      child: Text(
-                        e.name,
-                        style: AppText.body.copyWith(
-                          fontSize: 13,
-                          color: isDisabled ? c.textMute : c.text,
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected
+                              ? Icons.check_circle_outline
+                              : Icons.radio_button_unchecked,
+                          size: 16,
+                          color: isSelected
+                              ? c.primary
+                              : isDisabled
+                                  ? c.textMute
+                                  : c.textSub,
                         ),
-                      ),
+                        const SizedBox(width: AppTokens.sp3),
+                        Expanded(
+                          child: Text(
+                            e.name,
+                            style: AppText.body.copyWith(
+                              fontSize: 13,
+                              color: isDisabled ? c.textMute : c.text,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          e.location,
+                          style: AppText.monoLabel.copyWith(
+                            fontSize: 9.5,
+                            color: c.textMute,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      e.location,
-                      style: AppText.monoLabel.copyWith(
-                        fontSize: 9.5,
-                        color: c.textMute,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          );
+            );
         }),
       ],
     );

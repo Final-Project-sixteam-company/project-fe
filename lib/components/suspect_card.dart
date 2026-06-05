@@ -147,6 +147,7 @@ class _InterrogationChip extends StatelessWidget {
   }
 }
 
+
 // ── 의심도 수치 ───────────────────────────────────────────────────────────────
 
 class _SuspicionNum extends StatelessWidget {
