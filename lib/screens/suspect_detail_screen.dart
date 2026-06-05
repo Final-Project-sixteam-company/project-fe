@@ -503,8 +503,8 @@ class _BottomBar extends StatelessWidget {
                 onPressed: onInterrogate,
               ),
             ),
-            // 증인은 범인 지목 불가
-            if (!suspect.isWitness) ...[
+            // 지목 가능한 용의자만 범인 지목 노출(culpritEligible: 증인·레드헤링 제외)
+            if (suspect.culpritEligible) ...[
               const SizedBox(width: AppTokens.sp3),
               Expanded(
                 child: MSButton(

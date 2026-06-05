@@ -42,6 +42,10 @@ class _ResultScreenState extends State<ResultScreen>
   String? _error;
   DeductionResult? _data;
 
+  // P0-1: 채점이 아직 끝나지 않았을 때(404/AI015/네트워크 지연) 잠시 후 재조회(폴링).
+  static const int _maxResultPollAttempts = 5;
+  static const Duration _resultPollInterval = Duration(seconds: 3);
+
   @override
   void initState() {
     super.initState();
@@ -61,7 +65,7 @@ class _ResultScreenState extends State<ResultScreen>
     }
   }
 
-  Future<void> _fetchResult(int sessionId) async {
+  Future<void> _fetchResult(int sessionId, {int attempt = 0}) async {
     setState(() => _loading = true);
     try {
       final result = await playSessionRepo.result(sessionId);
@@ -72,6 +76,13 @@ class _ResultScreenState extends State<ResultScreen>
       });
       _ctrl.forward();
     } on ApiException catch (e) {
+      // 채점 미완료(404)·채점 진행 중(AI015)·네트워크 지연이면 잠시 후 재시도(폴링).
+      final notReady = e.isNetwork || e.status == 404 || e.code == 'AI015';
+      if (notReady && attempt < _maxResultPollAttempts) {
+        await Future.delayed(_resultPollInterval);
+        if (mounted) await _fetchResult(sessionId, attempt: attempt + 1);
+        return;
+      }
       if (mounted) {
         setState(() {
           _error = e.message;

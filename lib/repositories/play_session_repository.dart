@@ -1,5 +1,6 @@
 // lib/repositories/play_session_repository.dart
 import '../core/api/api_client.dart';
+import '../core/api/api_config.dart';
 import '../models/play_models.dart';
 
 /// 플레이 세션 전체 API(`/api/play-sessions/...`) 연동.
@@ -91,6 +92,7 @@ class PlaySessionRepository {
         'question': question,
         'presentedEvidenceId': ?presentedEvidenceId,
       },
+      timeout: ApiConfig.aiTimeout,
     );
     return InterrogationResult.fromJson(data as Map<String, dynamic>);
   }
@@ -128,6 +130,7 @@ class PlaySessionRepository {
         'coverUpText': ?coverUpText,
         'selectedEvidenceIds': selectedEvidenceIds,
       },
+      timeout: ApiConfig.aiTimeout,
     );
     return FinalDeductionResult.fromJson(data as Map<String, dynamic>);
   }

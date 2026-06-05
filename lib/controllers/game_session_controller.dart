@@ -34,10 +34,10 @@ class GameSessionController extends ChangeNotifier {
   /// 전체 캐릭터 목록 (용의자 + 증인).
   List<Suspect> get suspects => _suspects;
 
-  /// 범인 지목 가능한 용의자만. 증인(isWitness)은 제외.
+  /// 범인 지목 가능한 용의자만(culpritEligible). 증인·레드헤링 등 지목불가 캐릭터 제외.
   /// SubmitScreen 드롭다운과 BottomBar 버튼 모두 이 getter를 사용한다.
   List<Suspect> get accusableSuspects =>
-      _suspects.where((s) => !s.isWitness).toList();
+      _suspects.where((s) => s.culpritEligible).toList();
 
   final Map<String, PlaySuspect> _suspectRaw = {};
   PlaySuspect? rawSuspect(String id) => _suspectRaw[id];
@@ -239,6 +239,7 @@ class GameSessionController extends ChangeNotifier {
         // isWitness는 PlaySuspect.fromJson에서 이미 결정됨.
         // (서버 boolean > characterType 문자열 순으로 폴백)
         isWitness: s.isWitness,
+        culpritEligible: s.culpritEligible,
       );
 
   Evidence _toEvidence(PlayEvidence e) => Evidence(

@@ -285,6 +285,7 @@ class PlaySuspect {
     this.portraitAssetKey,
     this.characterType,
     this.isWitness = false,
+    this.culpritEligible = true,
   });
 
   final int suspectId;
@@ -314,6 +315,11 @@ class PlaySuspect {
   /// 후속 백엔드 DTO 추가 시 characterType 의존을 완전히 제거한다.
   final bool isWitness;
 
+  /// 최종 범인 지목 가능 여부. 서버 culpritEligible 우선.
+  /// 증인뿐 아니라 PERMANENT_RED_HERRING 등 '지목 불가' 캐릭터까지 거른다.
+  /// 서버 미제공 시 !isWitness 로 폴백(안전마진).
+  final bool culpritEligible;
+
   factory PlaySuspect.fromJson(Map<String, dynamic> j) {
     // portraitImageUrl(서버 명칭) 또는 portraitAssetKey(레거시) 중 존재하는 값 사용.
     final portrait = (j['portraitImageUrl'] as String?)?.isNotEmpty == true
@@ -324,6 +330,8 @@ class PlaySuspect {
     // isWitness: 서버가 boolean으로 내려주면 우선, 없으면 characterType 문자열로 판단.
     final isWitness = j['isWitness'] as bool? ??
         (characterType == 'NEUTRAL_WITNESS');
+    // culpritEligible: 서버 값 우선(레드헤링 등 비-증인 지목불가 포함), 없으면 !isWitness 폴백.
+    final culpritEligible = j['culpritEligible'] as bool? ?? !isWitness;
 
     return PlaySuspect(
       suspectId: (j['suspectId'] as num).toInt(),
@@ -339,6 +347,7 @@ class PlaySuspect {
       portraitAssetKey: portrait,
       characterType: characterType,
       isWitness: isWitness,
+      culpritEligible: culpritEligible,
     );
   }
 }
