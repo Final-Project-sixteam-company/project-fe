@@ -1,41 +1,38 @@
 // lib/models/play_models.dart
 // 플레이 세션 관련 API 응답 모델 (백엔드 DTO와 1:1 대응)
 
-/// 증거 중요도 — 백엔드 EvidenceImportance enum.
 enum EvidenceImportance { low, normal, high, core, fake }
 
 EvidenceImportance evidenceImportanceFromApi(String? v) => switch (v) {
-      'LOW' => EvidenceImportance.low,
-      'HIGH' => EvidenceImportance.high,
-      'CORE' => EvidenceImportance.core,
-      'FAKE' => EvidenceImportance.fake,
-      _ => EvidenceImportance.normal,
-    };
+  'LOW' => EvidenceImportance.low,
+  'HIGH' => EvidenceImportance.high,
+  'CORE' => EvidenceImportance.core,
+  'FAKE' => EvidenceImportance.fake,
+  _ => EvidenceImportance.normal,
+};
 
-/// 질문 유형 — 백엔드 QuestionType enum.
 enum QuestionType { free, recommended, evidencePresented }
 
 String questionTypeToApi(QuestionType t) => switch (t) {
-      QuestionType.free => 'FREE',
-      QuestionType.recommended => 'RECOMMENDED',
-      QuestionType.evidencePresented => 'EVIDENCE_PRESENTED',
-    };
+  QuestionType.free => 'FREE',
+  QuestionType.recommended => 'RECOMMENDED',
+  QuestionType.evidencePresented => 'EVIDENCE_PRESENTED',
+};
 
 QuestionType questionTypeFromApi(String? v) => switch (v) {
-      'RECOMMENDED' => QuestionType.recommended,
-      'EVIDENCE_PRESENTED' => QuestionType.evidencePresented,
-      _ => QuestionType.free,
-    };
+  'RECOMMENDED' => QuestionType.recommended,
+  'EVIDENCE_PRESENTED' => QuestionType.evidencePresented,
+  _ => QuestionType.free,
+};
 
-/// 세션 진행 상태 — 백엔드 PlaySessionStatus enum.
 enum PlaySessionStatus { playing, submitted, completed, abandoned }
 
 PlaySessionStatus playSessionStatusFromApi(String? v) => switch (v) {
-      'SUBMITTED' => PlaySessionStatus.submitted,
-      'COMPLETED' => PlaySessionStatus.completed,
-      'ABANDONED' => PlaySessionStatus.abandoned,
-      _ => PlaySessionStatus.playing,
-    };
+  'SUBMITTED' => PlaySessionStatus.submitted,
+  'COMPLETED' => PlaySessionStatus.completed,
+  'ABANDONED' => PlaySessionStatus.abandoned,
+  _ => PlaySessionStatus.playing,
+};
 
 // ── 세션 생성 ────────────────────────────────────────────────────────────────
 
@@ -53,11 +50,11 @@ class PlaySessionInfo {
   final DateTime? startedAt;
 
   factory PlaySessionInfo.fromJson(Map<String, dynamic> j) => PlaySessionInfo(
-        sessionId: (j['sessionId'] as num).toInt(),
-        scenarioId: (j['scenarioId'] as num).toInt(),
-        status: playSessionStatusFromApi(j['status'] as String?),
-        startedAt: _parseDate(j['startedAt']),
-      );
+    sessionId: (j['sessionId'] as num).toInt(),
+    scenarioId: (j['scenarioId'] as num).toInt(),
+    status: playSessionStatusFromApi(j['status'] as String?),
+    startedAt: _parseDate(j['startedAt']),
+  );
 }
 
 // ── 대시보드 ─────────────────────────────────────────────────────────────────
@@ -88,18 +85,21 @@ class DashboardInfo {
   final Briefing briefing;
 
   factory DashboardInfo.fromJson(Map<String, dynamic> j) => DashboardInfo(
-        sessionId: (j['sessionId'] as num).toInt(),
-        scenarioId: (j['scenarioId'] as num).toInt(),
-        scenarioTitle: j['scenarioTitle'] as String? ?? '',
-        status: playSessionStatusFromApi(j['status'] as String?),
-        elapsedSeconds: (j['elapsedSeconds'] as num?)?.toInt() ?? 0,
-        unlockedEvidenceCount: (j['unlockedEvidenceCount'] as num?)?.toInt() ?? 0,
-        totalEvidenceCount: (j['totalEvidenceCount'] as num?)?.toInt() ?? 0,
-        hintUsedCount: (j['hintUsedCount'] as num?)?.toInt() ?? 0,
-        interrogationCount: (j['interrogationCount'] as num?)?.toInt() ?? 0,
-        briefing: Briefing.fromJson(
-            (j['briefing'] as Map<String, dynamic>?) ?? const {}),
-      );
+    sessionId: (j['sessionId'] as num).toInt(),
+    scenarioId: (j['scenarioId'] as num).toInt(),
+    scenarioTitle: j['scenarioTitle'] as String? ?? '',
+    status: playSessionStatusFromApi(j['status'] as String?),
+    elapsedSeconds: (j['elapsedSeconds'] as num?)?.toInt() ?? 0,
+    unlockedEvidenceCount:
+    (j['unlockedEvidenceCount'] as num?)?.toInt() ?? 0,
+    totalEvidenceCount:
+    (j['totalEvidenceCount'] as num?)?.toInt() ?? 0,
+    hintUsedCount: (j['hintUsedCount'] as num?)?.toInt() ?? 0,
+    interrogationCount:
+    (j['interrogationCount'] as num?)?.toInt() ?? 0,
+    briefing: Briefing.fromJson(
+        (j['briefing'] as Map<String, dynamic>?) ?? const {}),
+  );
 }
 
 class Briefing {
@@ -114,10 +114,10 @@ class Briefing {
   final String summary;
 
   factory Briefing.fromJson(Map<String, dynamic> j) => Briefing(
-        victimName: j['victimName'] as String? ?? '알 수 없음',
-        foundLocation: j['foundLocation'] as String? ?? '알 수 없음',
-        summary: j['summary'] as String? ?? '',
-      );
+    victimName: j['victimName'] as String? ?? '알 수 없음',
+    foundLocation: j['foundLocation'] as String? ?? '알 수 없음',
+    summary: j['summary'] as String? ?? '',
+  );
 }
 
 // ── 증거 ─────────────────────────────────────────────────────────────────────
@@ -134,6 +134,9 @@ class PlayEvidence {
     this.locationName,
     this.unlockHint,
     this.relatedSuspects = const [],
+    // 이미지/카테고리 — 시나리오 YAML의 imageAssetKey / category 필드 대응
+    this.imageAssetKey,
+    this.categoryLabel,
   });
 
   final int evidenceId;
@@ -152,6 +155,12 @@ class PlayEvidence {
   final String? unlockHint;
   final List<RelatedSuspect> relatedSuspects;
 
+  /// 증거 이미지 URL 또는 로컬 assetKey.
+  final String? imageAssetKey;
+
+  /// 증거 카테고리 표시 라벨 (PHYSICAL / DOCUMENT / DIGITAL_LOG / MAP 등).
+  final String? categoryLabel;
+
   factory PlayEvidence.fromJson(Map<String, dynamic> j) => PlayEvidence(
         evidenceId: (j['evidenceId'] as num).toInt(),
         title: j['title'] as String? ?? '',
@@ -165,6 +174,14 @@ class PlayEvidence {
         relatedSuspects: ((j['relatedSuspects'] as List<dynamic>?) ?? const [])
             .map((e) => RelatedSuspect.fromJson(e as Map<String, dynamic>))
             .toList(),
+        // imageUrl(API spec 명칭) 또는 imageAssetKey(로컬/레거시) 우선순위 적용.
+        // 백엔드가 어느 키로 내려줘도 thumbnail/viewer UI가 동작한다.
+        imageAssetKey: (() {
+          final url = j['imageUrl'] as String?;
+          if (url != null && url.isNotEmpty) return url;
+          return j['imageAssetKey'] as String?;
+        })(),
+        categoryLabel: j['categoryLabel'] as String?,
       );
 }
 
@@ -233,19 +250,19 @@ class RelatedSuspect {
   final String name;
 
   factory RelatedSuspect.fromJson(Map<String, dynamic> j) => RelatedSuspect(
-        suspectId: (j['suspectId'] as num).toInt(),
-        name: j['name'] as String? ?? '',
-      );
+    suspectId: (j['suspectId'] as num).toInt(),
+    name: j['name'] as String? ?? '',
+  );
 }
 
-/// 심문 응답으로 해금된 증거(`{evidenceId, title}`). 용의자 모델 재사용 불가.
 class RelatedEvidence {
   const RelatedEvidence({required this.evidenceId, required this.title});
 
   final int evidenceId;
   final String title;
 
-  factory RelatedEvidence.fromJson(Map<String, dynamic> j) => RelatedEvidence(
+  factory RelatedEvidence.fromJson(Map<String, dynamic> j) =>
+      RelatedEvidence(
         evidenceId: (j['evidenceId'] as num).toInt(),
         title: j['title'] as String? ?? '',
       );
@@ -264,6 +281,10 @@ class PlaySuspect {
     this.publicStatement,
     this.alibi,
     this.portraitImageUrl,
+    // 이미지/캐릭터 타입
+    this.portraitAssetKey,
+    this.characterType,
+    this.isWitness = false,
   });
 
   final int suspectId;
@@ -276,19 +297,50 @@ class PlaySuspect {
   final String? alibi;
 
   /// 용의자 공식 초상 이미지(S3 URL). 없으면 null → UI는 이니셜 아바타로 폴백.
+  /// portraitAssetKey 와 동일 값으로 채워지는 레거시 별칭(기존 뷰어/소비처 호환).
   final String? portraitImageUrl;
 
-  factory PlaySuspect.fromJson(Map<String, dynamic> j) => PlaySuspect(
-        suspectId: (j['suspectId'] as num).toInt(),
-        name: j['name'] as String? ?? '',
-        suspicionLevel: (j['suspicionLevel'] as num?)?.toInt() ?? 0,
-        interrogationCount: (j['interrogationCount'] as num?)?.toInt() ?? 0,
-        role: j['role'] as String?,
-        relationToVictim: j['relationToVictim'] as String?,
-        publicStatement: j['publicStatement'] as String?,
-        alibi: j['alibi'] as String?,
-        portraitImageUrl: j['portraitImageUrl'] as String?,
-      );
+  /// 프로필 사진 URL 또는 로컬 assetKey.
+  /// 백엔드가 'portraitImageUrl' 또는 'portraitAssetKey' 중 어느 키로 내려줘도
+  /// 동일하게 처리한다. null이면 CharacterPortrait가 이니셜 아바타로 폴백.
+  final String? portraitAssetKey;
+
+  /// 백엔드 캐릭터 유형 문자열. 예: 'SUSPECT', 'NEUTRAL_WITNESS'.
+  /// isWitness 판정의 보조 수단. 후속에서 isWitness boolean 필드로 교체 예정.
+  final String? characterType;
+
+  /// 서버가 isWitness boolean을 직접 내려줄 경우 우선 적용.
+  /// 없으면 characterType == 'NEUTRAL_WITNESS' 로 폴백.
+  /// 후속 백엔드 DTO 추가 시 characterType 의존을 완전히 제거한다.
+  final bool isWitness;
+
+  factory PlaySuspect.fromJson(Map<String, dynamic> j) {
+    // portraitImageUrl(서버 명칭) 또는 portraitAssetKey(레거시) 중 존재하는 값 사용.
+    final portrait = (j['portraitImageUrl'] as String?)?.isNotEmpty == true
+        ? j['portraitImageUrl'] as String
+        : j['portraitAssetKey'] as String?;
+
+    final characterType = j['characterType'] as String?;
+    // isWitness: 서버가 boolean으로 내려주면 우선, 없으면 characterType 문자열로 판단.
+    final isWitness = j['isWitness'] as bool? ??
+        (characterType == 'NEUTRAL_WITNESS');
+
+    return PlaySuspect(
+      suspectId: (j['suspectId'] as num).toInt(),
+      name: j['name'] as String? ?? '',
+      suspicionLevel: (j['suspicionLevel'] as num?)?.toInt() ?? 0,
+      interrogationCount: (j['interrogationCount'] as num?)?.toInt() ?? 0,
+      role: j['role'] as String?,
+      relationToVictim: j['relationToVictim'] as String?,
+      publicStatement: j['publicStatement'] as String?,
+      alibi: j['alibi'] as String?,
+      // 동일 값으로 두 필드를 모두 채워 asset-key/URL 양쪽 소비처 호환.
+      portraitImageUrl: portrait,
+      portraitAssetKey: portrait,
+      characterType: characterType,
+      isWitness: isWitness,
+    );
+  }
 }
 
 // ── 현장(장소) ───────────────────────────────────────────────────────────────
@@ -372,14 +424,14 @@ class PlayHint {
   final int? remainingMinutes;
 
   factory PlayHint.fromJson(Map<String, dynamic> j) => PlayHint(
-        hintId: (j['hintId'] as num).toInt(),
-        hintLevel: (j['hintLevel'] as num?)?.toInt() ?? 0,
-        isAvailable: j['isAvailable'] as bool? ?? false,
-        isUsed: j['isUsed'] as bool? ?? false,
-        penaltyScore: (j['penaltyScore'] as num?)?.toInt() ?? 0,
-        content: j['content'] as String?,
-        remainingMinutes: (j['remainingMinutes'] as num?)?.toInt(),
-      );
+    hintId: (j['hintId'] as num).toInt(),
+    hintLevel: (j['hintLevel'] as num?)?.toInt() ?? 0,
+    isAvailable: j['isAvailable'] as bool? ?? false,
+    isUsed: j['isUsed'] as bool? ?? false,
+    penaltyScore: (j['penaltyScore'] as num?)?.toInt() ?? 0,
+    content: j['content'] as String?,
+    remainingMinutes: (j['remainingMinutes'] as num?)?.toInt(),
+  );
 }
 
 class HintUseResult {
@@ -396,11 +448,11 @@ class HintUseResult {
   final DateTime? usedAt;
 
   factory HintUseResult.fromJson(Map<String, dynamic> j) => HintUseResult(
-        hintId: (j['hintId'] as num).toInt(),
-        content: j['content'] as String? ?? '',
-        penaltyScore: (j['penaltyScore'] as num?)?.toInt() ?? 0,
-        usedAt: _parseDate(j['usedAt']),
-      );
+    hintId: (j['hintId'] as num).toInt(),
+    content: j['content'] as String? ?? '',
+    penaltyScore: (j['penaltyScore'] as num?)?.toInt() ?? 0,
+    usedAt: _parseDate(j['usedAt']),
+  );
 }
 
 // ── 심문 ─────────────────────────────────────────────────────────────────────
@@ -511,7 +563,8 @@ class DeductionResult {
   final List<KeyEvidence> keyEvidences;
   final List<RecommendedScenario> nextRecommendedScenarios;
 
-  factory DeductionResult.fromJson(Map<String, dynamic> j) => DeductionResult(
+  factory DeductionResult.fromJson(Map<String, dynamic> j) =>
+      DeductionResult(
         sessionId: (j['sessionId'] as num).toInt(),
         score: (j['score'] as num?)?.toInt() ?? 0,
         grade: j['grade'] as String? ?? '-',
@@ -519,20 +572,24 @@ class DeductionResult {
             (j['matched'] as Map<String, dynamic>?) ?? const {}),
         correctCulprit: j['correctCulprit'] == null
             ? null
-            : CorrectCulprit.fromJson(j['correctCulprit'] as Map<String, dynamic>),
+            : CorrectCulprit.fromJson(
+            j['correctCulprit'] as Map<String, dynamic>),
         matchedParts: ((j['matchedParts'] as List<dynamic>?) ?? const [])
             .cast<String>(),
         missedParts:
-            ((j['missedParts'] as List<dynamic>?) ?? const []).cast<String>(),
+        ((j['missedParts'] as List<dynamic>?) ?? const []).cast<String>(),
         feedback: j['feedback'] as String? ?? '',
         fullExplanation: j['fullExplanation'] as String? ?? '',
-        keyEvidences: ((j['keyEvidences'] as List<dynamic>?) ?? const [])
-            .map((e) => KeyEvidence.fromJson(e as Map<String, dynamic>))
+        keyEvidences:
+        ((j['keyEvidences'] as List<dynamic>?) ?? const [])
+            .map((e) =>
+            KeyEvidence.fromJson(e as Map<String, dynamic>))
             .toList(),
         nextRecommendedScenarios:
-            ((j['nextRecommendedScenarios'] as List<dynamic>?) ?? const [])
-                .map((e) => RecommendedScenario.fromJson(e as Map<String, dynamic>))
-                .toList(),
+        ((j['nextRecommendedScenarios'] as List<dynamic>?) ?? const [])
+            .map((e) =>
+            RecommendedScenario.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 }
 
@@ -552,22 +609,24 @@ class MatchedParts {
   final int keyEvidences;
 
   factory MatchedParts.fromJson(Map<String, dynamic> j) => MatchedParts(
-        culprit: j['culprit'] as bool? ?? false,
-        motive: j['motive'] as bool? ?? false,
-        method: j['method'] as bool? ?? false,
-        coverUp: j['coverUp'] as bool? ?? false,
-        keyEvidences: (j['keyEvidences'] as num?)?.toInt() ?? 0,
-      );
+    culprit: j['culprit'] as bool? ?? false,
+    motive: j['motive'] as bool? ?? false,
+    method: j['method'] as bool? ?? false,
+    coverUp: j['coverUp'] as bool? ?? false,
+    keyEvidences: (j['keyEvidences'] as num?)?.toInt() ?? 0,
+  );
 }
 
 class CorrectCulprit {
-  const CorrectCulprit({required this.suspectId, required this.name, this.role});
+  const CorrectCulprit(
+      {required this.suspectId, required this.name, this.role});
 
   final int suspectId;
   final String name;
   final String? role;
 
-  factory CorrectCulprit.fromJson(Map<String, dynamic> j) => CorrectCulprit(
+  factory CorrectCulprit.fromJson(Map<String, dynamic> j) =>
+      CorrectCulprit(
         suspectId: (j['suspectId'] as num).toInt(),
         name: j['name'] as String? ?? '',
         role: j['role'] as String?,
@@ -581,9 +640,9 @@ class KeyEvidence {
   final String title;
 
   factory KeyEvidence.fromJson(Map<String, dynamic> j) => KeyEvidence(
-        evidenceId: (j['evidenceId'] as num).toInt(),
-        title: j['title'] as String? ?? '',
-      );
+    evidenceId: (j['evidenceId'] as num).toInt(),
+    title: j['title'] as String? ?? '',
+  );
 }
 
 class RecommendedScenario {

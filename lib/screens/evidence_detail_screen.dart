@@ -1,7 +1,6 @@
 // lib/screens/evidence_detail_screen.dart
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import '../components/image_viewer.dart';
+import '../components/asset_image_widget.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
@@ -14,6 +13,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
+import 'evidence_image_viewer.dart';
 
 class EvidenceDetailScreen extends StatefulWidget {
   const EvidenceDetailScreen({
@@ -79,7 +79,6 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
       _detail?.relatedTimelineEvents ?? const [];
   String get _locationName =>
       _detail?.locationName ?? widget.evidence.location;
-  String? get _imageUrl => _detail?.imageUrl;
 
   @override
   void initState() {
@@ -105,6 +104,8 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
       if (mounted) setState(() => _loadingDetail = false);
     }
   }
+
+  String get _heroTag => 'evidence_image_${widget.evidence.id}';
 
   @override
   Widget build(BuildContext context) {
@@ -135,21 +136,17 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: AppTokens.sp6),
-                // ── 썸네일(이미지 있으면 노출, 없으면 아이콘 플레이스홀더) ──
-                // 이미지가 있으면 탭하여 전체화면 확대 모달로 크게 볼 수 있다.
-                Center(child: _Thumbnail(
-                  icon: widget.evidence.icon,
-                  imageUrl: _effectiveLocked ? null : _imageUrl,
-                  onTap: () {
-                    final url = _effectiveLocked ? null : _imageUrl;
-                    if (url != null && url.isNotEmpty) {
-                      showImageViewer(context, url);
-                    }
-                  },
-                )),
                 const SizedBox(height: AppTokens.sp4),
-                // ── 이름 ────────────────────────────────────────────
+                // ── 이미지 또는 아이콘 썸네일 ────────────────────
+                // 이미지가 있으면 탭하여 전체화면 확대 뷰어(Hero·핀치줌)로 본다.
+                // 로딩 중에는 AssetImageWidget 내부 스켈레톤이 표시된다.
+                _ImageOrIcon(
+                  evidence: widget.evidence,
+                  effectiveLocked: _effectiveLocked,
+                  heroTag: _heroTag,
+                ),
+                const SizedBox(height: AppTokens.sp4),
+                // ── 이름 ────────────────────────────────────────
                 Center(
                   child: Text(
                     _effectiveLocked ? '잠긴 증거' : widget.evidence.name,
@@ -158,10 +155,9 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp2),
-                // ── 발견 위치 ────────────────────────────────────────
+                // ── 발견 위치 ────────────────────────────────────
                 Center(
                   child: Text(
-                    // 잠금 상태면 위치 정보도 노출하지 않는다
                     _effectiveLocked
                         ? '해금 후 위치 정보가 공개됩니다'
                         : _locationName,
@@ -172,18 +168,28 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp6),
-                // ── 상태 필 ──────────────────────────────────────────
+                // ── 상태 필 ──────────────────────────────────────
                 Center(
                   child: _StatusPill(statusLabel: _statusLabel),
                 ),
                 const SizedBox(height: AppTokens.sp6),
-                // ── 관찰 정보 카드 ───────────────────────────────────
+                // ── 관찰 정보 카드 ───────────────────────────────
                 _ObservationCard(
                   evidence: widget.evidence,
                   effectiveLocked: _effectiveLocked,
                   description: _description,
                   loading: _loadingDetail && _description == null,
                 ),
+                // ── 이미지 있으면 크게 보기 버튼 ──────────────────────
+                if (!_effectiveLocked &&
+                    widget.evidence.imageAssetKey != null &&
+                    widget.evidence.imageAssetKey!.isNotEmpty) ...[
+                  const SizedBox(height: AppTokens.sp4),
+                  _ViewImageButton(
+                    evidence: widget.evidence,
+                    heroTag: _heroTag,
+                  ),
+                ],
                 // ── 관련 용의자 ──────────────────────────────────────
                 if (!_effectiveLocked && _relatedSuspects.isNotEmpty) ...[
                   const SizedBox(height: AppTokens.sp6),
@@ -248,79 +254,176 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
   }
 }
 
-// ── 썸네일 ────────────────────────────────────────────────────────────────────
+// ── 이미지 / 아이콘 썸네일 ────────────────────────────────────────────────────
 
-class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({required this.icon, this.imageUrl, this.onTap});
+class _ImageOrIcon extends StatelessWidget {
+  const _ImageOrIcon({
+    required this.evidence,
+    required this.effectiveLocked,
+    required this.heroTag,
+  });
 
-  final IconData icon;
-  final String? imageUrl;
-  // 이미지가 있을 때 탭 콜백(전체화면 확대). 이미지가 없으면 무시된다.
-  final VoidCallback? onTap;
+  final Evidence evidence;
+  final bool effectiveLocked;
+  final String heroTag;
+
+  bool get _hasImage =>
+      !effectiveLocked &&
+          evidence.imageAssetKey != null &&
+          evidence.imageAssetKey!.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
-    final url = imageUrl;
-    final hasImage = url != null && url.isNotEmpty;
-    final decoration = BoxDecoration(
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [AppColors.tealBase, AppColors.skyBase],
-      ),
-      borderRadius: BorderRadius.circular(AppTokens.r6),
-      border: Border.all(color: AppColors.ink0.withValues(alpha: .14)),
-    );
-
-    final iconChild = Icon(icon, size: 34, color: AppColors.ink0);
-
-    final box = Container(
-      width: 86,
-      height: 86,
-      decoration: decoration,
-      clipBehavior: Clip.hardEdge,
-      alignment: Alignment.center,
-      child: hasImage
-          ? CachedNetworkImage(
-              imageUrl: url,
-              fit: BoxFit.cover,
-              width: 86,
-              height: 86,
-              // 로딩 중엔 스켈레톤, 실패 시 아이콘 폴백(S3 키 조합 금지).
-              placeholder: (_, _) =>
-                  const MSSkeleton(width: 86, height: 86, radius: AppTokens.r6),
-              errorWidget: (_, _, _) => iconChild,
-            )
-          : iconChild,
-    );
-
-    if (!hasImage) return box;
-
-    // 탭하면 크게 볼 수 있음을 알리는 돋보기 배지 + 제스처.
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          box,
-          Positioned(
-            right: 4,
-            bottom: 4,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: AppColors.ink950.withValues(alpha: .55),
-                borderRadius: BorderRadius.circular(AppTokens.r2),
+    if (_hasImage) {
+      return Center(
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EvidenceImageViewer(
+                heroTag: heroTag,
+                assetKey: evidence.imageAssetKey!,
+                title: evidence.name,
+                location: evidence.location,
+                categoryLabel: evidence.categoryLabel,
               ),
-              child: const Icon(Icons.zoom_in, size: 14, color: AppColors.ink0),
             ),
           ),
-        ],
+          child: Hero(
+            tag: heroTag,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppTokens.r6),
+              child: Stack(
+                children: [
+                  AssetImageWidget(
+                    assetKey: evidence.imageAssetKey,
+                    width: 240,
+                    height: 160,
+                    fit: BoxFit.cover,
+                    borderRadius: BorderRadius.circular(AppTokens.r6),
+                    fallback: _GradientIconBox(
+                      icon: evidence.icon,
+                      width: 240,
+                      height: 160,
+                    ),
+                  ),
+                  // 확대 힌트 오버레이
+                  Positioned(
+                    right: AppTokens.sp2,
+                    bottom: AppTokens.sp2,
+                    child: Container(
+                      padding: const EdgeInsets.all(AppTokens.sp1),
+                      decoration: BoxDecoration(
+                        color: AppColors.ink950.withValues(alpha: .6),
+                        borderRadius: BorderRadius.circular(AppTokens.r2),
+                      ),
+                      child: const Icon(
+                        Icons.zoom_in,
+                        size: 16,
+                        color: AppColors.ink50,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Center(
+      child: _GradientIconBox(
+        icon: evidence.icon,
+        width: 86,
+        height: 86,
       ),
     );
   }
 }
 
+class _GradientIconBox extends StatelessWidget {
+  const _GradientIconBox({
+    required this.icon,
+    required this.width,
+    required this.height,
+  });
+  final IconData icon;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.tealBase, AppColors.skyBase],
+        ),
+        borderRadius: BorderRadius.circular(AppTokens.r6),
+        border: Border.all(color: AppColors.ink0.withValues(alpha: .14)),
+      ),
+      alignment: Alignment.center,
+      child: Icon(icon, size: width * 0.38, color: AppColors.ink0),
+    );
+  }
+}
+
+// ── 이미지 열기 버튼 ─────────────────────────────────────────────────────────
+
+class _ViewImageButton extends StatelessWidget {
+  const _ViewImageButton({
+    required this.evidence,
+    required this.heroTag,
+  });
+  final Evidence evidence;
+  final String heroTag;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EvidenceImageViewer(
+            heroTag: heroTag,
+            assetKey: evidence.imageAssetKey!,
+            title: evidence.name,
+            location: evidence.location,
+            categoryLabel: evidence.categoryLabel,
+          ),
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          vertical: AppTokens.sp3,
+          horizontal: AppTokens.sp4,
+        ),
+        decoration: BoxDecoration(
+          color: c.primarySoft,
+          border: Border.all(color: c.primary),
+          borderRadius: BorderRadius.circular(AppTokens.r3),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.zoom_in, size: 16, color: c.primary),
+            const SizedBox(width: AppTokens.sp2),
+            Text(
+              '증거 이미지 크게 보기',
+              style: AppText.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: c.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 // ── 상태 필 ───────────────────────────────────────────────────────────────────
 
@@ -336,7 +439,6 @@ class _StatusPill extends StatelessWidget {
       '확보됨' => MSPillTone.primary,
       _ => MSPillTone.mute, // 시간 잠금
     };
-
     return MSPill(statusLabel, tone: tone);
   }
 }
@@ -450,4 +552,3 @@ class _TimelineEventRow extends StatelessWidget {
     );
   }
 }
-

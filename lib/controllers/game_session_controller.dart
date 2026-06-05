@@ -1,3 +1,4 @@
+// lib/controllers/game_session_controller.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,11 +13,9 @@ class GameSessionController extends ChangeNotifier {
       : _repo = repo ?? playSessionRepo;
 
   final String scenarioId;
-
   final PlaySessionRepository _repo;
 
   // ── 서버 세션 ─────────────────────────────────────────────────────────────
-  /// 백엔드 플레이 세션 ID. 세션 생성 성공 후 채워진다.
   int? backendSessionId;
 
   bool _loading = false;
@@ -24,7 +23,6 @@ class GameSessionController extends ChangeNotifier {
   bool get isLoading => _loading;
   String? get loadError => _loadError;
 
-  /// 서버에 이미 진행 중인 세션이 있어(409) 새 세션 생성이 막힌 상태.
   bool _sessionConflict = false;
   bool get sessionConflict => _sessionConflict;
 
@@ -32,7 +30,14 @@ class GameSessionController extends ChangeNotifier {
   DashboardInfo? get dashboard => _dashboard;
 
   List<Suspect> _suspects = const [];
+
+  /// 전체 캐릭터 목록 (용의자 + 증인).
   List<Suspect> get suspects => _suspects;
+
+  /// 범인 지목 가능한 용의자만. 증인(isWitness)은 제외.
+  /// SubmitScreen 드롭다운과 BottomBar 버튼 모두 이 getter를 사용한다.
+  List<Suspect> get accusableSuspects =>
+      _suspects.where((s) => !s.isWitness).toList();
 
   final Map<String, PlaySuspect> _suspectRaw = {};
   PlaySuspect? rawSuspect(String id) => _suspectRaw[id];
@@ -51,26 +56,19 @@ class GameSessionController extends ChangeNotifier {
   int? get _backendScenarioId {
     final parsed = int.tryParse(scenarioId);
     if (parsed != null) return parsed;
-    // 샘플 데모 시나리오 식별자 → 백엔드 시드 시나리오(1) 매핑
     if (scenarioId == 'demoday-eve') return 1;
     return null;
   }
 
   bool get isServerBacked => _backendScenarioId != null;
 
-  /// timeline/scene 화면의 하드코딩 CL-001 샘플 데이터(`sampleCase.timeline`,
-  /// scene_screen 의 `_locations`)는 CL-001 케이스에서만 유효하다.
-  /// 백엔드 `GET .../timeline` · `.../locations` 가 아직 404(미구현)라, 그 외
-  /// 시나리오(4·5 등)에서 이 샘플을 그대로 띄우면 스포일러/서사 모순이 된다.
-  /// 따라서 CL-001(샘플 id 'demoday-eve' 또는 백엔드 시드 '1')에서만 표시한다.
-  /// 엔드포인트 구현 시 이 게이트를 제거하고 실데이터로 교체할 것.
+  /// CL-001(데모데이 전야) 정적 샘플 데이터를 사용하는 세션인지 여부.
+  /// 타임라인·힌트 텍스트 등 하드코딩 샘플 데이터를 표시해도 되는지 판단하는 게이트.
+  /// 백엔드 timeline 엔드포인트 구현 후 항상 false로 교체한다.
   bool get usesCl001SampleCaseData =>
-      scenarioId == 'demoday-eve' || scenarioId == '1';
+      scenarioId == 'demoday-eve' || _backendScenarioId == 1;
 
-  // ── 진행 중 세션 영속화(재진입 시 재개용) ─────────────────────────────────
-  // 백엔드에 '내 활성 세션 조회' 엔드포인트가 없고, 409 응답도 기존 세션 ID를
-  // 돌려주지 않는다. 그래서 세션 생성 시 ID를 기기에 저장해 두고, 재진입/콜드
-  // 스타트 때 그 세션이 아직 PLAYING이면 새로 만들지 않고 그대로 이어한다.
+  // ── 세션 영속화 ───────────────────────────────────────────────────────────
   static String _activeSessionKey(int scenarioId) =>
       'active_play_session_$scenarioId';
 
@@ -89,33 +87,22 @@ class GameSessionController extends ChangeNotifier {
     await prefs.remove(_activeSessionKey(scenarioId));
   }
 
-  /// 진행 중인 세션 생성/로딩 future. 생성 직후 이탈(abandon) 시 이 future 의
-  /// 완료를 기다려 backendSessionId 를 확보한 뒤 정리하기 위해 보관한다.
-  Future<void>? _loadFuture;
-
-  /// 서버에서 세션을 확보 + 초기 데이터(대시보드/용의자/증거) 로딩.
-  /// 저장된 세션이 아직 진행 중이면 재개하고, 없으면 새로 생성한다.
   Future<void> loadFromServer() async {
     final sid = _backendScenarioId;
-    if (sid == null) return; // 샘플 시나리오는 서버 연동 생략
+    if (sid == null) return;
     _loading = true;
     _loadError = null;
     _sessionConflict = false;
     notifyListeners();
     try {
-      // 1) 재개: 직전에 생성한 세션이 아직 PLAYING이면 그대로 이어한다.
       final saved = await _readSavedSession(sid);
-      if (saved != null && await _tryResume(saved, sid)) {
-        return; // 재개 성공(_refreshAll 완료)
-      }
-      // 2) 신규 세션 생성
+      if (saved != null && await _tryResume(saved, sid)) return;
       final session = await _repo.createSession(sid);
       backendSessionId = session.sessionId;
       await _saveSession(sid, session.sessionId);
       await _refreshAll();
     } on ApiException catch (e) {
       if (e.status == 409) {
-        // 진행 중 세션이 있으나 ID를 알 수 없는 경우(영속 ID 유실/다른 기기 등).
         _sessionConflict = true;
         _loadError = '이미 진행 중인 세션이 있어 새로 시작할 수 없습니다.';
       } else {
@@ -129,26 +116,22 @@ class GameSessionController extends ChangeNotifier {
     }
   }
 
-  /// 저장된 세션을 재개 시도. 아직 PLAYING이면 데이터를 채우고 true 반환.
-  /// 완료/포기/소멸된 세션이면 저장 기록을 지우고 false(→ 신규 생성).
   Future<bool> _tryResume(int savedId, int scenarioId) async {
     try {
       backendSessionId = savedId;
       await _refreshAll();
     } on ApiException catch (e) {
       backendSessionId = null;
-      if (e.isNetwork) rethrow; // 네트워크 오류는 상위 catch에서 처리
-      await _clearSavedSession(scenarioId); // 404 등 → 정리 후 신규 생성
+      if (e.isNetwork) rethrow;
+      await _clearSavedSession(scenarioId);
       return false;
     }
     if (_dashboard?.status == PlaySessionStatus.playing) return true;
-    // 이미 끝난 세션 → 재개 불가
     backendSessionId = null;
     await _clearSavedSession(scenarioId);
     return false;
   }
 
-  /// 로딩 실패 후 재시도(에러 화면의 '다시 시도').
   Future<void> retry() => loadFromServer();
 
   /// 409(이미 진행 중 세션) 복구: 이 기기에 저장된 세션 ID가 있으면 abandon 으로
@@ -187,7 +170,8 @@ class GameSessionController extends ChangeNotifier {
     final rawSuspects = results[1] as List<PlaySuspect>;
     _suspectRaw
       ..clear()
-      ..addEntries(rawSuspects.map((s) => MapEntry(s.suspectId.toString(), s)));
+      ..addEntries(
+          rawSuspects.map((s) => MapEntry(s.suspectId.toString(), s)));
     _suspects = rawSuspects.map(_toSuspect).toList();
 
     final rawEvidences = results[2] as List<PlayEvidence>;
@@ -231,17 +215,18 @@ class GameSessionController extends ChangeNotifier {
         // 미제공/오류 시 기존 현장 정보 유지
       }
       notifyListeners();
-    } catch (_) {
-      // 새로고침 실패는 조용히 무시(기존 데이터 유지)
-    }
+    } catch (_) {}
   }
 
   void _syncUnlockedFromServer(List<PlayEvidence> raw) {
     _unlockedEvidenceIds
       ..clear()
-      ..addAll(
-          raw.where((e) => e.isUnlocked).map((e) => e.evidenceId.toString()));
+      ..addAll(raw
+          .where((e) => e.isUnlocked)
+          .map((e) => e.evidenceId.toString()));
   }
+
+  // ── 모델 변환 ─────────────────────────────────────────────────────────────
 
   Suspect _toSuspect(PlaySuspect s) => Suspect(
         id: s.suspectId.toString(),
@@ -250,6 +235,10 @@ class GameSessionController extends ChangeNotifier {
         suspicion: s.suspicionLevel,
         interrogationCount: s.interrogationCount,
         portraitUrl: s.portraitImageUrl,
+        portraitAssetKey: s.portraitAssetKey,
+        // isWitness는 PlaySuspect.fromJson에서 이미 결정됨.
+        // (서버 boolean > characterType 문자열 순으로 폴백)
+        isWitness: s.isWitness,
       );
 
   Evidence _toEvidence(PlayEvidence e) => Evidence(
@@ -262,16 +251,18 @@ class GameSessionController extends ChangeNotifier {
         isAnalyzed: e.importance == EvidenceImportance.core,
         oneLine: e.oneLine,
         imageUrl: e.imageUrl,
+        imageAssetKey: e.imageAssetKey,
+        categoryLabel: e.categoryLabel,
       );
 
   static IconData _iconForImportance(EvidenceImportance imp) => switch (imp) {
-        EvidenceImportance.core => Icons.gpp_maybe_outlined,
-        EvidenceImportance.high => Icons.priority_high,
-        EvidenceImportance.fake => Icons.block_outlined,
-        _ => Icons.description_outlined,
-      };
+    EvidenceImportance.core => Icons.gpp_maybe_outlined,
+    EvidenceImportance.high => Icons.priority_high,
+    EvidenceImportance.fake => Icons.block_outlined,
+    _ => Icons.description_outlined,
+  };
 
-  // ── 타이머(경과 시간 표시용) ─────────────────────────────────────────────────
+  // ── 타이머 ────────────────────────────────────────────────────────────────
   Timer? _timer;
   Duration _elapsed = Duration.zero;
   Duration get elapsed => _elapsed;
@@ -282,9 +273,10 @@ class GameSessionController extends ChangeNotifier {
     return '$m:$s';
   }
 
-  // ── 해금된 증거(서버 동기화) ─────────────────────────────────────────────────
+  // ── 해금 증거 ─────────────────────────────────────────────────────────────
   final Set<String> _unlockedEvidenceIds = {};
-  Set<String> get unlockedEvidenceIds => Set.unmodifiable(_unlockedEvidenceIds);
+  Set<String> get unlockedEvidenceIds =>
+      Set.unmodifiable(_unlockedEvidenceIds);
 
   int get unlockedCount =>
       _dashboard?.unlockedEvidenceCount ?? _unlockedEvidenceIds.length;
@@ -296,6 +288,10 @@ class GameSessionController extends ChangeNotifier {
   List<InterrogationLog> get interrogationLogs => List.unmodifiable(_logs);
 
   // ── 세션 상태 ─────────────────────────────────────────────────────────────
+  /// loadFromServer() 의 진행 중인 Future.
+  /// abandonSession()이 세션 생성 완료를 기다렸다가 /abandon을 호출할 수 있도록 보관.
+  Future<void>? _loadFuture;
+
   bool _isStarted = false;
   bool _isCompleted = false;
   bool get isStarted => _isStarted;
@@ -325,7 +321,7 @@ class GameSessionController extends ChangeNotifier {
     _isStarted = true;
     _startTimer();
     notifyListeners();
-    // 서버 세션 생성 + 데이터 로딩(비동기). future 를 보관해 생성 중 이탈 시 대기 가능.
+    // Future를 보관해 abandon 시 완료 대기가 가능하도록 한다.
     _loadFuture = loadFromServer();
   }
 
@@ -351,63 +347,52 @@ class GameSessionController extends ChangeNotifier {
   bool isEvidenceUnlocked(String evidenceId) =>
       _unlockedEvidenceIds.contains(evidenceId);
 
-  /// 조건 기반 수동 해금(로컬 즉시 반영). 서버 새로고침은 [refreshEvidences].
   void unlockEvidence(String evidenceId) {
-    if (_unlockedEvidenceIds.add(evidenceId)) {
-      notifyListeners();
-    }
+    if (_unlockedEvidenceIds.add(evidenceId)) notifyListeners();
   }
 
-  // ── 심문 로그 저장 ────────────────────────────────────────────────────────
   void addInterrogationLog(InterrogationLog log) {
     _logs.add(log);
     notifyListeners();
   }
 
-  // ── 세션 종료 ─────────────────────────────────────────────────────────────
-  /// 최종 제출 완료 표시. 점수/등급은 결과 화면에서 서버 값으로 표시한다.
   void completeSession() {
     _isCompleted = true;
     _timer?.cancel();
-    // 종료된 세션은 재개 대상이 아니므로 저장 기록 정리(다음 진입은 신규 생성).
     final sid = _backendScenarioId;
     if (sid != null) _clearSavedSession(sid);
     notifyListeners();
   }
 
-  /// 진행 중인 수사를 중단(포기)한다. 뒤로가기 이탈 등에서 호출.
-  /// 서버 active_key(userId_scenarioId) 유니크 제약상 PLAYING 세션을 남기면
-  /// 다음 진입이 409로 막히므로 abandon API로 정리한다. 네트워크 실패는
-  /// 무시(best-effort)하되, 로컬 재개 기록과 타이머는 반드시 정리한다.
   Future<void> abandonSession() async {
-    if (_isCompleted) return; // 이미 끝난 세션은 포기 대상이 아니다
-    // 세션 생성이 진행 중이면 완료를 기다려 backendSessionId 를 확보한 뒤 정리한다.
-    // (생성 직후 이탈 시 PLAYING 세션이 서버에 잔류해 다음 진입이 409가 되는 레이스 방지)
-    try {
-      await _loadFuture;
-    } catch (_) {
-      // 로딩 실패는 무시 — 아래에서 backendSessionId 유무로 분기
+    if (_isCompleted) return;
+    // 세션 생성이 진행 중이면 완료를 기다린 후 abandon을 실행한다.
+    // fire-and-forget으로 두면 backendSessionId가 아직 null인 채로
+    // abandon이 실행되어 /abandon 호출을 건너뛰고, 이후 in-flight load가
+    // PLAYING 세션을 저장해 dispose된 컨트롤러에 notify하는 race가 생긴다.
+    if (_loadFuture != null) {
+      await _loadFuture!.catchError((_) {});
     }
     _timer?.cancel();
     final id = backendSessionId;
-    if (id == null) {
-      // 정리할 서버 세션이 없으면 로컬 기록만 정리
-      final sid = _backendScenarioId;
-      if (sid != null) await _clearSavedSession(sid);
-      return;
-    }
-    bool abandoned = false;
-    try {
-      await _repo.abandon(id);
-      abandoned = true;
-    } catch (_) {
-      // 서버 정리 실패: 로컬 재개 기록을 보존해 다음 진입에서 재개/복구가 가능하도록 한다.
-      // (키를 지우면 서버엔 PLAYING 세션이 남아 409가 나는데 재개할 ID도 잃는다)
-    }
-    backendSessionId = null;
-    if (abandoned) {
-      final sid = _backendScenarioId;
-      if (sid != null) await _clearSavedSession(sid);
+    final sid = _backendScenarioId;
+
+    if (id != null) {
+      try {
+        await _repo.abandon(id);
+        // abandon 성공 시에만 로컬 세션 키를 삭제한다.
+        // 실패하면 백엔드 세션이 PLAYING으로 남으므로 키를 보존해
+        // 다음 진입 시 _tryResume 경로로 재개할 수 있게 한다.
+        // 키를 지우면 createSession → 409 + 복구 불가 상태가 된다.
+        backendSessionId = null;
+        if (sid != null) await _clearSavedSession(sid);
+      } catch (_) {
+        // best-effort: 서버 정리 실패 → 키 보존, 타이머만 정리.
+        backendSessionId = null;
+        // sid 키는 의도적으로 유지.
+      }
+    } else {
+      backendSessionId = null;
     }
   }
 

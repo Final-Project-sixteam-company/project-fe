@@ -1,3 +1,4 @@
+// lib/screens/timeline_screen.dart
 import 'package:flutter/material.dart';
 import '../components/ms_kicker.dart';
 import '../components/states.dart';
@@ -44,10 +45,8 @@ class _TimelineScreenState extends State<TimelineScreen> {
   _TimelineFilter _filter = _TimelineFilter.all;
 
   // TODO(backend): 서버 타임라인 연동.
-  // api-spec.md §9.9 GET /api/play-sessions/{sessionId}/timeline 가 정의돼 있으나
-  // 현재 백엔드에서 404(미구현)라 sampleCase.timeline(정적 데이터)로 표시한다.
-  // 엔드포인트 구현 시 PlayEvidence/PlaySuspect처럼 컨트롤러로 끌어올려
-  // controller.timeline 을 읽도록 교체할 것.
+  // api-spec.md §9.9 GET /api/play-sessions/{sessionId}/timeline 정의됨.
+  // 백엔드 구현 시 controller.timeline 을 읽도록 교체할 것.
   List<TimelineEntry> get _filtered => switch (_filter) {
     _TimelineFilter.all => sampleCase.timeline,
     _TimelineFilter.conflict =>
@@ -59,8 +58,9 @@ class _TimelineScreenState extends State<TimelineScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    // CL-001 외 시나리오(4·5 등)에서는 하드코딩 타임라인이 스포일러가 되므로
-    // 표시하지 않는다(백엔드 timeline 엔드포인트 미구현). 구현 시 게이트 제거.
+
+    // CL-001 외 시나리오에서는 하드코딩 타임라인이 스포일러가 되므로 숨긴다.
+    // 백엔드 timeline 엔드포인트 구현 후 이 게이트를 제거한다.
     final showSample = context.sessionRead.usesCl001SampleCaseData;
     if (!showSample) {
       return Scaffold(
@@ -76,6 +76,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
         ),
       );
     }
+
     final entries = _filtered;
 
     return Scaffold(
@@ -88,7 +89,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: AppTokens.sp4),
-            // ── 1. 필터 칩 ─────────────────────────────────────────
+            // ── 필터 칩 ────────────────────────────────────────────
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -110,10 +111,10 @@ class _TimelineScreenState extends State<TimelineScreen> {
               ),
             ),
             const SizedBox(height: AppTokens.sp4),
-            // ── 2. 섹션 타이틀 ─────────────────────────────────────
+            // ── 섹션 타이틀 ────────────────────────────────────────
             const MSKicker('사건 타임라인'),
             const SizedBox(height: AppTokens.sp3),
-            // ── 3. 타임라인 ────────────────────────────────────────
+            // ── 타임라인 ───────────────────────────────────────────
             entries.isEmpty
                 ? Padding(
               padding: const EdgeInsets.only(top: AppTokens.sp8),
@@ -135,7 +136,6 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final c = context.c;
-
     return AppBar(
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -172,9 +172,12 @@ class _FilterChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: AppMotion.dur2,
         curve: AppMotion.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.chipPadH,
+          vertical: AppTokens.chipPadV,
+        ),
         decoration: BoxDecoration(
-          color: active ? c.primarySoft : Colors.transparent,
+          color: active ? c.primarySoft : c.bg.withValues(alpha: 0),
           border: Border.all(color: active ? c.primary : c.line),
           borderRadius: BorderRadius.circular(AppTokens.rPill),
         ),

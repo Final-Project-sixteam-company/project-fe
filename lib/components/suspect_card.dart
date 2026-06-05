@@ -1,6 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
+// lib/components/suspect_card.dart
 import 'package:flutter/material.dart';
-import 'states.dart';
+import '../components/asset_image_widget.dart';
+import '../components/ms_pill.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
 import '../theme/app_colors.dart';
@@ -17,14 +18,14 @@ class SuspectCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final countLabel = suspect.interrogationCount > 0
-        ? ', 심문 ${suspect.interrogationCount}회'
-        : '';
+    final countLabel =
+    suspect.interrogationCount > 0 ? ', 심문 ${suspect.interrogationCount}회' : '';
 
     return Semantics(
       button: true,
-      label: '${suspect.name}, ${suspect.role}, 의심도 ${suspect.suspicion}'
-          '$countLabel',
+      label: suspect.isWitness
+          ? '${suspect.name}, ${suspect.role}$countLabel'
+          : '${suspect.name}, ${suspect.role}, 의심도 ${suspect.suspicion}$countLabel',
       child: Material(
         color: c.bg,
         borderRadius: BorderRadius.circular(AppTokens.r4),
@@ -33,57 +34,81 @@ class SuspectCard extends StatelessWidget {
           splashColor: c.primary.withValues(alpha: .08),
           highlightColor: c.primary.withValues(alpha: .04),
           borderRadius: BorderRadius.circular(AppTokens.r4),
-        child: Container(
-          padding: const EdgeInsets.all(AppTokens.sp4),
-          decoration: BoxDecoration(
-            border: Border.all(color: c.line),
-            borderRadius: BorderRadius.circular(AppTokens.r4),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _Avatar(
-                    initial:
-                        suspect.name.isNotEmpty ? suspect.name.characters.first : '?',
-                    imageUrl: suspect.portraitUrl,
-                  ),
-                  const SizedBox(width: AppTokens.sp3),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          suspect.name,
-                          style: AppText.titleM.copyWith(
-                            fontSize: 14,
-                            color: c.text,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          suspect.role,
-                          style: AppText.bodySm.copyWith(color: c.textSub),
-                        ),
-                        if (suspect.interrogationCount > 0) ...[
-                          const SizedBox(height: AppTokens.sp2),
-                          _InterrogationChip(count: suspect.interrogationCount),
-                        ],
-                      ],
+          child: Container(
+            padding: const EdgeInsets.all(AppTokens.sp4),
+            decoration: BoxDecoration(
+              border: Border.all(color: c.line),
+              borderRadius: BorderRadius.circular(AppTokens.r4),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // ── 프로필 사진 / 이니셜 아바타 ─────────────
+                    Hero(
+                      tag: suspect.id,
+                      child: CharacterPortrait(
+                        name: suspect.name,
+                        size: 40,
+                        assetKey: suspect.portraitAssetKey,
+                        borderRadius: AppTokens.r3,
+                        isWitness: suspect.isWitness,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: AppTokens.sp3),
-                  _SuspicionNum(suspicion: suspect.suspicion),
+                    const SizedBox(width: AppTokens.sp3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  suspect.name,
+                                  style: AppText.titleM.copyWith(
+                                    fontSize: 14,
+                                    color: c.text,
+                                  ),
+                                ),
+                              ),
+                              // 증인 뱃지
+                              if (suspect.isWitness)
+                                const MSPill(
+                                  '증인',
+                                  tone: MSPillTone.mute,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            suspect.role,
+                            style: AppText.bodySm.copyWith(color: c.textSub),
+                          ),
+                          if (suspect.interrogationCount > 0) ...[
+                            const SizedBox(height: AppTokens.sp2),
+                            _InterrogationChip(
+                                count: suspect.interrogationCount),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppTokens.sp3),
+                    // 증인은 의심도 숫자 표시 안 함
+                    if (!suspect.isWitness)
+                      _SuspicionNum(suspicion: suspect.suspicion),
+                  ],
+                ),
+                // 용의자만 의심도 미터 표시
+                if (!suspect.isWitness) ...[
+                  const SizedBox(height: AppTokens.sp3),
+                  _Meter(percent: suspect.suspicion),
                 ],
-              ),
-              const SizedBox(height: AppTokens.sp3),
-              _Meter(percent: suspect.suspicion),
-            ],
+              ],
+            ),
           ),
-        ),
         ),
       ),
     );
@@ -94,15 +119,14 @@ class SuspectCard extends StatelessWidget {
 
 class _InterrogationChip extends StatelessWidget {
   const _InterrogationChip({required this.count});
-
   final int count;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp2, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.sp2, vertical: 2),
       decoration: BoxDecoration(
         color: c.primarySoft,
         borderRadius: BorderRadius.circular(AppTokens.r2),
@@ -111,10 +135,11 @@ class _InterrogationChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.forum_outlined, size: 11, color: c.primary),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppTokens.sp1),
           Text(
             '심문 $count회',
-            style: AppText.monoLabel.copyWith(color: c.primary, height: 1.0),
+            style:
+            AppText.monoLabel.copyWith(color: c.primary, height: 1.0),
           ),
         ],
       ),
@@ -122,84 +147,22 @@ class _InterrogationChip extends StatelessWidget {
   }
 }
 
-// ── 아바타 ────────────────────────────────────────────────────────────────────
-
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initial, this.imageUrl});
-
-  final String initial;
-  // 공식 초상 URL. null/빈값이거나 로딩 실패 시 이니셜 그라데이션으로 폴백.
-  final String? imageUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final initialFallback = Text(
-      initial,
-      style: AppText.titleM.copyWith(
-        fontSize: 16,
-        color: AppColors.ink950,
-        height: 1.0,
-      ),
-    );
-
-    final url = imageUrl;
-    final hasImage = url != null && url.isNotEmpty;
-
-    return Container(
-      width: 40,
-      height: 40,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.tealBase, AppColors.skyBase],
-        ),
-        borderRadius: BorderRadius.circular(AppTokens.r3),
-        border: Border.all(
-          color: const Color(0x24FFFFFF),
-          width: 1,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: hasImage
-          ? CachedNetworkImage(
-              imageUrl: url,
-              width: 40,
-              height: 40,
-              fit: BoxFit.cover,
-              // 로딩 중엔 스켈레톤, 실패 시 이니셜 그라데이션 폴백.
-              placeholder: (_, _) =>
-                  const MSSkeleton(width: 40, height: 40, radius: AppTokens.r3),
-              errorWidget: (_, _, _) => initialFallback,
-            )
-          : initialFallback,
-    );
-  }
-}
 
 // ── 의심도 수치 ───────────────────────────────────────────────────────────────
 
 class _SuspicionNum extends StatelessWidget {
   const _SuspicionNum({required this.suspicion});
-
   final int suspicion;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'SUSPICION',
-          style: AppText.monoLabel.copyWith(
-            color: c.textMute,
-            height: 1.0,
-          ),
-        ),
+        Text('SUSPICION',
+            style: AppText.monoLabel.copyWith(color: c.textMute, height: 1.0)),
         const SizedBox(height: 2),
         Text(
           '$suspicion',
@@ -219,7 +182,6 @@ class _SuspicionNum extends StatelessWidget {
 
 class _Meter extends StatelessWidget {
   const _Meter({required this.percent});
-
   final int percent;
 
   @override
@@ -232,30 +194,24 @@ class _Meter extends StatelessWidget {
       child: SizedBox(
         height: 5,
         child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Stack(
-              children: [
-                // 배경
-                Positioned.fill(
-                  child: ColoredBox(color: c.bgHover),
-                ),
-                // 채움
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: constraints.maxWidth * ratio,
-                  child: DecoratedBox(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppColors.skyBase, AppColors.roseBase],
-                      ),
+          builder: (_, constraints) => Stack(
+            children: [
+              Positioned.fill(child: ColoredBox(color: c.bgHover)),
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: constraints.maxWidth * ratio,
+                child: const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.skyBase, AppColors.roseBase],
                     ),
                   ),
                 ),
-              ],
-            );
-          },
+              ),
+            ],
+          ),
         ),
       ),
     );
