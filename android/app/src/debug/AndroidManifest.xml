@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 디버그 빌드 한정: 로컬/emulator의 평문 HTTP 백엔드(예: http://10.0.2.2) 접속 허용.
+         릴리스(main) 빌드는 변경하지 않아 운영은 HTTPS만 사용한다. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>
