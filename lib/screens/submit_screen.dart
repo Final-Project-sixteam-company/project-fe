@@ -48,9 +48,9 @@ class _SubmitScreenState extends State<SubmitScreen> {
   @override
   void initState() {
     super.initState();
-    // 증인이 초기값으로 전달된 경우 무시 (SuspectDetailScreen 경로 방어)
+    // 지목 불가 캐릭터(증인·레드헤링)가 초기값으로 전달된 경우 무시
     final initial = widget.initialSuspect;
-    _selectedSuspect = (initial != null && !initial.isWitness) ? initial : null;
+    _selectedSuspect = (initial != null && initial.culpritEligible) ? initial : null;
   }
 
   @override
@@ -148,6 +148,19 @@ class _SubmitScreenState extends State<SubmitScreen> {
         ),
       );
     } on ApiException catch (e) {
+      // P0-1: 느린 채점/재제출/타임아웃에서도 결과화면에 도달하도록 복구한다.
+      // 이미 제출(AI010)·채점 진행 중(AI015) → 제출이 접수된 상태이므로 결과화면으로(결과화면이 폴링).
+      if (e.code == 'AI010' || e.code == 'AI015') {
+        if (!mounted) return;
+        controller.completeSession();
+        await _goToResult(sessionId, controller.scenarioId);
+        return;
+      }
+      // 타임아웃/네트워크 → 제출 성공 여부 불확실 → /result 탐침으로 확인.
+      if (e.isNetwork) {
+        await _recoverFromUncertainSubmit(sessionId);
+        return;
+      }
       final isServerError = (e.status ?? 0) >= 500;
       final message = isServerError
           ? '채점 서버 오류로 제출하지 못했습니다. (${e.message})\n입력은 그대로 유지되니 잠시 후 다시 제출해 주세요.'
@@ -165,14 +178,55 @@ class _SubmitScreenState extends State<SubmitScreen> {
     setState(() => _submitError = message);
   }
 
+  /// 결과화면으로 이동(결과화면이 채점 미완료 시 폴링한다).
+  Future<void> _goToResult(int sessionId, String scenarioId) async {
+    if (!mounted) return;
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ResultScreen(sessionId: sessionId, scenarioId: scenarioId),
+      ),
+    );
+  }
+
+  /// 타임아웃/네트워크로 제출 성공 여부가 불확실할 때, /result가 이미 있으면 제출 성공으로 간주한다.
+  Future<void> _recoverFromUncertainSubmit(int sessionId) async {
+    try {
+      await playSessionRepo.result(sessionId);
+      if (!mounted) return;
+      final controller = context.sessionRead;
+      controller.completeSession();
+      await _goToResult(sessionId, controller.scenarioId);
+    } on ApiException {
+      // 아직 결과 없음(미제출/채점 전) → 입력 보존 + 재확인 CTA.
+      if (mounted) _showUncertainSubmit(sessionId);
+    }
+  }
+
+  /// 제출 응답 불확실 시: 입력을 보존하고 "결과 다시 확인" CTA를 띄운다(데드엔드 방지).
+  void _showUncertainSubmit(int sessionId) {
+    if (!mounted) return;
+    setState(() => _submitError =
+        '제출 응답이 지연됐습니다. 채점이 진행 중일 수 있어요. 입력은 그대로 유지됩니다.');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('제출이 접수됐는지 확인이 필요합니다.'),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: '결과 다시 확인',
+          onPressed: () => _recoverFromUncertainSubmit(sessionId),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final controller = context.session;
 
-    // 증인(isWitness) 제외, 범인 지목 가능한 용의자만.
+    // 범인 지목 가능한 용의자만(culpritEligible: 증인·레드헤링 제외).
     final accusableSuspects =
-    controller.suspects.where((s) => !s.isWitness).toList();
+    controller.suspects.where((s) => s.culpritEligible).toList();
 
     // controller.suspects 재빌드(retry/refresh) 후 _selectedSuspect가
     // 이전 인스턴스를 가리키면 DropdownButton value mismatch → assert 크래시.
