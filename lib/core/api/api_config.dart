@@ -37,4 +37,8 @@ class ApiConfig {
 
   /// 네트워크 타임아웃.
   static const Duration timeout = Duration(seconds: 20);
+
+  /// AI 엔드포인트(심문/최종추리) 전용 타임아웃.
+  /// 동기 LLM 응답/채점이 일반 요청보다 길어 기본 타임아웃과 분리한다.
+  static const Duration aiTimeout = Duration(seconds: 60);
 }

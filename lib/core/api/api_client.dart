@@ -60,11 +60,11 @@ class ApiClient {
   /// 현재 백엔드는 MockUserProvider(userId=1)를 사용하므로 미설정 시 헤더를 생략한다.
   String? Function()? authTokenProvider;
 
-  Future<dynamic> get(String path, {Map<String, dynamic>? query}) =>
-      _send('GET', path, query: query);
+  Future<dynamic> get(String path, {Map<String, dynamic>? query, Duration? timeout}) =>
+      _send('GET', path, query: query, timeout: timeout);
 
-  Future<dynamic> post(String path, {Object? body, Map<String, dynamic>? query}) =>
-      _send('POST', path, body: body, query: query);
+  Future<dynamic> post(String path, {Object? body, Map<String, dynamic>? query, Duration? timeout}) =>
+      _send('POST', path, body: body, query: query, timeout: timeout);
 
   Future<dynamic> patch(String path, {Object? body}) =>
       _send('PATCH', path, body: body);
@@ -77,6 +77,7 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? query,
     Object? body,
+    Duration? timeout,
   }) async {
     final uri = _buildUri(path, query);
     final headers = <String, String>{
@@ -94,7 +95,7 @@ class ApiClient {
     try {
       final request = http.Request(method, uri)..headers.addAll(headers);
       if (encodedBody != null) request.body = encodedBody;
-      final streamed = await _http.send(request).timeout(ApiConfig.timeout);
+      final streamed = await _http.send(request).timeout(timeout ?? ApiConfig.timeout);
       res = await http.Response.fromStream(streamed);
     } on TimeoutException {
       throw ApiException.timeout();
