@@ -32,18 +32,44 @@ class _SubmitScreenState extends State<SubmitScreen> {
   static const _minText      = 5;
   static const _minSummary   = 10;
 
+  // 이전 제출 가능 상태를 기억하여 중복 setState를 방지하기 위한 변수
+  bool _wasAllMet = false;
+
   @override
   void initState() {
     super.initState();
     final s = widget.initialSuspect;
-    _selectedSuspect = (s != null && !s.isWitness) ? s : null;
+    _selectedSuspect = (s != null && !s.isWitness && (s.culpritEligible ?? true)) ? s : null;
+    _wasAllMet = _allMet;
+
+    // 컨트롤러들에 글자 수 체크 및 UI 갱신을 위한 리스너 연결
+    _motiveCtrl.addListener(_onTextChanged);
+    _methodCtrl.addListener(_onTextChanged);
+    _concealCtrl.addListener(_onTextChanged);
+    _summaryCtrl.addListener(_onTextChanged);
   }
 
   @override
   void dispose() {
+    _motiveCtrl.removeListener(_onTextChanged);
+    _methodCtrl.removeListener(_onTextChanged);
+    _concealCtrl.removeListener(_onTextChanged);
+    _summaryCtrl.removeListener(_onTextChanged);
+
     _motiveCtrl.dispose(); _methodCtrl.dispose();
     _concealCtrl.dispose(); _summaryCtrl.dispose();
     super.dispose();
+  }
+
+  void _onTextChanged() {
+    final currentAllMet = _allMet;
+    if (_wasAllMet != currentAllMet || !currentAllMet) {
+      if (mounted) {
+        setState(() {
+          _wasAllMet = currentAllMet;
+        });
+      }
+    }
   }
 
   List<SubmitRequirement> get _reqs => [
@@ -98,15 +124,13 @@ class _SubmitScreenState extends State<SubmitScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
 
-      // 케이스 1: 이미 제출이 완료되어 중복 제출 에러가 난 경우 -> 결과 화면으로 이동 가능
       if (e.code == 'FINAL_DEDUCTION_ALREADY_SUBMITTED') {
         _snack('이미 제출됐습니다. 결과 화면으로 이동합니다.', dur: const Duration(seconds: 2));
         await Future.delayed(const Duration(milliseconds: 1800));
         _navigateToResult(sessionId);
       }
-      // 케이스 2: 5xx 서버 에러 혹은 기타 API 에러 -> 폼을 유지하고 다시 시도할 수 있게 함
       else {
-        setState(() => _submitting = false); // 다시 버튼 활성화 및 로딩 해제
+        setState(() => _submitting = false);
         final s = e.status ?? 0;
         if (s >= 500) {
           _snack('채점 서버에 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
@@ -116,7 +140,6 @@ class _SubmitScreenState extends State<SubmitScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      // 케이스 3: 네트워크 단절, 타임아웃 등 일반 예외 -> 유저가 다시 제출할 수 있도록 폼 유지
       setState(() => _submitting = false);
       _snack('네트워크 연결이 불안정합니다. 연결 상태를 확인하고 다시 시도해 주세요.');
     }
@@ -133,7 +156,10 @@ class _SubmitScreenState extends State<SubmitScreen> {
   @override
   Widget build(BuildContext context) {
     final c        = context.c;
-    final suspects = context.session.suspects.where((s) => !s.isWitness).toList();
+    final suspects = context.session.suspects
+        .where((s) => !s.isWitness && (s.culpritEligible ?? true))
+        .toList();
+
     final selected = suspects.where((s) => s.id == _selectedSuspect?.id).firstOrNull;
     final unlocked = context.session.evidences.where((e) => !e.isLocked).toList();
 
@@ -149,19 +175,19 @@ class _SubmitScreenState extends State<SubmitScreen> {
             const SizedBox(height: AppTokens.sp8),
             const MSKicker('1. FINAL SUSPECT · 진범 지목'),
             const SizedBox(height: AppTokens.sp3),
-            SuspectDropdown(suspects: suspects, selected: selected,
-                onSelect: (s) => setState(() => _selectedSuspect = s)),
+            SuspectDropdown(
+              suspects: suspects,
+              selected: selected,
+              onSelect: (s) => setState(() => _selectedSuspect = s),
+            ),
             const SizedBox(height: AppTokens.sp6),
             const MSKicker('2. 범행 동기 및 방법'),
             const SizedBox(height: AppTokens.sp3),
-            MSTextField(controller: _motiveCtrl, hintText: '범인이 피해자를 해친 동기는 무엇인가요?',
-                maxLines: 3, onChanged: (_) => setState(() {})),
+            MSTextField(controller: _motiveCtrl, hintText: '범인이 피해자를 해친 동기는 무엇인가요?', maxLines: 3),
             const SizedBox(height: AppTokens.sp3),
-            MSTextField(controller: _methodCtrl, hintText: '어떤 방법으로 범행을 저질렀나요?',
-                maxLines: 3, onChanged: (_) => setState(() {})),
+            MSTextField(controller: _methodCtrl, hintText: '어떤 방법으로 범행을 저질렀나요?', maxLines: 3),
             const SizedBox(height: AppTokens.sp3),
-            MSTextField(controller: _concealCtrl, hintText: '범행을 어떻게 은폐하려 했나요?',
-                maxLines: 3, onChanged: (_) => setState(() {})),
+            MSTextField(controller: _concealCtrl, hintText: '범행을 어떻게 은폐하려 했나요?', maxLines: 3),
             const SizedBox(height: AppTokens.sp6),
             MSKicker('3. 결정적 증거 · ${_evidence.length}/$_maxEvidence 선택'),
             const SizedBox(height: AppTokens.sp3),
@@ -170,8 +196,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
             const SizedBox(height: AppTokens.sp6),
             const MSKicker('4. 종합 추리 설명'),
             const SizedBox(height: AppTokens.sp3),
-            MSTextField(controller: _summaryCtrl, hintText: '사건의 전말을 상세히 기록해주세요.',
-                maxLines: 5, onChanged: (_) => setState(() {})),
+            MSTextField(controller: _summaryCtrl, hintText: '사건의 전말을 상세히 기록해주세요.', maxLines: 5),
             const SizedBox(height: AppTokens.sp8),
             if (!_allMet) ...[
               SubmitChecklist(requirements: _reqs),
