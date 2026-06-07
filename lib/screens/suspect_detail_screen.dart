@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../components/asset_image_widget.dart';
 import '../components/evidence_item.dart';
-import '../components/image_viewer.dart';
+import '../components/image_viewer_modal.dart';
 import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
@@ -122,6 +122,7 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
                     // 그 위에 PR#13의 탭하여 크게 보기(돋보기 배지)를 레이어한다.
                     child: _ZoomablePortrait(
                       imageUrl: widget.suspect.portraitUrl,
+                      name: widget.suspect.name,
                       child: CharacterPortrait(
                         name: widget.suspect.name,
                         size: 80,
@@ -242,11 +243,12 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
 // URL이 없으면 child를 그대로 반환해 폴백(이니셜) 동작을 보존한다.
 
 class _ZoomablePortrait extends StatelessWidget {
-  const _ZoomablePortrait({required this.child, this.imageUrl});
+  const _ZoomablePortrait({required this.child, this.imageUrl, this.name});
 
   final Widget child;
   // 공식 초상 URL. null/빈값이면 확대 배지를 노출하지 않는다.
   final String? imageUrl;
+  final String? name;
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +259,11 @@ class _ZoomablePortrait extends StatelessWidget {
 
     // 초상이 있으면 탭하여 전체화면으로 크게 볼 수 있음을 돋보기 배지로 알린다.
     return GestureDetector(
-      onTap: () => showImageViewer(context, url),
+      onTap: () => ImageViewerModal.show(
+        context,
+        imageUrl: url,
+        label: name,
+      ),
       child: Stack(
         clipBehavior: Clip.none,
         children: [

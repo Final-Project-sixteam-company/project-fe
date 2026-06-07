@@ -114,46 +114,46 @@ class _CaseScreenState extends State<CaseScreen> {
       child: GameSessionProvider(
         controller: _session,
         child: Scaffold(
-        backgroundColor: c.bg,
-        appBar: _buildHud(context),
-        bottomNavigationBar: MSBottomNav(
-          currentIndex: _navIndex,
-          onTap: (i) {
-            setState(() => _navIndex = i);
-            // 증거 탭(1) 진입 시 서버에서 증거/대시보드 재조회.
-            // 시간 기반 해금(unlock_type=TIME)은 심문 응답에 실리지 않아
-            // 탭 진입 시점에 다시 불러와야 새로 풀린 증거가 노출된다.
-            if (i == 1) _session.refreshEvidences();
-          },
-        ),
-        body: AnimatedBuilder(
-          animation: _session,
-          builder: (context, _) {
-            // 세션 초기 로딩/실패 시에는 탭(가짜/빈 데이터) 대신 전역 상태를 노출.
-            // dashboard가 채워지면 정상 로딩 완료로 본다.
-            if (_session.dashboard == null) {
-              if (_session.isLoading) {
-                return const Center(child: MSSpinner(size: 28));
+          backgroundColor: c.bg,
+          appBar: _buildHud(context),
+          bottomNavigationBar: MSBottomNav(
+            currentIndex: _navIndex,
+            onTap: (i) {
+              setState(() => _navIndex = i);
+              // 증거 탭(1) 진입 시 서버에서 증거/대시보드 재조회.
+              // 시간 기반 해금(unlock_type=TIME)은 심문 응답에 실리지 않아
+              // 탭 진입 시점에 다시 불러와야 새로 풀린 증거가 노출된다.
+              if (i == 1) _session.refreshEvidences();
+            },
+          ),
+          body: AnimatedBuilder(
+            animation: _session,
+            builder: (context, _) {
+              // 세션 초기 로딩/실패 시에는 탭(가짜/빈 데이터) 대신 전역 상태를 노출.
+              // dashboard가 채워지면 정상 로딩 완료로 본다.
+              if (_session.dashboard == null) {
+                if (_session.isLoading) {
+                  return const Center(child: MSSpinner(size: 28));
+                }
+                if (_session.loadError != null) {
+                  return _buildLoadError(context);
+                }
               }
-              if (_session.loadError != null) {
-                return _buildLoadError(context);
+              // 정답 누출 런타임 가드: 이미 종료된(PLAYING 아님) 세션이 어떤 경로로든
+              // 케이스 화면에 노출되면 증거/용의자/타임라인 탭(정답성 데이터 포함)을
+              // 띄우지 않고 종결 상태를 안내한다. (정상 제출은 ResultScreen으로 대체됨)
+              final status = _session.dashboard?.status;
+              if (!_session.isCompleted &&
+                  status != null &&
+                  status != PlaySessionStatus.playing) {
+                return _buildClosedSession(context);
               }
-            }
-            // 정답 누출 런타임 가드: 이미 종료된(PLAYING 아님) 세션이 어떤 경로로든
-            // 케이스 화면에 노출되면 증거/용의자/타임라인 탭(정답성 데이터 포함)을
-            // 띄우지 않고 종결 상태를 안내한다. (정상 제출은 ResultScreen으로 대체됨)
-            final status = _session.dashboard?.status;
-            if (!_session.isCompleted &&
-                status != null &&
-                status != PlaySessionStatus.playing) {
-              return _buildClosedSession(context);
-            }
-            return IndexedStack(
-              index: _navIndex,
-              children: _kScreens,
-            );
-          },
-        ),
+              return IndexedStack(
+                index: _navIndex,
+                children: _kScreens,
+              );
+            },
+          ),
         ),
       ),
     );
@@ -215,30 +215,29 @@ class _CaseScreenState extends State<CaseScreen> {
             : '이 수사는 더 이상 진행할 수 없습니다.',
         action: (scored && sessionId != null)
             ? MSButton(
-                label: '결과 보기',
-                variant: MSButtonVariant.primary,
-                onPressed: () => Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (_) => ResultScreen(
-                      sessionId: sessionId,
-                      scenarioId: _session.scenarioId,
-                    ),
-                  ),
-                ),
-              )
-            : MSButton(
-                label: '홈으로 돌아가기',
-                variant: MSButtonVariant.primary,
-                onPressed: () =>
-                    Navigator.of(context).popUntil((route) => route.isFirst),
+          label: '결과 보기',
+          variant: MSButtonVariant.primary,
+          onPressed: () => Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => ResultScreen(
+                sessionId: sessionId,
               ),
+            ),
+          ),
+        )
+            : MSButton(
+          label: '홈으로 돌아가기',
+          variant: MSButtonVariant.primary,
+          onPressed: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst),
+        ),
         secondaryAction: (scored && sessionId != null)
             ? MSButton(
-                label: '홈으로 돌아가기',
-                variant: MSButtonVariant.ghost,
-                onPressed: () =>
-                    Navigator.of(context).popUntil((route) => route.isFirst),
-              )
+          label: '홈으로 돌아가기',
+          variant: MSButtonVariant.ghost,
+          onPressed: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst),
+        )
             : null,
       ),
     );
@@ -388,7 +387,7 @@ class _AbandonDialog extends StatelessWidget {
             const SizedBox(height: AppTokens.sp3),
             Text(
               '지금 나가면 진행 중인 수사가 중단됩니다.\n'
-              '진행 상황은 저장되지 않으며 다음에 새로 시작해야 합니다.',
+                  '진행 상황은 저장되지 않으며 다음에 새로 시작해야 합니다.',
               style: AppText.body.copyWith(color: c.textSub, height: 1.6),
             ),
             const SizedBox(height: AppTokens.sp6),

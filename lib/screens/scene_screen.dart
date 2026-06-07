@@ -1,5 +1,4 @@
 // lib/screens/scene_screen.dart
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../components/asset_image_widget.dart';
 import '../components/game_modals.dart';
@@ -216,13 +215,9 @@ class _SceneScreenState extends State<SceneScreen> {
 class _SceneMap extends StatelessWidget {
   const _SceneMap({this.mapImageUrl, this.selectedIndex});
 
-  /// 현장 지도 이미지 URL. null이면 플레이스홀더를 표시한다(S3 키 조합 금지).
   final String? mapImageUrl;
-
-  /// 선택된 장소 인덱스(향후 핀 하이라이트용). 현재는 미사용.
   final int? selectedIndex;
 
-  // TODO(backend): 세션/시나리오 mapAssetKey를 받아 실제 이미지로 교체.
   static const String? _mapAssetKey = null;
 
   @override
@@ -230,9 +225,6 @@ class _SceneMap extends StatelessWidget {
     final c = context.c;
     final url = mapImageUrl;
     final hasLiveMap = url != null && url.isNotEmpty;
-    // 피해자 핀 좌표(_victimPinOffset)는 CL-001 평면도 전용이다.
-    // 라이브 서버 맵이나 다른 시나리오엔 좌표가 맞지 않아(스포일러/오표시),
-    // CL-001 샘플 + 라이브 맵 부재일 때만 핀을 띄운다.
     final showVictimPin =
         context.sessionRead.usesCl001SampleCaseData && !hasLiveMap;
 
@@ -248,14 +240,18 @@ class _SceneMap extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 맵 이미지: 서버 mapImageUrl > 로컬 assetKey > 플레이스홀더
+            // 💡 CachedNetworkImage를 Image.network로 대체
             if (hasLiveMap)
-              CachedNetworkImage(
-                imageUrl: url,
+              Image.network(
+                url,
                 fit: BoxFit.cover,
-                placeholder: (_, _) =>
-                    const SizedBox.expand(child: MSSkeleton(radius: AppTokens.r4)),
-                errorWidget: (_, _, _) => _MapPlaceholder(),
+                loadingBuilder: (_, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const SizedBox.expand(
+                    child: MSSkeleton(radius: AppTokens.r4),
+                  );
+                },
+                errorBuilder: (_, __, ___) => _MapPlaceholder(),
               )
             else if (_mapAssetKey != null)
               AssetImageWidget(
@@ -267,7 +263,8 @@ class _SceneMap extends StatelessWidget {
               )
             else
               _MapPlaceholder(),
-            // 피해자 위치 핀 — CL-001 평면도 전용 좌표라 해당 컨텍스트에서만 표시.
+
+            // 피해자 위치 핀 오버레이
             if (showVictimPin)
               LayoutBuilder(
                 builder: (_, constraints) {
