@@ -30,9 +30,8 @@ class _SubmitScreenState extends State<SubmitScreen> {
 
   static const _maxEvidence  = 3;
   static const _minText      = 5;
-  static const _minSummary   = 10;
 
-  // 이전 제출 가능 상태를 기억하여 중복 setState를 방지하기 위한 변수
+  // 제출 가능 상태 변경 여부를 추적하여 불필요한 리빌드를 방지하는 변수
   bool _wasAllMet = false;
 
   @override
@@ -42,11 +41,9 @@ class _SubmitScreenState extends State<SubmitScreen> {
     _selectedSuspect = (s != null && !s.isWitness && (s.culpritEligible ?? true)) ? s : null;
     _wasAllMet = _allMet;
 
-    // 컨트롤러들에 글자 수 체크 및 UI 갱신을 위한 리스너 연결
     _motiveCtrl.addListener(_onTextChanged);
     _methodCtrl.addListener(_onTextChanged);
     _concealCtrl.addListener(_onTextChanged);
-    _summaryCtrl.addListener(_onTextChanged);
   }
 
   @override
@@ -54,13 +51,13 @@ class _SubmitScreenState extends State<SubmitScreen> {
     _motiveCtrl.removeListener(_onTextChanged);
     _methodCtrl.removeListener(_onTextChanged);
     _concealCtrl.removeListener(_onTextChanged);
-    _summaryCtrl.removeListener(_onTextChanged);
 
     _motiveCtrl.dispose(); _methodCtrl.dispose();
     _concealCtrl.dispose(); _summaryCtrl.dispose();
     super.dispose();
   }
 
+  // 필수 조건 만족 여부가 바뀔 때만 setState를 호출해 리빌드를 최소화합니다.
   void _onTextChanged() {
     final currentAllMet = _allMet;
     if (_wasAllMet != currentAllMet || !currentAllMet) {
@@ -77,7 +74,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
     SubmitRequirement('범행 동기 $_minText자 이상',    _motiveCtrl.text.trim().length  >= _minText),
     SubmitRequirement('범행 방법 $_minText자 이상',    _methodCtrl.text.trim().length  >= _minText),
     SubmitRequirement('은폐 방법 $_minText자 이상',    _concealCtrl.text.trim().length >= _minText),
-    SubmitRequirement('종합 추리 $_minSummary자 이상', _summaryCtrl.text.trim().length >= _minSummary),
+    // [수정] 백엔드 미전송 필드이므로 필수 체크리스트에서 제외 (선택 메모화)
     SubmitRequirement('결정적 증거 $_maxEvidence개',   _evidence.length == _maxEvidence),
   ];
 
@@ -156,6 +153,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
   @override
   Widget build(BuildContext context) {
     final c        = context.c;
+
     final suspects = context.session.suspects
         .where((s) => !s.isWitness && (s.culpritEligible ?? true))
         .toList();
@@ -194,9 +192,9 @@ class _SubmitScreenState extends State<SubmitScreen> {
             EvidenceSelector(evidences: unlocked, selected: _evidence,
                 onToggle: _toggle, maxCount: _maxEvidence),
             const SizedBox(height: AppTokens.sp6),
-            const MSKicker('4. 종합 추리 설명'),
+            const MSKicker('4. 종합 추리 설명 (선택 사항)'),
             const SizedBox(height: AppTokens.sp3),
-            MSTextField(controller: _summaryCtrl, hintText: '사건의 전말을 상세히 기록해주세요.', maxLines: 5),
+            MSTextField(controller: _summaryCtrl, hintText: '사건의 전말을 자유롭게 메모해 보세요. (제출 시 저장되지 않습니다.)', maxLines: 5),
             const SizedBox(height: AppTokens.sp8),
             if (!_allMet) ...[
               SubmitChecklist(requirements: _reqs),

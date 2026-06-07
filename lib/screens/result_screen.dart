@@ -1,4 +1,3 @@
-// lib/screens/result_screen.dart
 import 'package:flutter/material.dart';
 import '../core/api/api_exception.dart';
 import '../models/play_models.dart';
@@ -94,15 +93,19 @@ class _ResultScreenState extends State<ResultScreen>
     } on ApiException catch (e) {
       if (!mounted) return;
       final notReady = e.isNotFound || e.status == 202;
-      if (notReady && attempt < _kMaxPoll - 1) {
+      final isTransientError = e.isNetwork || e.status == null;
+
+      if ((notReady || isTransientError) && attempt < _kMaxPoll - 1) {
         await Future.delayed(_kPollDelay);
         if (mounted) await _poll(id, attempt + 1);
         return;
       }
       setState(() {
-        _loading = false; _exhausted = notReady;
+        _loading = false;
+        _exhausted = notReady || attempt >= _kMaxPoll - 1;
         _error = notReady
-            ? '채점이 아직 완료되지 않았습니다. 잠시 후 다시 확인해 주세요.' : e.message;
+            ? '채점이 아직 완료되지 않았습니다. 잠시 후 다시 확인해 주세요.'
+            : e.message;
       });
     } catch (_) {
       if (!mounted) return;
