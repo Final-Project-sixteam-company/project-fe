@@ -1,65 +1,144 @@
-// lib/components/image_viewer.dart
-import 'package:cached_network_image/cached_network_image.dart';
+// lib/components/image_viewer_modal.dart
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
-import 'states.dart';
+import '../theme/app_theme.dart';
 
-/// 네트워크 이미지를 전체화면 확대 모달로 연다.
-/// - 핀치 줌(1~4배), 빈 영역 탭 또는 우상단 X로 닫기.
-/// - 로딩/실패 시 graceful 폴백(스피너 / 깨진 이미지 아이콘).
-/// 증거 상세·용의자 상세 등 여러 화면에서 공용으로 사용한다.
-void showImageViewer(BuildContext context, String url) {
-  if (url.isEmpty) return;
-  showDialog<void>(
-    context: context,
-    barrierColor: AppColors.ink950.withValues(alpha: .92),
-    builder: (_) => _ImageViewerModal(url: url),
-  );
-}
+// ── ImageViewerModal ──────────────────────────────────────────────────────────
 
-class _ImageViewerModal extends StatelessWidget {
-  const _ImageViewerModal({required this.url});
+/// 전체화면 이미지 뷰어 모달.
+///
+/// ```dart
+/// ImageViewerModal.show(context,
+///   imageUrl: 'https://example.com/evidence.jpg',
+///   label: '찢긴 컵 라벨');
+/// ```
+class ImageViewerModal extends StatelessWidget {
+  const ImageViewerModal({
+    required this.imageUrl,
+    this.label,
+    super.key,
+  });
 
-  final String url;
+  final String  imageUrl;
+  final String? label;
+
+  static Future<void> show(
+      BuildContext context, {
+        required String imageUrl,
+        String? label,
+      }) {
+    return showDialog<void>(
+      context: context,
+      barrierColor: AppColors.darkScrim,
+      builder: (_) => ImageViewerModal(imageUrl: imageUrl, label: label),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
-      child: Stack(
+    final c = context.c;
+    return Dialog(
+      backgroundColor: AppColors.transparent,
+      insetPadding: const EdgeInsets.all(AppTokens.sp4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Positioned.fill(
-            child: InteractiveViewer(
-              minScale: 1,
-              maxScale: 4,
-              child: Center(
-                child: CachedNetworkImage(
-                  imageUrl: url,
-                  fit: BoxFit.contain,
-                  placeholder: (_, _) => const MSSpinner(size: 28),
-                  errorWidget: (_, _, _) => const Icon(
-                    Icons.broken_image_outlined,
-                    size: 48,
-                    color: AppColors.ink0,
-                  ),
-                ),
-              ),
+          Align(
+            alignment: Alignment.topRight,
+            child: IconButton(
+              icon: Icon(Icons.close, color: c.text),
+              onPressed: () => Navigator.of(context).pop(),
             ),
           ),
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.all(AppTokens.sp3),
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.ink0),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
-            ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppTokens.r6),
+            child: _NetImage(url: imageUrl, fit: BoxFit.contain),
           ),
+          if (label != null) ...[
+            const SizedBox(height: AppTokens.sp3),
+            Text(label!,
+                style: AppText.monoLabel.copyWith(color: c.textSub),
+                textAlign: TextAlign.center),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+// ── IconThumb ─────────────────────────────────────────────────────────────────
+
+/// 카드/리스트 안에서 쓰는 소형 이미지 썸네일.
+/// CachedNetworkImage 대체 — Image.network 사용 (규칙 8).
+///
+/// ```dart
+/// IconThumb(imageUrl: evidence.imageUrl, size: AppTokens.sp12)
+/// ```
+class IconThumb extends StatelessWidget {
+  const IconThumb({
+    required this.imageUrl,
+    this.size = AppTokens.sp12,
+    this.radius = AppTokens.r3,
+    super.key,
+  });
+
+  final String imageUrl;
+  final double size;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: SizedBox(
+        width: size, height: size,
+        child: _NetImage(url: imageUrl, fit: BoxFit.cover),
+      ),
+    );
+  }
+}
+
+// ── _NetImage — CachedNetworkImage 대체 ──────────────────────────────────────
+
+class _NetImage extends StatelessWidget {
+  const _NetImage({required this.url, required this.fit});
+
+  final String  url;
+  final BoxFit  fit;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Image.network(
+      url,
+      fit: fit,
+      loadingBuilder: (_, child, prog) {
+        if (prog == null) return child;
+        return _ImgPlaceholder(bg: c.bgElev, loading: true);
+      },
+      errorBuilder: (_, __, ___) => _ImgPlaceholder(bg: c.bgElev),
+    );
+  }
+}
+
+class _ImgPlaceholder extends StatelessWidget {
+  const _ImgPlaceholder({required this.bg, this.loading = false});
+
+  final Color bg;
+  final bool  loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return ColoredBox(
+      color: bg,
+      child: Center(
+        child: loading
+            ? CircularProgressIndicator(strokeWidth: AppTokens.sp1, color: c.primary)
+            : Icon(Icons.broken_image_outlined,
+            size: AppTokens.sp8, color: c.textMute),
       ),
     );
   }
