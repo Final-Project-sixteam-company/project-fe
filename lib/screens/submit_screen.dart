@@ -97,21 +97,28 @@ class _SubmitScreenState extends State<SubmitScreen> {
       if (mounted) _navigateToResult(sessionId);
     } on ApiException catch (e) {
       if (!mounted) return;
-      final s = e.status ?? 0;
-      if (s >= 500 || e.code == 'FINAL_DEDUCTION_ALREADY_SUBMITTED') {
-        _snack(s >= 500 ? '채점 서버 오류. 결과 화면에서 확인합니다...' : '이미 제출됐습니다. 결과 화면으로 이동합니다.',
-            dur: const Duration(seconds: 2));
+
+      // 케이스 1: 이미 제출이 완료되어 중복 제출 에러가 난 경우 -> 결과 화면으로 이동 가능
+      if (e.code == 'FINAL_DEDUCTION_ALREADY_SUBMITTED') {
+        _snack('이미 제출됐습니다. 결과 화면으로 이동합니다.', dur: const Duration(seconds: 2));
         await Future.delayed(const Duration(milliseconds: 1800));
         _navigateToResult(sessionId);
-      } else {
-        setState(() => _submitting = false);
-        _snack('제출 실패: ${e.message}');
+      }
+      // 케이스 2: 5xx 서버 에러 혹은 기타 API 에러 -> 폼을 유지하고 다시 시도할 수 있게 함
+      else {
+        setState(() => _submitting = false); // 다시 버튼 활성화 및 로딩 해제
+        final s = e.status ?? 0;
+        if (s >= 500) {
+          _snack('채점 서버에 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+        } else {
+          _snack('제출 실패: ${e.message}');
+        }
       }
     } catch (_) {
       if (!mounted) return;
-      _snack('응답 없음. 결과 화면에서 확인합니다...', dur: const Duration(seconds: 2));
-      await Future.delayed(const Duration(milliseconds: 1800));
-      _navigateToResult(sessionId);
+      // 케이스 3: 네트워크 단절, 타임아웃 등 일반 예외 -> 유저가 다시 제출할 수 있도록 폼 유지
+      setState(() => _submitting = false);
+      _snack('네트워크 연결이 불안정합니다. 연결 상태를 확인하고 다시 시도해 주세요.');
     }
   }
 

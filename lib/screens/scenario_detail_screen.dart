@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../components/review_write_sheet.dart';
 import '../models/review_models.dart';
 import '../models/scenario.dart';
+import '../repositories/scenario_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
@@ -26,6 +27,8 @@ class ScenarioDetailScreen extends StatefulWidget {
 
 class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
   bool _bookmarked = false;
+  bool _isLoading = false;
+  late Scenario _detailedScenario; // 전체 상세 데이터를 담을 변수
 
   /// canPlay 필드가 Scenario 모델에 추가되면 그 값으로 교체한다.
   bool get _isPlayable => _kLocalPlayableIds.contains(widget.scenario.id);
@@ -33,13 +36,33 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _detailedScenario = widget.scenario;
     _loadBookmark();
+    _loadFullDetail();
   }
 
   Future<void> _loadBookmark() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getBool('$_kBookmarkPrefix${widget.scenario.id}') ?? false;
     if (mounted) setState(() => _bookmarked = saved);
+  }
+
+  Future<void> _loadFullDetail() async {
+    setState(() => _isLoading = true);
+    try {
+      final fullScenario = await scenarioRepo.detail(widget.scenario.id);
+
+      if (mounted) {
+        setState(() {
+          _detailedScenario = fullScenario; // 풀 데이터로 교체
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      // 에러 발생 시 로그를 남기고, UI는 initState에서 세팅한 요약본으로 유지합니다.
+      debugPrint('시나리오 상세 로딩 실패: $e');
+    }
   }
 
   Future<void> _toggleBookmark() async {
@@ -52,7 +75,8 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final c       = context.c;
-    final s       = widget.scenario;
+
+    final s       = _detailedScenario;
     final reviews = sampleReviews.where((r) => r.scenarioId == s.id).toList();
 
     return Scaffold(
@@ -96,7 +120,14 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
             ScenarioHeroArt(scenario: s),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
-              child: _DetailBody(
+              child: _isLoading
+                  ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(AppTokens.sp10),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+                  : _DetailBody(
                 scenario:  s,
                 reviews:   reviews,
                 bookmarked: _bookmarked,

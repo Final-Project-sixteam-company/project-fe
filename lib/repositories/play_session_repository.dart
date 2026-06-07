@@ -26,9 +26,9 @@ class PlaySessionRepository {
 
   /// 증거 목록. [includeLocked]=true 면 잠긴 증거도 마스킹된 형태로 포함.
   Future<List<PlayEvidence>> evidences(
-    int sessionId, {
-    bool includeLocked = false,
-  }) async {
+      int sessionId, {
+        bool includeLocked = false,
+      }) async {
     final data = await _api.get(
       '/api/play-sessions/$sessionId/evidences',
       query: {'includeLocked': includeLocked},
@@ -42,7 +42,7 @@ class PlaySessionRepository {
   /// 해금된 증거에 한해 호출한다(잠긴 증거 본문 누출 방지).
   Future<EvidenceDetail> evidenceDetail(int sessionId, int evidenceId) async {
     final data =
-        await _api.get('/api/play-sessions/$sessionId/evidences/$evidenceId');
+    await _api.get('/api/play-sessions/$sessionId/evidences/$evidenceId');
     return EvidenceDetail.fromJson(data as Map<String, dynamic>);
   }
 
@@ -67,7 +67,7 @@ class PlaySessionRepository {
 
   Future<HintUseResult> useHint(int sessionId, int hintId) async {
     final data =
-        await _api.post('/api/play-sessions/$sessionId/hints/$hintId/use');
+    await _api.post('/api/play-sessions/$sessionId/hints/$hintId/use');
     return HintUseResult.fromJson(data as Map<String, dynamic>);
   }
 
@@ -78,19 +78,20 @@ class PlaySessionRepository {
   // ── 심문 ───────────────────────────────────────────────────────────────────
 
   Future<InterrogationResult> interrogate(
-    int sessionId, {
-    required int suspectId,
-    required QuestionType questionType,
-    required String question,
-    int? presentedEvidenceId,
-  }) async {
+      int sessionId, {
+        required int suspectId,
+        required QuestionType questionType,
+        required String question,
+        int? presentedEvidenceId,
+      }) async {
     final data = await _api.post(
       '/api/play-sessions/$sessionId/interrogations',
       body: {
         'suspectId': suspectId,
         'questionType': questionTypeToApi(questionType),
         'question': question,
-        'presentedEvidenceId': ?presentedEvidenceId,
+        // Collection if 문법을 통해 null이 아닐 때만 맵에 포함시킵니다.
+        if (presentedEvidenceId != null) 'presentedEvidenceId': presentedEvidenceId,
       },
       timeout: ApiConfig.aiTimeout,
     );
@@ -99,12 +100,15 @@ class PlaySessionRepository {
 
   /// 심문 로그 조회. [suspectId] 지정 시 해당 용의자만.
   Future<List<InterrogationResult>> interrogationLogs(
-    int sessionId, {
-    int? suspectId,
-  }) async {
+      int sessionId, {
+        int? suspectId,
+      }) async {
     final data = await _api.get(
       '/api/play-sessions/$sessionId/interrogations',
-      query: {'suspectId': ?suspectId},
+      // query parameter 맵 생성 시 null 체크 처리
+      query: {
+        if (suspectId != null) 'suspectId': suspectId,
+      },
     );
     return (data as List<dynamic>)
         .map((e) => InterrogationResult.fromJson(e as Map<String, dynamic>))
@@ -114,21 +118,22 @@ class PlaySessionRepository {
   // ── 최종 추리 / 결과 ───────────────────────────────────────────────────────
 
   Future<FinalDeductionResult> submitFinalDeduction(
-    int sessionId, {
-    required int selectedCulpritId,
-    required String motiveText,
-    required String methodText,
-    String? coverUpText,
-    required List<int> selectedEvidenceIds,
-  }) async {
+      int sessionId, {
+        required int selectedCulpritId,
+        required String motiveText,
+        required String methodText,
+        String? coverUpText,
+        required List<int> selectedEvidenceIds,
+      }) async {
     final data = await _api.post(
       '/api/play-sessions/$sessionId/final-deduction',
       body: {
         'selectedCulpritId': selectedCulpritId,
         'motiveText': motiveText,
         'methodText': methodText,
-        'coverUpText': ?coverUpText,
         'selectedEvidenceIds': selectedEvidenceIds,
+        // null이 아닐 때만 body 맵에 추가
+        if (coverUpText != null) 'coverUpText': coverUpText,
       },
       timeout: ApiConfig.aiTimeout,
     );
