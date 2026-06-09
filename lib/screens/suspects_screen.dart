@@ -1,6 +1,8 @@
+// lib/screens/suspects_screen.dart
 import 'package:flutter/material.dart';
-import '../components/ms_button.dart';
+import '../components/filter_chip_row.dart';
 import '../components/ms_kicker.dart';
+import '../components/ms_button.dart';
 import '../components/ms_stat_row.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
@@ -12,6 +14,16 @@ import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'suspect_detail_screen.dart';
 
+enum _SuspectFilter { all, suspect, witness }
+
+extension _SuspectFilterLabel on _SuspectFilter {
+  String get label => switch (this) {
+    _SuspectFilter.all => '전체',
+    _SuspectFilter.suspect => '용의자',
+    _SuspectFilter.witness => '증인',
+  };
+}
+
 class SuspectsScreen extends StatefulWidget {
   const SuspectsScreen({super.key});
 
@@ -22,6 +34,7 @@ class SuspectsScreen extends StatefulWidget {
 class _SuspectsScreenState extends State<SuspectsScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
+  _SuspectFilter _filter = _SuspectFilter.all;
 
   @override
   void dispose() {
@@ -31,19 +44,29 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
 
   List<Suspect> _filtered(List<Suspect> source) {
     final sorted = List<Suspect>.from(source)
-      ..sort((a, b) => b.suspicion.compareTo(a.suspicion));
+      ..sort((a, b) {
+        if (a.isWitness != b.isWitness) return a.isWitness ? 1 : -1;
+        return b.suspicion.compareTo(a.suspicion);
+      });
 
-    if (_query.isEmpty) return sorted;
-    return sorted
-        .where(
-          (s) => s.name.contains(_query) || s.role.contains(_query),
-    )
-        .toList();
+    return sorted.where((s) {
+      final matchesQuery = _query.isEmpty ||
+          s.name.contains(_query) ||
+          s.role.contains(_query);
+      final matchesFilter = switch (_filter) {
+        _SuspectFilter.all => true,
+        _SuspectFilter.suspect => !s.isWitness,
+        _SuspectFilter.witness => s.isWitness,
+      };
+      return matchesQuery && matchesFilter;
+    }).toList();
   }
 
-  int _maxSuspicion(List<Suspect> source) => source.isEmpty
-      ? 0
-      : source.map((s) => s.suspicion).reduce((a, b) => a > b ? a : b);
+  int _maxSuspicion(List<Suspect> source) {
+    final suspects = source.where((s) => !s.isWitness).toList();
+    if (suspects.isEmpty) return 0;
+    return suspects.map((s) => s.suspicion).reduce((a, b) => a > b ? a : b);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +81,8 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
             final ctrl = context.session;
             final all = ctrl.suspects;
             final results = _filtered(all);
+            final suspectCount = all.where((s) => !s.isWitness).length;
+            final witnessCount = all.where((s) => s.isWitness).length;
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
@@ -65,32 +90,42 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: AppTokens.sp4),
-                  // ── 1. 검색창 ─────────────────────────────────────────────
                   MSTextField(
                     controller: _searchCtrl,
                     hintText: '용의자 이름 · 직책 검색…',
                     suffixIcon: Icons.search,
                     onChanged: (v) => setState(() => _query = v.trim()),
                   ),
+                  const SizedBox(height: AppTokens.sp3),
+                  Row(
+                    children: _SuspectFilter.values.map((f) {
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          right: f != _SuspectFilter.values.last
+                              ? AppTokens.sp2
+                              : 0,
+                        ),
+                        child: MSFilterChip(
+                          label: f.label,
+                          active: _filter == f,
+                          onTap: () => setState(() => _filter = f),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                   const SizedBox(height: AppTokens.sp4),
-                  // ── 2. 통계 ───────────────────────────────────────────────
                   MSStatRow([
-                    StatCell('전체 용의자', '${all.length}명'),
-                    StatCell('심문 횟수', '${ctrl.dashboard?.interrogationCount ?? 0}회'),
-                    StatCell(
-                      '최고 의심도',
-                      '${_maxSuspicion(all)}%',
-                      tone: StatTone.warn,
-                    ),
+                    StatCell('용의자', '$suspectCount명'),
+                    if (witnessCount > 0) StatCell('증인', '$witnessCount명'),
+                    StatCell('심문 횟수',
+                        '${ctrl.dashboard?.interrogationCount ?? 0}회'),
+                    StatCell('최고 의심도', '${_maxSuspicion(all)}%',
+                        tone: StatTone.warn),
                   ]),
                   const SizedBox(height: AppTokens.sp4),
-                  // ── 3. 섹션 타이틀 ────────────────────────────────────────
-                  const MSKicker('모든 용의자'),
+                  const MSKicker('모든 인물'),
                   const SizedBox(height: AppTokens.sp3),
-                  // ── 4. 리스트 ─────────────────────────────────────────────
-                  Expanded(
-                    child: _buildBody(context, ctrl, results),
-                  ),
+                  Expanded(child: _buildBody(context, ctrl, results)),
                 ],
               ),
             );
@@ -101,10 +136,10 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
   }
 
   Widget _buildBody(
-    BuildContext context,
-    GameSessionController ctrl,
-    List<Suspect> results,
-  ) {
+      BuildContext context,
+      GameSessionController ctrl,
+      List<Suspect> results,
+      ) {
     if (ctrl.isLoading && results.isEmpty) {
       return const MSListSkeleton(itemHeight: 84);
     }
@@ -113,18 +148,10 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
         icon: Icons.cloud_off,
         title: '불러오지 못했습니다',
         subtitle: ctrl.loadError,
-        action: MSButton(
-          label: '다시 시도',
-          variant: MSButtonVariant.secondary,
-          onPressed: () => ctrl.retry(),
-        ),
       );
     }
     if (results.isEmpty) {
-      return const MSEmpty(
-        icon: Icons.person_off,
-        title: '용의자가 없습니다',
-      );
+      return const MSEmpty(icon: Icons.person_off, title: '인물이 없습니다');
     }
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
@@ -138,9 +165,7 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
             MaterialPageRoute(
               builder: (_) => GameSessionProvider(
                 controller: c,
-                child: SuspectDetailScreen(
-                  suspect: results[i],
-                ),
+                child: SuspectDetailScreen(suspect: results[i]),
               ),
             ),
           );

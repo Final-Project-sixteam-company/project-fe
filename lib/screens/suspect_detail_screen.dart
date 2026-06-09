@@ -1,12 +1,8 @@
 // lib/screens/suspect_detail_screen.dart
 import 'package:flutter/material.dart';
-import '../components/asset_image_widget.dart';
 import '../components/evidence_item.dart';
-import '../components/image_viewer_modal.dart';
-import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
-import '../controllers/game_session_controller.dart';
 import '../controllers/game_session_provider.dart';
 import '../core/api/api_exception.dart';
 import '../models/case.dart';
@@ -16,27 +12,22 @@ import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
-import 'interrogation_chat_screen.dart';
-import 'submit_screen.dart';
-
+import 'suspect_detail_bottom_bar.dart';
+import 'suspect_detail_widgets.dart';
+import 'suspect_detail_cards.dart';
 class SuspectDetailScreen extends StatefulWidget {
   const SuspectDetailScreen({required this.suspect, super.key});
-
   final Suspect suspect;
-
   @override
   State<SuspectDetailScreen> createState() => _SuspectDetailScreenState();
 }
-
 class _SuspectDetailScreenState extends State<SuspectDetailScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _opacity;
   late final Animation<Offset> _slide;
-
   bool _logsLoaded = false;
   List<InterrogationResult> _logs = const [];
-
   @override
   void initState() {
     super.initState();
@@ -46,7 +37,6 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
         .animate(CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut));
     _ctrl.forward();
   }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -56,34 +46,16 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
   }
 
   Future<void> _loadLogs() async {
-    final controller = context.sessionRead;
-    final sessionId = controller.backendSessionId;
+    final ctrl = context.sessionRead;
+    final sessionId = ctrl.backendSessionId;
     final suspectId = int.tryParse(widget.suspect.id);
     if (sessionId == null || suspectId == null) return;
     try {
       final logs = await playSessionRepo.interrogationLogs(
-        sessionId,
-        suspectId: suspectId,
-      );
+          sessionId, suspectId: suspectId);
       if (mounted) setState(() => _logs = logs);
     } on ApiException catch (_) {
-      // 로그 조회 실패는 조용히 무시
     } catch (_) {}
-  }
-
-  /// 심문 화면으로 이동하고, 돌아오면 심문 로그를 다시 불러와 최신 상태로 갱신한다.
-  /// (상세↔채팅 단일 소스화: 서버 로그가 진실 소스이며 복귀 시 재조회한다.)
-  Future<void> _openInterrogation() async {
-    final ctrl = context.sessionRead;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => GameSessionProvider(
-          controller: ctrl,
-          child: InterrogationChatScreen(suspect: widget.suspect),
-        ),
-      ),
-    );
-    if (mounted) await _loadLogs();
   }
 
   @override
@@ -92,19 +64,41 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
     super.dispose();
   }
 
+  List<Evidence> _relatedEvidences() {
+    final ctrl = context.session;
+    final suspectId = int.tryParse(widget.suspect.id);
+    if (suspectId == null) return const [];
+    return ctrl.evidences.where((e) {
+      final raw = ctrl.rawEvidence(e.id);
+      return raw != null &&
+          raw.relatedSuspects.any((rs) => rs.suspectId == suspectId);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final raw = context.session.rawSuspect(widget.suspect.id);
-    final related = _relatedEvidences(context);
+    final related = _relatedEvidences();
+    final tone = raw?.personalityTone ?? widget.suspect.personalityTone;
 
     return Scaffold(
       backgroundColor: c.bg,
-      appBar: _buildAppBar(context),
-      bottomNavigationBar: _BottomBar(
-        suspect: widget.suspect,
-        onInterrogate: _openInterrogation,
+      appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: AppColors.transparent,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: c.text),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          widget.suspect.isWitness ? 'WITNESS' : 'SUSPECT',
+          style: AppText.monoLabel.copyWith(color: c.textMute),
+        ),
       ),
+      bottomNavigationBar:
+      SuspectDetailBottomBar(suspect: widget.suspect),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
@@ -112,68 +106,63 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: AppTokens.sp6),
-            // ── 프로필 사진 + 이름 ────────────────────────────────
+            // ── 프로필 헤더 ────────────────────────────────────────
             Center(
               child: Column(
                 children: [
                   Hero(
                     tag: widget.suspect.id,
-                    // develop의 에셋키 기반 초상 렌더링을 유지하고,
-                    // 그 위에 PR#13의 탭하여 크게 보기(돋보기 배지)를 레이어한다.
-                    child: _ZoomablePortrait(
-                      imageUrl: widget.suspect.portraitUrl,
+                    child: SuspectLargeAvatar(
                       name: widget.suspect.name,
-                      child: CharacterPortrait(
-                        name: widget.suspect.name,
-                        size: 80,
-                        assetKey: widget.suspect.portraitAssetKey,
-                        borderRadius: AppTokens.r5,
-                        isWitness: widget.suspect.isWitness,
-                      ),
+                      isWitness: widget.suspect.isWitness,
                     ),
                   ),
                   const SizedBox(height: AppTokens.sp3),
-                  Text(
-                    widget.suspect.name,
-                    style: AppText.titleL.copyWith(color: c.text),
-                  ),
+                  Text(widget.suspect.name,
+                      style: AppText.titleL.copyWith(color: c.text)),
                   const SizedBox(height: AppTokens.sp1),
-                  Text(
-                    raw?.role ?? widget.suspect.role,
-                    style: AppText.bodySm.copyWith(color: c.textSub),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(raw?.role ?? widget.suspect.role,
+                          style:
+                          AppText.bodySm.copyWith(color: c.textSub)),
+                      if (widget.suspect.isWitness) ...[
+                        const SizedBox(width: AppTokens.sp2),
+                        const MSPill('증인', tone: MSPillTone.mute),
+                      ],
+                    ],
                   ),
-                  // 증인 뱃지
-                  if (widget.suspect.isWitness) ...[
+                  if (tone != null) ...[
                     const SizedBox(height: AppTokens.sp2),
-                    const MSPill('증인 / 참고인', tone: MSPillTone.mute),
+                    PersonalityBadge(tone: tone),
                   ],
                 ],
               ),
             ),
             const SizedBox(height: AppTokens.sp6),
-            // ── 의심도 패널 (용의자만) ────────────────────────────
+            // ── 의심도 패널 ────────────────────────────────────────
             if (!widget.suspect.isWitness)
               FadeTransition(
                 opacity: _opacity,
                 child: AnimatedBuilder(
                   animation: _slide,
-                  builder: (_, child) =>
-                      Transform.translate(offset: _slide.value, child: child),
-                  child: _SuspicionPanel(
+                  builder: (_, child) => Transform.translate(
+                      offset: _slide.value, child: child),
+                  child: SuspicionPanel(
                     suspicion:
                     raw?.suspicionLevel ?? widget.suspect.suspicion,
                   ),
                 ),
               ),
-            // ── 피해자와의 관계 ───────────────────────────────────
-            if (raw?.relationToVictim != null &&
-                raw!.relationToVictim!.isNotEmpty) ...[
+            // ── 피해자와의 관계 ────────────────────────────────────
+            if (raw?.relationToVictim?.isNotEmpty ?? false) ...[
               const SizedBox(height: AppTokens.sp6),
               const MSKicker('피해자와의 관계'),
               const SizedBox(height: AppTokens.sp3),
-              _InfoCard(text: raw.relationToVictim!),
+              SuspectInfoCard(text: raw!.relationToVictim!),
             ],
-            // ── 관련 증거 ────────────────────────────────────────
+            // ── 관련 증거 ──────────────────────────────────────────
             if (related.isNotEmpty) ...[
               const SizedBox(height: AppTokens.sp6),
               const MSKicker('관련 증거'),
@@ -185,429 +174,24 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
                 ),
               ),
             ],
+            // ── 진술 ──────────────────────────────────────────────
             const SizedBox(height: AppTokens.sp6),
-            // ── 진술 ─────────────────────────────────────────────
             const MSKicker('진술'),
             const SizedBox(height: AppTokens.sp3),
-            _StatementCard(
+            SuspectStatementCard(
               statement: raw?.publicStatement,
               alibi: raw?.alibi,
+              publicAlibi:
+              raw?.publicAlibi ?? widget.suspect.publicAlibi,
             ),
-            // ── 이전 심문 기록 ────────────────────────────────────
+            // ── 이전 심문 기록 ─────────────────────────────────────
             if (_logs.isNotEmpty) ...[
               const SizedBox(height: AppTokens.sp6),
               MSKicker('이전 심문 · ${_logs.length}건'),
               const SizedBox(height: AppTokens.sp3),
-              ..._logs.map((log) => _LogCard(log: log)),
+              ..._logs.map((log) => SuspectLogCard(log: log)),
             ],
             const SizedBox(height: AppTokens.sp10),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<Evidence> _relatedEvidences(BuildContext context) {
-    final controller = context.session;
-    final suspectId = int.tryParse(widget.suspect.id);
-    if (suspectId == null) return const [];
-    return controller.evidences.where((e) {
-      final raw = controller.rawEvidence(e.id);
-      return raw != null &&
-          raw.relatedSuspects.any((rs) => rs.suspectId == suspectId);
-    }).toList();
-  }
-
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    final c = context.c;
-    return AppBar(
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      backgroundColor: Colors.transparent,
-      leading: IconButton(
-        icon: Icon(Icons.arrow_back, color: c.text),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-      title: Text(
-        widget.suspect.isWitness ? 'WITNESS' : 'SUSPECT',
-        style: AppText.monoLabel.copyWith(color: c.textMute),
-      ),
-    );
-  }
-}
-
-// ── 확대 가능한 초상 ──────────────────────────────────────────────────────────
-//
-// develop의 에셋키 기반 [CharacterPortrait]를 child로 받아 그대로 렌더링하고,
-// 공식 초상 URL이 있으면 PR#13의 탭하여 전체화면 보기(돋보기 배지)를 레이어한다.
-// URL이 없으면 child를 그대로 반환해 폴백(이니셜) 동작을 보존한다.
-
-class _ZoomablePortrait extends StatelessWidget {
-  const _ZoomablePortrait({required this.child, this.imageUrl, this.name});
-
-  final Widget child;
-  // 공식 초상 URL. null/빈값이면 확대 배지를 노출하지 않는다.
-  final String? imageUrl;
-  final String? name;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = imageUrl;
-    final hasImage = url != null && url.isNotEmpty;
-
-    if (!hasImage) return child;
-
-    // 초상이 있으면 탭하여 전체화면으로 크게 볼 수 있음을 돋보기 배지로 알린다.
-    return GestureDetector(
-      onTap: () => ImageViewerModal.show(
-        context,
-        imageUrl: url,
-        label: name,
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          child,
-          Positioned(
-            right: 3,
-            bottom: 3,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: AppColors.ink950.withValues(alpha: .55),
-                borderRadius: BorderRadius.circular(AppTokens.r2),
-              ),
-              child: const Icon(Icons.zoom_in, size: 14, color: AppColors.ink0),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── 의심도 패널 ───────────────────────────────────────────────────────────────
-
-class _SuspicionPanel extends StatelessWidget {
-  const _SuspicionPanel({required this.suspicion});
-  final int suspicion;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    final double ratio = (suspicion / 100).clamp(0.0, 1.0);
-
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.sp4),
-      decoration: BoxDecoration(
-        color: c.bgElev,
-        border: Border.all(color: c.line),
-        borderRadius: BorderRadius.circular(AppTokens.r6),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('SUSPICION',
-              style: AppText.monoLabel.copyWith(color: c.textMute)),
-          const SizedBox(height: AppTokens.sp1),
-          Text(
-            '$suspicion',
-            style: AppText.monoNum.copyWith(
-              fontSize: 48,
-              fontWeight: FontWeight.w700,
-              color: c.danger,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppTokens.r1),
-            child: SizedBox(
-              height: 8,
-              child: LayoutBuilder(
-                builder: (_, constraints) => Stack(
-                  children: [
-                    Positioned.fill(child: ColoredBox(color: c.bgHover)),
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: constraints.maxWidth * ratio,
-                      child: const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [AppColors.skyBase, AppColors.roseBase],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.sp4),
-      decoration: BoxDecoration(
-        color: c.bgElev,
-        border: Border.all(color: c.line),
-        borderRadius: BorderRadius.circular(AppTokens.r6),
-      ),
-      child: Text(text,
-          style: AppText.body.copyWith(color: c.text, height: 1.6)),
-    );
-  }
-}
-
-class _StatementCard extends StatelessWidget {
-  const _StatementCard({this.statement, this.alibi});
-  final String? statement;
-  final String? alibi;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    final text = (statement != null && statement!.isNotEmpty)
-        ? '"$statement"'
-        : '아직 확보된 진술이 없습니다.';
-
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.sp4),
-      decoration: BoxDecoration(
-        color: c.bgElev,
-        border: Border.all(color: c.line),
-        borderRadius: BorderRadius.circular(AppTokens.r6),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(text,
-              style: AppText.body.copyWith(color: c.text, height: 1.6)),
-          if (alibi != null && alibi!.isNotEmpty) ...[
-            const SizedBox(height: AppTokens.sp3),
-            Text('알리바이',
-                style: AppText.monoLabel.copyWith(color: c.textMute)),
-            const SizedBox(height: AppTokens.sp1),
-            Text(alibi!,
-                style:
-                AppText.bodySm.copyWith(color: c.textSub, height: 1.5)),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _LogCard extends StatelessWidget {
-  const _LogCard({required this.log});
-  final InterrogationResult log;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppTokens.sp2),
-      padding: const EdgeInsets.all(AppTokens.sp3),
-      decoration: BoxDecoration(
-        color: c.bgElev,
-        border: Border.all(color: c.line),
-        borderRadius: BorderRadius.circular(AppTokens.r4),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 증거 제시 심문이면 어떤 증거를 제시했는지 마커로 표시(채팅 버블과 일관).
-          if (log.presentedEvidence != null) ...[
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.description_outlined, size: 12, color: c.success),
-                const SizedBox(width: AppTokens.sp1),
-                Flexible(
-                  child: Text(
-                    '증거 제시 · ${log.presentedEvidence!.title}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.monoLabel.copyWith(
-                      fontSize: 10,
-                      color: c.success,
-                      height: 1.0,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppTokens.sp1),
-          ],
-          Text(
-            'Q. ${log.question}',
-            style: AppText.bodySm.copyWith(
-              color: c.primary,
-              fontWeight: FontWeight.w600,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: AppTokens.sp1),
-          Text('A. ${log.answer}',
-              style:
-              AppText.bodySm.copyWith(color: c.textSub, height: 1.5)),
-        ],
-      ),
-    );
-  }
-}
-
-// ── 하단 고정 버튼 바 ─────────────────────────────────────────────────────────
-
-class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.suspect, required this.onInterrogate});
-
-  final Suspect suspect;
-  final VoidCallback onInterrogate;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.sp4,
-          vertical: AppTokens.sp3,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: MSButton(
-                label: '뒤로',
-                variant: MSButtonVariant.secondary,
-                expanded: true,
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
-            const SizedBox(width: AppTokens.sp2),
-            Expanded(
-              flex: 2,
-              child: MSButton(
-                label: '심문하기',
-                variant: MSButtonVariant.primary,
-                expanded: true,
-                // PR#13의 콜백 방식 유지: 심문 후 복귀 시 _loadLogs로 재조회한다
-                // (develop의 인라인 네비게이션 동작을 포함하는 상위 집합).
-                onPressed: onInterrogate,
-              ),
-            ),
-            // 지목 가능한 용의자만 범인 지목 노출(culpritEligible: 증인·레드헤링 제외)
-            if (suspect.culpritEligible) ...[
-              const SizedBox(width: AppTokens.sp3),
-              Expanded(
-                child: MSButton(
-                  label: '범인 지목',
-                  variant: MSButtonVariant.danger,
-                  expanded: true,
-                  onPressed: () => _showConfirmDialog(context),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showConfirmDialog(BuildContext context) {
-    final c = context.c;
-    final controller = context.sessionRead;
-    final navigator = Navigator.of(context);
-    showDialog(
-      context: context,
-      barrierColor: c.scrim,
-      builder: (_) => _ConfirmDialog(
-        suspect: suspect,
-        controller: controller,
-        navigator: navigator,
-      ),
-    );
-  }
-}
-
-class _ConfirmDialog extends StatelessWidget {
-  const _ConfirmDialog({
-    required this.suspect,
-    required this.controller,
-    required this.navigator,
-  });
-  final Suspect suspect;
-  final GameSessionController controller;
-  final NavigatorState navigator;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return Dialog(
-      backgroundColor: c.bgElev,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppTokens.r6),
-        side: BorderSide(color: c.line),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.sp6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('범인 지목',
-                style: AppText.titleM.copyWith(color: c.text)),
-            const SizedBox(height: AppTokens.sp3),
-            Text(
-              '${suspect.name}을(를) 범인으로 지목하고 최종 추리를 작성합니다.\n범행 동기·방법·결정적 증거를 입력해야 제출할 수 있습니다.',
-              style: AppText.body.copyWith(color: c.textSub, height: 1.6),
-            ),
-            const SizedBox(height: AppTokens.sp6),
-            Row(
-              children: [
-                Expanded(
-                  child: MSButton(
-                    label: '취소',
-                    variant: MSButtonVariant.secondary,
-                    expanded: true,
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ),
-                const SizedBox(width: AppTokens.sp3),
-                Expanded(
-                  child: MSButton(
-                    label: '추리 작성',
-                    variant: MSButtonVariant.danger,
-                    expanded: true,
-                    onPressed: () {
-                      navigator.pop();
-                      navigator.push(
-                        MaterialPageRoute(
-                          builder: (_) => GameSessionProvider(
-                            controller: controller,
-                            child: SubmitScreen(
-                                initialSuspect: suspect),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
