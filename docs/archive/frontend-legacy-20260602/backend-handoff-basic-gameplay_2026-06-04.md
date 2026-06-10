@@ -1,3 +1,9 @@
+# Historical Notice
+
+이 문서는 2026-06-04 기준 과거 백엔드 handoff다. 최신 구현 상태는 `docs/FRONTEND_IMPLEMENTATION_STATUS.md`와 백엔드 정본 문서를 기준으로 확인한다.
+
+---
+
 # 백엔드 핸드오프 — 기본 게임플레이 e2e (2026-06-04)
 
 검증 환경: 실제 백엔드 docker-compose 기동 (start-up-project), host 포트 **18080** (8080은 무관한 theo-core 점유). MySQL :33306 / Redis :16379. 시나리오 1~5 seed (1=데모데이, 2=밀실의유산[stub], 3=동아리회비[stub,CUSTOM], 4=서월채, 5=studio9).
