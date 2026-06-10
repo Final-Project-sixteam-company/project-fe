@@ -38,7 +38,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
   void initState() {
     super.initState();
     final s = widget.initialSuspect;
-    _selectedSuspect = (s != null && !s.isWitness && (s.culpritEligible ?? true)) ? s : null;
+    _selectedSuspect = (s != null && !s.isWitness && s.culpritEligible) ? s : null;
     _wasAllMet = _allMet;
 
     _motiveCtrl.addListener(_onTextChanged);
@@ -158,7 +158,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
     final c        = context.c;
 
     final suspects = context.session.suspects
-        .where((s) => !s.isWitness && (s.culpritEligible ?? true))
+        .where((s) => !s.isWitness && s.culpritEligible)
         .toList();
 
     final selected = suspects.where((s) => s.id == _selectedSuspect?.id).firstOrNull;
