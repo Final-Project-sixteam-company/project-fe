@@ -127,22 +127,37 @@ GET /api/play-sessions/active?scenarioId={scenarioId}
 예상 형태:
 
 ```dart
-Future<PlaySessionInfo?> activeSession(int scenarioId) async {
-  try {
-    final data = await _api.get(
-      '/api/play-sessions/active',
-      query: {'scenarioId': scenarioId},
-    );
-    if (data == null) return null;
-    return PlaySessionInfo.fromJson(data as Map<String, dynamic>);
-  } on ApiException catch (e) {
-    if (e.isNotFound) return null;
-    rethrow;
-  }
+Future<ActivePlaySession?> activeSession(int scenarioId) async {
+  final data = await _api.get(
+    '/api/play-sessions/active',
+    query: {'scenarioId': scenarioId},
+  );
+  final active = ActivePlaySession.fromJson(data as Map<String, dynamic>);
+  return active.hasActiveSession ? active : null;
 }
 ```
 
-백엔드가 active session 없음에 대해 `204`, `404`, `{data:null}` 중 무엇을 주는지에 따라 parsing을 맞춘다.
+현재 백엔드는 active session이 없어도 200을 반환하고 `hasActiveSession=false`, `activeSessionId=null`로 내려준다.
+
+응답 모델 후보:
+
+```dart
+class ActivePlaySession {
+  const ActivePlaySession({
+    required this.hasActiveSession,
+    this.activeSessionId,
+    required this.scenarioId,
+    this.status,
+    this.startedAt,
+  });
+
+  final bool hasActiveSession;
+  final int? activeSessionId;
+  final int scenarioId;
+  final String? status;
+  final DateTime? startedAt;
+}
+```
 
 ### Controller 흐름
 
@@ -215,20 +230,21 @@ class DeviceTokenRepository {
 
   Future<void> register({
     required String token,
-    required String platform,
+    String deviceType = 'ANDROID',
   }) async {
     await _api.post(
       '/api/device-tokens',
       body: {
         'token': token,
-        'platform': platform,
+        'deviceType': deviceType,
       },
     );
   }
 }
 ```
 
-정확한 request field는 backend API spec을 기준으로 맞춘다.
+현재 backend request field는 `token`, `deviceType`이다. `deviceType`은 생략 가능하지만 Android에서는 `ANDROID`로 명시해도 된다.
+`/api/device-tokens`는 보호 API이므로 Auth token wiring 이후 호출한다.
 
 ### Best-effort 처리
 
@@ -287,16 +303,19 @@ class PlayTimelineEvent {
     required this.title,
     this.description,
     this.eventType,
-    this.conflict,
+    this.relatedEvidenceId,
   });
 
   final String time;
   final String title;
   final String? description;
   final String? eventType;
-  final String? conflict;
+  final int? relatedEvidenceId;
 }
 ```
+
+현재 backend `PlayTimelineResponse`는 `time`, `title`, `description`, `eventType`, `relatedEvidenceId`를 내려준다.
+별도 `conflict` field는 없다. 모순/용의자 주장 필터는 `eventType` 기준으로 매핑하거나, 1차 구현에서는 전체 표시만 한다.
 
 ### Repository 추가
 

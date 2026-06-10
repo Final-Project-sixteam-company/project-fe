@@ -60,6 +60,7 @@
         "unlockHint": null
       },
       {
+        "evidenceId": 22,
         "title": "아직 확인되지 않은 비교 증거",
         "isUnlocked": false,
         "unlockHint": "현장 단서를 더 확보하면 비교할 수 있습니다."
@@ -70,14 +71,18 @@
         "targetCharacterCode": "SUSPECT_ACTOR",
         "targetSuspectId": 3,
         "targetName": "서이라",
-        "question": "MARK 9 위치를 리허설 중 다시 확인하거나 조정한 적 있나요?"
+        "question": "MARK 9 위치를 리허설 중 다시 확인하거나 조정한 적 있나요?",
+        "presentedEvidenceId": 12,
+        "questionType": "EVIDENCE_PRESENTED"
       }
     ]
   }
 }
 ```
 
-실제 field 명은 backend API spec과 PR #57 계약을 기준으로 맞춘다.
+현재 backend field는 `PlayEvidenceDetailResponse` 기준이다.
+locked compare evidence도 `evidenceId`는 내려올 수 있지만, `evidenceCode`는 내려오지 않는다.
+프론트는 `isUnlocked=false`이면 `evidenceId`가 있어도 상세 이동에 사용하지 않는다.
 
 ## 구현 대상 파일
 
@@ -162,16 +167,21 @@ class SuggestedQuestionInfo {
     this.targetSuspectId,
     this.targetName,
     required this.question,
+    this.presentedEvidenceId,
+    this.questionType,
   });
 
   final String? targetCharacterCode;
   final int? targetSuspectId;
   final String? targetName;
   final String question;
+  final int? presentedEvidenceId;
+  final String? questionType;
 }
 ```
 
-target 식별자는 backend 응답 확정 필드에 맞춰 조정한다. 프론트에서는 `targetSuspectId`가 있으면 가장 안정적이다.
+프론트에서는 `targetSuspectId`가 있으면 가장 안정적이다.
+`questionType`은 backend가 `EVIDENCE_PRESENTED`로 내려주지만, 전송 시에도 evidence 기반 질문은 `EVIDENCE_PRESENTED`로 유지한다.
 
 ## 2. Evidence Detail UI
 
@@ -234,6 +244,7 @@ locked compare evidence:
 
 - detail 이동 금지
 - `evidenceCode`를 UI에 표시하지 않음
+- `evidenceId`가 있어도 `isUnlocked=false`이면 라우팅에 사용하지 않음
 - `unlockHint`가 있으면 보조 텍스트로 표시
 
 주의:

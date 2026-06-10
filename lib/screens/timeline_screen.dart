@@ -44,9 +44,9 @@ class TimelineScreen extends StatefulWidget {
 class _TimelineScreenState extends State<TimelineScreen> {
   _TimelineFilter _filter = _TimelineFilter.all;
 
-  // TODO(backend): 서버 타임라인 연동.
-  // api-spec.md §9.9 GET /api/play-sessions/{sessionId}/timeline 정의됨.
-  // 백엔드 구현 시 controller.timeline 을 읽도록 교체할 것.
+  // TODO(frontend): 서버 타임라인 연동.
+  // 백엔드에는 GET /api/play-sessions/{sessionId}/timeline 이 구현되어 있다.
+  // 프론트에 repository/controller state를 추가한 뒤 sampleCase.timeline을 제거한다.
   List<TimelineEntry> get _filtered => switch (_filter) {
     _TimelineFilter.all => sampleCase.timeline,
     _TimelineFilter.conflict =>
@@ -60,7 +60,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
     final c = context.c;
 
     // CL-001 외 시나리오에서는 하드코딩 타임라인이 스포일러가 되므로 숨긴다.
-    // 백엔드 timeline 엔드포인트 구현 후 이 게이트를 제거한다.
+    // 프론트가 서버 timeline API를 연동하면 이 게이트를 제거한다.
     final showSample = context.sessionRead.usesCl001SampleCaseData;
     if (!showSample) {
       return Scaffold(

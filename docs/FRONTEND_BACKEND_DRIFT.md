@@ -86,11 +86,13 @@ ApiClient.instance.authTokenProvider = () => AuthService.instance.token;
 
 ### 백엔드 기준
 
-최신 백엔드 계약은 active session 조회 endpoint를 제공하는 방향이다.
+최신 백엔드 코드는 active session 조회 endpoint를 제공한다.
 
 ```http
 GET /api/play-sessions/active?scenarioId={scenarioId}
 ```
+
+active session이 없을 때도 200을 반환하며, `hasActiveSession=false`, `activeSessionId=null`로 내려준다.
 
 ### 왜 문제인가
 
@@ -336,7 +338,7 @@ GET /api/play-sessions/{sessionId}/timeline
 예:
 
 - timeline/locations 미구현 전제
-- active endpoint 404 전제
+- active endpoint 미구현 또는 과거 응답 정책 전제
 - 구 auth endpoint 초안
 - 추천 질문 endpoint 초안
 
