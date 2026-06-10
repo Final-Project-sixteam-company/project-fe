@@ -1,8 +1,21 @@
+// lib/models/scenario.dart
 enum ScenarioType { official, custom }
 
 enum Difficulty { easy, medium, hard }
 
 enum PlayState { inProgress, completed, abandoned }
+
+enum ScenarioGenre { murder, theft, arson, espionage, fraud }
+
+extension ScenarioGenreLabel on ScenarioGenre {
+  String get label => switch (this) {
+    ScenarioGenre.murder => '살인',
+    ScenarioGenre.theft => '절도',
+    ScenarioGenre.arson => '방화',
+    ScenarioGenre.espionage => '스파이',
+    ScenarioGenre.fraud => '사기',
+  };
+}
 
 class Scenario {
   final String id;
@@ -20,6 +33,9 @@ class Scenario {
   final String synopsis;
   final String? author;
   final String? thumbnailUrl;
+  final String? coverAssetKey;
+  final String? mapAssetKey;
+  final ScenarioGenre? genre;
 
   const Scenario({
     required this.id,
@@ -37,6 +53,9 @@ class Scenario {
     required this.synopsis,
     this.author,
     this.thumbnailUrl,
+    this.coverAssetKey,
+    this.mapAssetKey,
+    this.genre,
   });
 
   String get difficultyLabel => switch (difficulty) {

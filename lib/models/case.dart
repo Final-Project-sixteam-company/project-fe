@@ -1,25 +1,60 @@
 // lib/models/case.dart
 import 'package:flutter/material.dart';
 
+enum ProofDimension { timeProof, methodProof, motiveProof, coverUpProof }
+
+extension ProofDimensionLabel on ProofDimension {
+  String get label => switch (this) {
+    ProofDimension.timeProof => '시간 증명',
+    ProofDimension.methodProof => '방법 증명',
+    ProofDimension.motiveProof => '동기 증명',
+    ProofDimension.coverUpProof => '은폐 증명',
+  };
+}
+
+enum EvidencePhase { phase0, phase1, phase2, phase3, phase4 }
+
+extension EvidencePhaseLabelX on EvidencePhase {
+  String get label => switch (this) {
+    EvidencePhase.phase0 => 'Phase 0',
+    EvidencePhase.phase1 => 'Phase 1',
+    EvidencePhase.phase2 => 'Phase 2',
+    EvidencePhase.phase3 => 'Phase 3',
+    EvidencePhase.phase4 => 'Phase 4',
+  };
+
+  int get index => switch (this) {
+    EvidencePhase.phase0 => 0,
+    EvidencePhase.phase1 => 1,
+    EvidencePhase.phase2 => 2,
+    EvidencePhase.phase3 => 3,
+    EvidencePhase.phase4 => 4,
+  };
+}
+
 class Suspect {
   final String id;
   final String name;
   final String role;
   final int suspicion;
   final int interrogationCount;
-  // 공식 초상 이미지 URL. null/빈값이면 이니셜 아바타로 폴백.
+
+  /// 공식 초상 이미지 URL — game_session_controller.dart 호환용 레거시 별칭.
+  /// null/빈값이면 이니셜 아바타로 폴백.
   final String? portraitUrl;
 
-  /// 용의자 프로필 사진 assetKey (S3 URL 또는 로컬 경로).
-  /// null이면 이니셜 아바타로 폴백.
+  /// 프로필 이미지 에셋 키 (S3 URL 또는 로컬 경로).
   final String? portraitAssetKey;
 
-  /// NEUTRAL_WITNESS 등 용의자가 아닌 증인 여부.
+  /// 증인 여부. true면 용의자가 아닌 참고인.
+  /// game_session_controller.dart 에서 named 파라미터로 전달된다.
   final bool isWitness;
 
-  /// 최종 범인 지목 가능 여부(서버 culpritEligible). 증인 + 레드헤링 등 지목불가 캐릭터 제외용.
-  /// 서버 미제공 시 !isWitness 로 폴백(PlaySuspect.fromJson에서 결정).
+  /// 최종 범인 지목 가능 여부.
   final bool culpritEligible;
+
+  final String? publicAlibi;
+  final String? personalityTone;
 
   const Suspect({
     required this.id,
@@ -31,6 +66,8 @@ class Suspect {
     this.portraitAssetKey,
     this.isWitness = false,
     this.culpritEligible = true,
+    this.publicAlibi,
+    this.personalityTone,
   });
 }
 
@@ -42,16 +79,12 @@ class Evidence {
   final bool isNew;
   final bool isAnalyzed;
   final bool isLocked;
-  // 목록 티저 한 줄 요약. 없으면 null.
+  final EvidencePhase phase;
+  final List<ProofDimension> proofDimensions;
+  final String? category;
   final String? oneLine;
-  // 증거 썸네일 이미지 URL. null/빈값/로딩 실패 시 icon 폴백.
   final String? imageUrl;
-
-  /// 증거 이미지 assetKey. null이면 icon 폴백.
   final String? imageAssetKey;
-
-  /// 증거 카테고리 표시용 라벨.
-  /// 예: 'PHYSICAL', 'DOCUMENT', 'DIGITAL_LOG', 'MAP', 'TESTIMONY', 'SCENE'
   final String? categoryLabel;
 
   const Evidence({
@@ -62,6 +95,9 @@ class Evidence {
     this.isNew = false,
     this.isAnalyzed = false,
     this.isLocked = false,
+    this.phase = EvidencePhase.phase0,
+    this.proofDimensions = const [],
+    this.category,
     this.oneLine,
     this.imageUrl,
     this.imageAssetKey,
@@ -74,9 +110,5 @@ class TimelineEntry {
   final String label;
   final String? conflict;
 
-  const TimelineEntry({
-    required this.time,
-    required this.label,
-    this.conflict,
-  });
+  const TimelineEntry({required this.time, required this.label, this.conflict});
 }

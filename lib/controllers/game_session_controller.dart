@@ -234,10 +234,8 @@ class GameSessionController extends ChangeNotifier {
         role: s.role ?? '',
         suspicion: s.suspicionLevel,
         interrogationCount: s.interrogationCount,
-        portraitUrl: s.portraitImageUrl,
+        portraitUrl: s.portraitAssetKey,
         portraitAssetKey: s.portraitAssetKey,
-        // isWitness는 PlaySuspect.fromJson에서 이미 결정됨.
-        // (서버 boolean > characterType 문자열 순으로 폴백)
         isWitness: s.isWitness,
         culpritEligible: s.culpritEligible,
       );
@@ -254,6 +252,9 @@ class GameSessionController extends ChangeNotifier {
         imageUrl: e.imageUrl,
         imageAssetKey: e.imageAssetKey,
         categoryLabel: e.categoryLabel,
+        phase: e.phase,
+        proofDimensions: e.proofDimensions,
+        category: e.category,
       );
 
   static IconData _iconForImportance(EvidenceImportance imp) => switch (imp) {
