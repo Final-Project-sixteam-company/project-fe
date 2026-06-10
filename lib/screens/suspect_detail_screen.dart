@@ -98,7 +98,10 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
         ),
       ),
       bottomNavigationBar:
-      SuspectDetailBottomBar(suspect: widget.suspect),
+      SuspectDetailBottomBar(
+        suspect: widget.suspect,
+        onInterrogationDone: _loadLogs,
+      ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
@@ -106,7 +109,6 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: AppTokens.sp6),
-            // ── 프로필 헤더 ────────────────────────────────────────
             Center(
               child: Column(
                 children: [
@@ -141,7 +143,6 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
               ),
             ),
             const SizedBox(height: AppTokens.sp6),
-            // ── 의심도 패널 ────────────────────────────────────────
             if (!widget.suspect.isWitness)
               FadeTransition(
                 opacity: _opacity,
@@ -155,7 +156,6 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
                   ),
                 ),
               ),
-            // ── 피해자와의 관계 ────────────────────────────────────
             if (raw?.relationToVictim?.isNotEmpty ?? false) ...[
               const SizedBox(height: AppTokens.sp6),
               const MSKicker('피해자와의 관계'),

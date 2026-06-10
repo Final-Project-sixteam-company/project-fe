@@ -22,26 +22,39 @@ extension EvidencePhaseLabelX on EvidencePhase {
     EvidencePhase.phase3 => 'Phase 3',
     EvidencePhase.phase4 => 'Phase 4',
   };
+
+  int get index => switch (this) {
+    EvidencePhase.phase0 => 0,
+    EvidencePhase.phase1 => 1,
+    EvidencePhase.phase2 => 2,
+    EvidencePhase.phase3 => 3,
+    EvidencePhase.phase4 => 4,
+  };
 }
 
-enum CharacterType { suspect, witness }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. Suspect 모델 수정
-// ─────────────────────────────────────────────────────────────────────────────
 class Suspect {
   final String id;
   final String name;
   final String role;
   final int suspicion;
   final int interrogationCount;
-  final CharacterType characterType;
+
+  /// 공식 초상 이미지 URL — game_session_controller.dart 호환용 레거시 별칭.
+  /// null/빈값이면 이니셜 아바타로 폴백.
+  final String? portraitUrl;
+
+  /// 프로필 이미지 에셋 키 (S3 URL 또는 로컬 경로).
+  final String? portraitAssetKey;
+
+  /// 증인 여부. true면 용의자가 아닌 참고인.
+  /// game_session_controller.dart 에서 named 파라미터로 전달된다.
+  final bool isWitness;
+
+  /// 최종 범인 지목 가능 여부.
+  final bool culpritEligible;
+
   final String? publicAlibi;
   final String? personalityTone;
-  final String? portraitAssetKey;
-  final String? portraitUrl;
-  final bool isWitness;
-  final bool culpritEligible;
 
   const Suspect({
     required this.id,
@@ -49,19 +62,15 @@ class Suspect {
     required this.role,
     required this.suspicion,
     this.interrogationCount = 0,
-    this.characterType = CharacterType.suspect,
-    this.publicAlibi,
-    this.personalityTone,
-    this.portraitAssetKey,
     this.portraitUrl,
+    this.portraitAssetKey,
     this.isWitness = false,
     this.culpritEligible = true,
+    this.publicAlibi,
+    this.personalityTone,
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 2. Evidence 모델 수정
-// ─────────────────────────────────────────────────────────────────────────────
 class Evidence {
   final String id;
   final String name;
@@ -73,7 +82,6 @@ class Evidence {
   final EvidencePhase phase;
   final List<ProofDimension> proofDimensions;
   final String? category;
-
   final String? oneLine;
   final String? imageUrl;
   final String? imageAssetKey;
@@ -102,9 +110,5 @@ class TimelineEntry {
   final String label;
   final String? conflict;
 
-  const TimelineEntry({
-    required this.time,
-    required this.label,
-    this.conflict,
-  });
+  const TimelineEntry({required this.time, required this.label, this.conflict});
 }

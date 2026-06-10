@@ -252,6 +252,9 @@ class GameSessionController extends ChangeNotifier {
         imageUrl: e.imageUrl,
         imageAssetKey: e.imageAssetKey,
         categoryLabel: e.categoryLabel,
+        phase: e.phase,
+        proofDimensions: e.proofDimensions,
+        category: e.category,
       );
 
   static IconData _iconForImportance(EvidenceImportance imp) => switch (imp) {

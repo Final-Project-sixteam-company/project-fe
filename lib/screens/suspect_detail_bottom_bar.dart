@@ -6,20 +6,31 @@ import '../components/ms_button.dart';
 import '../controllers/game_session_controller.dart';
 import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
-import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'interrogation_chat_screen.dart';
 import 'submit_screen.dart';
 
+/// 하단 고정 버튼 바.
+///
+/// [onInterrogationDone] — 심문 화면에서 pop되어 돌아올 때 호출된다.
+/// 호출처(SuspectDetailScreen)에서 `_loadLogs()`를 연결해 로그를 갱신한다.
 class SuspectDetailBottomBar extends StatelessWidget {
-  const SuspectDetailBottomBar({required this.suspect, super.key});
+  const SuspectDetailBottomBar({
+    required this.suspect,
+    this.onInterrogationDone,
+    super.key,
+  });
 
   final Suspect suspect;
+  final VoidCallback? onInterrogationDone;
 
   @override
   Widget build(BuildContext context) {
+    // culpritEligible: 증인·레드헤링 등 지목 불가 캐릭터는 버튼을 숨긴다.
+    final showAccuse = suspect.culpritEligible && !suspect.isWitness;
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -44,20 +55,10 @@ class SuspectDetailBottomBar extends StatelessWidget {
                 label: '심문하기',
                 variant: MSButtonVariant.primary,
                 expanded: true,
-                onPressed: () {
-                  final ctrl = context.sessionRead;
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => GameSessionProvider(
-                        controller: ctrl,
-                        child: InterrogationChatScreen(suspect: suspect),
-                      ),
-                    ),
-                  );
-                },
+                onPressed: () => _openInterrogation(context),
               ),
             ),
-            if (!suspect.isWitness) ...[
+            if (showAccuse) ...[
               const SizedBox(width: AppTokens.sp3),
               Expanded(
                 child: MSButton(
@@ -72,6 +73,21 @@ class SuspectDetailBottomBar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// 심문 화면 push — await 후 onInterrogationDone 콜백을 호출해 로그를 갱신한다.
+  Future<void> _openInterrogation(BuildContext context) async {
+    final ctrl = context.sessionRead;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GameSessionProvider(
+          controller: ctrl,
+          child: InterrogationChatScreen(suspect: suspect),
+        ),
+      ),
+    );
+    // push가 완료(pop)된 뒤 호출처에 갱신을 위임한다.
+    onInterrogationDone?.call();
   }
 
   void _showConfirmDialog(BuildContext context) {
@@ -122,7 +138,7 @@ class SuspectAccuseDialog extends StatelessWidget {
             const SizedBox(height: AppTokens.sp3),
             Text(
               '${suspect.name}을(를) 범인으로 지목하고 최종 추리를 작성합니다.\n'
-              '범행 동기·방법·결정적 증거를 입력해야 제출할 수 있습니다.',
+                  '범행 동기·방법·결정적 증거를 입력해야 제출할 수 있습니다.',
               style: AppText.body.copyWith(color: c.textSub, height: 1.6),
             ),
             const SizedBox(height: AppTokens.sp6),

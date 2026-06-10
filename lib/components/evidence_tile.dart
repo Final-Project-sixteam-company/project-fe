@@ -1,5 +1,6 @@
 // lib/components/evidence_tile.dart
 import 'package:flutter/material.dart';
+import '../controllers/game_session_provider.dart';
 import '../models/case.dart';
 import '../screens/evidence_detail_screen.dart';
 import '../theme/app_text.dart';
@@ -51,18 +52,37 @@ class EvidenceTile extends StatelessWidget {
       );
     }
 
+    // sessionId·listData를 주입해 상세 화면이 서버 데이터를 받을 수 있도록 한다.
+    // GameSessionProvider가 없는 컨텍스트(미리보기 등)에서는 null로 폴백한다.
+    VoidCallback resolvedTap;
+    if (onTap != null) {
+      resolvedTap = onTap!;
+    } else {
+      int? sessionId;
+      dynamic rawEvidence;
+      try {
+        final session = GameSessionProvider.read(context);
+        sessionId = session.backendSessionId;
+        rawEvidence = session.rawEvidence(evidence.id);
+      } catch (_) {
+        // GameSessionProvider 없는 컨텍스트 — sessionId/rawEvidence 없이 열람
+      }
+      resolvedTap = () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EvidenceDetailScreen(
+            evidence: evidence,
+            isUnlocked: isNewlyUnlocked,
+            sessionId: sessionId,
+            listData: rawEvidence,
+          ),
+        ),
+      );
+    }
+
     return _Tile(
       evidence: evidence,
       isNewlyUnlocked: isNewlyUnlocked,
-      onTap: onTap ??
-              () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => EvidenceDetailScreen(
-                evidence: evidence,
-                isUnlocked: isNewlyUnlocked,
-              ),
-            ),
-          ),
+      onTap: resolvedTap,
     );
   }
 }
