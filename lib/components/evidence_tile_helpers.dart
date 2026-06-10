@@ -1,6 +1,7 @@
 // lib/components/evidence_tile_helpers.dart
 // EvidenceTile 내부 소형 위젯 (evidence_tile.dart 에서 분리)
 import 'package:flutter/material.dart';
+import '../components/asset_image_widget.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
@@ -41,26 +42,21 @@ class EvidenceIconThumb extends StatelessWidget {
   const EvidenceIconThumb({
     required this.icon,
     required this.color,
+    this.imageUrl,
     super.key,
   });
 
   final IconData icon;
   final Color color;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
-
-    return Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: c.bgHover,
-        border: Border.all(color: c.line),
-        borderRadius: BorderRadius.circular(AppTokens.r2),
-      ),
-      alignment: Alignment.center,
-      child: Icon(icon, size: 17, color: color),
+    return EvidenceThumb(
+      icon: icon,
+      iconColor: color,
+      assetKey: imageUrl,
+      size: 34,
     );
   }
 }

@@ -145,6 +145,7 @@ class _Tile extends StatelessWidget {
                 color: isNewlyUnlocked
                     ? c.success
                     : (evidence.isAnalyzed ? c.success : c.primary),
+                imageUrl: evidence.imageUrl ?? evidence.imageAssetKey,
               ),
               const SizedBox(width: AppTokens.sp3),
               Expanded(

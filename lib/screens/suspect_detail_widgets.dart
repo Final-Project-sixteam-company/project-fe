@@ -2,6 +2,8 @@
 // SuspectDetailScreen 에서 분리된 하위 위젯들
 
 import 'package:flutter/material.dart';
+import '../components/asset_image_widget.dart';
+import '../components/image_viewer_modal.dart';
 import '../models/case.dart';
 import '../models/play_models.dart';
 import '../theme/app_colors.dart';
@@ -14,45 +16,34 @@ import '../theme/app_theme.dart';
 class SuspectLargeAvatar extends StatelessWidget {
   const SuspectLargeAvatar({
     required this.name,
+    this.assetKey,
     this.isWitness = false,
     super.key,
   });
 
   final String name;
+  final String? assetKey;
   final bool isWitness;
 
   @override
   Widget build(BuildContext context) {
-    final initial = name.isNotEmpty ? name.characters.first : '?';
-
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: BoxDecoration(
-        gradient: isWitness
-            ? const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.ink700, AppColors.ink500],
-              )
-            : const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.tealBase, AppColors.skyBase],
-              ),
-        borderRadius: BorderRadius.circular(AppTokens.r5),
-        border: Border.all(color: AppColors.ink0.withValues(alpha: .14)),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: AppText.titleL.copyWith(
-          fontSize: 32,
-          color: AppColors.ink950,
-          height: 1.0,
-        ),
-      ),
+    Widget avatar = CharacterPortrait(
+      name: name,
+      size: 80,
+      assetKey: assetKey,
+      borderRadius: AppTokens.r5,
+      isWitness: isWitness,
     );
+
+    if (assetKey != null && assetKey!.isNotEmpty) {
+      avatar = GestureDetector(
+        onTap: () {
+          ImageViewerModal.show(context, imageUrl: assetKey!, label: name);
+        },
+        child: avatar,
+      );
+    }
+    return avatar;
   }
 }
 

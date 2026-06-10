@@ -116,6 +116,7 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
                     tag: widget.suspect.id,
                     child: SuspectLargeAvatar(
                       name: widget.suspect.name,
+                      assetKey: raw?.portraitAssetKey ?? widget.suspect.portraitUrl ?? widget.suspect.portraitAssetKey,
                       isWitness: widget.suspect.isWitness,
                     ),
                   ),
