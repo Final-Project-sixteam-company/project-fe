@@ -111,6 +111,13 @@ class _NetImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    if (!url.startsWith('http')) {
+      return Image.asset(
+        url,
+        fit: fit,
+        errorBuilder: (_, __, ___) => _ImgPlaceholder(bg: c.bgElev),
+      );
+    }
     return Image.network(
       url,
       fit: fit,

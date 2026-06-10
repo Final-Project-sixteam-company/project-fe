@@ -1,5 +1,7 @@
 // lib/screens/evidence_detail_widgets.dart
 import 'package:flutter/material.dart';
+import '../components/asset_image_widget.dart';
+import '../components/image_viewer_modal.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_pill.dart';
 import '../components/states.dart';
@@ -17,19 +19,44 @@ class EvidenceHero extends StatelessWidget {
   final Evidence evidence;
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 86, height: 86,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [AppColors.tealBase, AppColors.skyBase],
-          ),
-          borderRadius: BorderRadius.circular(AppTokens.r6),
-          border: Border.all(color: AppColors.ink0.withValues(alpha: .14)),
+    final imageKey = evidence.imageUrl ?? evidence.imageAssetKey;
+    final hasImage = imageKey != null && imageKey.isNotEmpty;
+
+    final fallback = Container(
+      width: 86, height: 86,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: [AppColors.tealBase, AppColors.skyBase],
         ),
-        alignment: Alignment.center,
-        child: Icon(evidence.icon, size: 34, color: AppColors.ink0),
+        borderRadius: BorderRadius.circular(AppTokens.r6),
+        border: Border.all(color: AppColors.ink0.withValues(alpha: .14)),
+      ),
+      alignment: Alignment.center,
+      child: Icon(evidence.icon, size: 34, color: AppColors.ink0),
+    );
+
+    if (!hasImage) {
+      return Center(child: fallback);
+    }
+
+    return Center(
+      child: GestureDetector(
+        onTap: () {
+          ImageViewerModal.show(
+            context,
+            imageUrl: imageKey,
+            label: evidence.name,
+          );
+        },
+        child: AssetImageWidget(
+          assetKey: imageKey,
+          width: 86,
+          height: 86,
+          fit: BoxFit.cover,
+          borderRadius: BorderRadius.circular(AppTokens.r6),
+          fallback: fallback,
+        ),
       ),
     );
   }

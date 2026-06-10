@@ -8,8 +8,8 @@ import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'evidence_tile_helpers.dart';
 import 'ms_pill.dart';
-
-/// 증거 유형 문자열 → 한국어 라벨
+// 용의자(심문) 탭 인덱스 — CaseScreen._kScreens 순서와 일치해야 한다.
+const int _kSuspectsTabIndex = 2;
 String _categoryLabel(String? cat) => switch (cat) {
   'PHYSICAL' => '물적',
   'DOCUMENT' => '문서',
@@ -17,7 +17,6 @@ String _categoryLabel(String? cat) => switch (cat) {
   'TESTIMONY' => '증언',
   _ => '기타',
 };
-
 class EvidenceTile extends StatelessWidget {
   const EvidenceTile({
     required this.evidence,
@@ -26,16 +25,13 @@ class EvidenceTile extends StatelessWidget {
     this.isNewlyUnlocked = false,
     super.key,
   });
-
   final Evidence evidence;
   final VoidCallback? onTap;
   final bool isTimeLocked;
   final bool isNewlyUnlocked;
-
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-
     if (isTimeLocked) {
       return Opacity(
         opacity: 0.5,
@@ -52,37 +48,47 @@ class EvidenceTile extends StatelessWidget {
       );
     }
 
-    // sessionId·listData를 주입해 상세 화면이 서버 데이터를 받을 수 있도록 한다.
-    // GameSessionProvider가 없는 컨텍스트(미리보기 등)에서는 null로 폴백한다.
-    VoidCallback resolvedTap;
     if (onTap != null) {
-      resolvedTap = onTap!;
-    } else {
-      int? sessionId;
-      dynamic rawEvidence;
-      try {
-        final session = GameSessionProvider.read(context);
-        sessionId = session.backendSessionId;
-        rawEvidence = session.rawEvidence(evidence.id);
-      } catch (_) {
-        // GameSessionProvider 없는 컨텍스트 — sessionId/rawEvidence 없이 열람
+      return _Tile(
+        evidence: evidence,
+        isNewlyUnlocked: isNewlyUnlocked,
+        onTap: onTap,
+      );
+    }
+
+    // 기본 탭 핸들러 — 세션에서 sessionId·rawEvidence를 읽어
+    // 상세 화면에 주입한다. 해금된 증거에는 '용의자 심문하기' CTA도 복원한다.
+    int? sessionId;
+    dynamic rawEvidence;
+    VoidCallback? onInterrogate;
+
+    try {
+      final session = GameSessionProvider.read(context);
+      sessionId = session.backendSessionId;
+      rawEvidence = session.rawEvidence(evidence.id);
+      // 해금된 증거에서 용의자 탭으로 이동하는 경로를 제공한다.
+      // requestTab은 CaseScreen이 소비해 바텀 탭을 전환한다.
+      if (!evidence.isLocked || isNewlyUnlocked) {
+        onInterrogate = () => session.requestTab(_kSuspectsTabIndex);
       }
-      resolvedTap = () => Navigator.of(context).push(
+    } catch (_) {
+      // GameSessionProvider 없는 컨텍스트(미리보기 등) — null로 폴백
+    }
+
+    return _Tile(
+      evidence: evidence,
+      isNewlyUnlocked: isNewlyUnlocked,
+      onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => EvidenceDetailScreen(
             evidence: evidence,
             isUnlocked: isNewlyUnlocked,
             sessionId: sessionId,
             listData: rawEvidence,
+            onInterrogate: onInterrogate,
           ),
         ),
-      );
-    }
-
-    return _Tile(
-      evidence: evidence,
-      isNewlyUnlocked: isNewlyUnlocked,
-      onTap: resolvedTap,
+      ),
     );
   }
 }
