@@ -125,7 +125,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
         _snack('이미 제출됐습니다. 결과 화면으로 이동합니다.', dur: const Duration(seconds: 2));
         await Future.delayed(const Duration(milliseconds: 1800));
         _navigateToResult(sessionId);
-      } else if (e.isNetwork) {
+      } else if (e.code == 'TIMEOUT') {
         _snack('응답이 지연되었습니다. 결과 화면으로 이동하여 확인합니다.', dur: const Duration(seconds: 2));
         await Future.delayed(const Duration(milliseconds: 1800));
         _navigateToResult(sessionId);
