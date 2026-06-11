@@ -54,25 +54,19 @@ class AuthService {
     final stored  = prefs.getString(_accessKey);
     final refresh = prefs.getString(_refreshKey);
 
-    if (stored != null && _isUsableToken(stored)) {
-      // accessToken이 유효하면 둘 다 복원한다.
-      _cachedAccessToken  = stored;
-      _cachedRefreshToken = refresh;
-    } else {
-      // accessToken이 더미이거나 만료됐으면 저장소에서 제거한다.
-      // refreshToken은 갱신 플로우에서 사용할 수 있으므로 메모리에 유지하되,
-      // accessToken이 아예 없었던 경우(더미 포함)에는 refreshToken도 함께 버린다.
-      final hasStaleAccess = stored != null;
-      if (hasStaleAccess) {
-        // 만료된 실제 JWT — accessToken만 삭제하고 refreshToken은 보존한다.
-        await prefs.remove(_accessKey);
-        _cachedAccessToken  = null;
-        _cachedRefreshToken = refresh; // 갱신 플로우에서 사용 가능
+    if (stored != null) {
+      if (_isUsableToken(stored)) {
+        // accessToken이 유효하면 둘 다 복원한다.
+        _cachedAccessToken  = stored;
+        _cachedRefreshToken = refresh;
       } else {
-        // 저장된 토큰 자체가 없음 — 완전 미인증 상태
-        _cachedAccessToken  = null;
-        _cachedRefreshToken = null;
+        // accessToken이 만료되었거나 유효하지 않으면 access/refresh 모두 완전 삭제
+        await clearTokens();
       }
+    } else {
+      // 저장된 토큰 자체가 없음 — 완전 미인증 상태
+      _cachedAccessToken  = null;
+      _cachedRefreshToken = null;
     }
   }
 

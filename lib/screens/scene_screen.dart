@@ -251,7 +251,7 @@ class _SceneMap extends StatelessWidget {
                     child: MSSkeleton(radius: AppTokens.r4),
                   );
                 },
-                errorBuilder: (_, __, ___) => _MapPlaceholder(),
+                errorBuilder: (context, error, stackTrace) => _MapPlaceholder(),
               )
             else if (_mapAssetKey != null)
               AssetImageWidget(

@@ -115,7 +115,7 @@ class _NetImage extends StatelessWidget {
       return Image.asset(
         url,
         fit: fit,
-        errorBuilder: (_, __, ___) => _ImgPlaceholder(bg: c.bgElev),
+        errorBuilder: (context, error, stackTrace) => _ImgPlaceholder(bg: c.bgElev),
       );
     }
     return Image.network(
@@ -125,7 +125,7 @@ class _NetImage extends StatelessWidget {
         if (prog == null) return child;
         return _ImgPlaceholder(bg: c.bgElev, loading: true);
       },
-      errorBuilder: (_, __, ___) => _ImgPlaceholder(bg: c.bgElev),
+      errorBuilder: (context, error, stackTrace) => _ImgPlaceholder(bg: c.bgElev),
     );
   }
 }

@@ -91,7 +91,7 @@ class _NetworkImage extends StatelessWidget {
       return Image.asset(
         url,
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => _Placeholder(color: c.bgElev),
+        errorBuilder: (context, error, stackTrace) => _Placeholder(color: c.bgElev),
       );
     }
     return Image.network(
@@ -101,7 +101,7 @@ class _NetworkImage extends StatelessWidget {
         if (progress == null) return child;
         return _Placeholder(color: c.bgElev, loading: true);
       },
-      errorBuilder: (_, __, ___) => _Placeholder(color: c.bgElev),
+      errorBuilder: (context, error, stackTrace) => _Placeholder(color: c.bgElev),
     );
   }
 }
