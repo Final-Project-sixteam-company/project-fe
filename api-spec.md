@@ -10,7 +10,8 @@
 | Repository path | `docs/CaseLab_AI_API_Spec.md` |
 | GitHub link | [start-up-project/docs/CaseLab_AI_API_Spec.md](https://github.com/Final-Project-sixteam-company/start-up-project/blob/develop/docs/CaseLab_AI_API_Spec.md) |
 
-로컬에서 backend와 frontend repo를 같은 상위 폴더에 clone한 경우에는 `../start-up/docs/CaseLab_AI_API_Spec.md`로도 확인할 수 있다.
+로컬에서 backend와 frontend repo를 같은 상위 폴더에 clone한 경우에는 기본 clone명 기준 `../start-up-project/docs/CaseLab_AI_API_Spec.md`로도 확인할 수 있다.
+로컬 폴더명을 다르게 쓴 경우에는 실제 backend checkout 경로에 맞춰 읽는다.
 
 프론트 화면/API 매핑과 구현 계획은 이 repo의 아래 문서를 기준으로 확인한다.
 

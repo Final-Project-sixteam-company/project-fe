@@ -2,7 +2,7 @@
 
 기준일: 2026-06-11
 
-대상 repo: `C:\java\assignment\spring\start-up-fe`
+대상 repo: `start-up-fe`
 
 백엔드 기준:
 
@@ -345,11 +345,29 @@ if (widget.initialQuestion?.trim().isNotEmpty == true) {
 추천 draft 정책:
 
 ```text
-guidance chip으로 심문 화면에 진입하면 검증된 추천 질문으로 override
-이미 심문 화면 안에서 chip을 누르는 구조라면 confirm 또는 replace
+기존 draft 없음
+-> 추천 질문을 입력창에 prefill
+
+기존 draft 있음
+-> confirm bottom sheet 표시
+-> 사용자가 "추천 질문으로 교체"를 선택한 경우에만 replace
+-> 취소하면 기존 draft 유지
+
+자동 전송 금지
+무확인 덮어쓰기 금지
 ```
 
-현재 구조에서는 evidence detail -> interrogation 진입이므로 override가 단순하다.
+현재 구조는 evidence detail -> interrogation 진입이지만, 같은 suspect에 저장된 draft가 있거나 심문 화면 안에서 chip을 누르는 구조로 확장될 수 있다.
+따라서 guidance chip 진입 경로에서도 draft가 비어 있을 때만 즉시 prefill하고, 기존 입력이 있으면 confirm bottom sheet를 반드시 거친다.
+
+권장 bottom sheet copy:
+
+```text
+작성 중인 질문을 추천 질문으로 바꿀까요?
+기존 입력은 사라집니다.
+
+[취소] [추천 질문으로 교체]
+```
 
 ## 5. 전송 시 QuestionType 결정
 

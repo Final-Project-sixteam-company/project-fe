@@ -4,7 +4,7 @@ ClueRoom 프론트엔드 앱이다.
 
 사용자는 공식 시나리오를 선택하고, 사건 브리핑과 현장/증거/용의자 정보를 확인한 뒤 AI 심문과 최종 추리 제출을 통해 사건을 해결한다.
 
-이 repo는 Flutter/Dart 기반 앱이며, 백엔드는 별도 Spring Boot repo인 `start-up`에서 제공한다.
+이 repo는 Flutter/Dart 기반 앱이며, 백엔드는 별도 Spring Boot repo인 `Final-Project-sixteam-company/start-up-project`에서 제공한다.
 
 ## 현재 기준
 
@@ -36,11 +36,13 @@ ClueRoom 프론트엔드 앱이다.
 백엔드 API/운영/시나리오 정본은 backend repo의 아래 문서를 기준으로 본다.
 
 ```text
-start-up/docs/CaseLab_AI_API_Spec.md
-start-up/docs/frontend/CLUEROOM_APP_FLOW_API_GUIDE.md
-start-up/docs/scenarios/SCENARIO_GUIDANCE_UX_SPEC.md
-start-up/docs/RUN_AND_DEPLOY.md
+start-up-project/docs/CaseLab_AI_API_Spec.md
+start-up-project/docs/frontend/CLUEROOM_APP_FLOW_API_GUIDE.md
+start-up-project/docs/scenarios/SCENARIO_GUIDANCE_UX_SPEC.md
+start-up-project/docs/RUN_AND_DEPLOY.md
 ```
+
+`SCENARIO_GUIDANCE_UX_SPEC.md`는 backend #56 문서 통합 PR 머지 후 develop 기준 정본으로 본다.
 
 ## 실행
 

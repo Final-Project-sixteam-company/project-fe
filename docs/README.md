@@ -27,11 +27,14 @@
 
 | 기준 | 백엔드 repo 경로 | 프론트에서 맞춰야 할 내용 |
 |---|---|---|
-| API 계약 | `start-up/docs/CaseLab_AI_API_Spec.md` | request/response, endpoint, status/error shape |
-| 화면/API 매핑 | `start-up/docs/frontend/CLUEROOM_APP_FLOW_API_GUIDE.md` | 화면별 API 사용, navigation, loading/error policy |
-| Guidance UX | `start-up/docs/scenarios/SCENARIO_GUIDANCE_UX_SPEC.md` | evidence guidance, suggested question, prefill-only 정책 |
-| 실행/배포 | `start-up/docs/RUN_AND_DEPLOY.md` | API base URL, prod/dev 연결 기준 |
-| 운영/알림 | `start-up/docs/infra/OPS_RUNBOOK.md` | FCM/device token, API 운영 확인 흐름 |
+| API 계약 | `start-up-project/docs/CaseLab_AI_API_Spec.md` | request/response, endpoint, status/error shape |
+| 화면/API 매핑 | `start-up-project/docs/frontend/CLUEROOM_APP_FLOW_API_GUIDE.md` | 화면별 API 사용, navigation, loading/error policy |
+| Guidance UX | `start-up-project/docs/scenarios/SCENARIO_GUIDANCE_UX_SPEC.md` | evidence guidance, suggested question, prefill-only 정책 |
+| 실행/배포 | `start-up-project/docs/RUN_AND_DEPLOY.md` | API base URL, prod/dev 연결 기준 |
+| 운영/알림 | `start-up-project/docs/infra/OPS_RUNBOOK.md` | FCM/device token, API 운영 확인 흐름 |
+
+`SCENARIO_GUIDANCE_UX_SPEC.md`는 backend #56 문서 통합 PR 머지 후 develop 기준 정본으로 본다.
+로컬 checkout 폴더명이 `start-up-project`가 아니면 실제 backend repo 경로에 맞춰 읽는다.
 
 ## 다음 단계
 

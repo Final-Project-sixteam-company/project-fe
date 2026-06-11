@@ -2,9 +2,9 @@
 
 기준일: 2026-06-11
 
-대상 repo: `C:\java\assignment\spring\start-up-fe`
+대상 repo: `start-up-fe`
 
-백엔드 기준 repo: `C:\java\assignment\spring\start-up`
+백엔드 기준 repo: `Final-Project-sixteam-company/start-up-project`
 
 이 문서는 현재 Flutter 프론트 구현과 Spring Boot 백엔드 최신 계약 사이의 차이를 정리한다. 목표는 blame이 아니라 수정 순서를 명확히 하는 것이다.
 

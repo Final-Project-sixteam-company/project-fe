@@ -2,7 +2,7 @@
 
 기준일: 2026-06-11
 
-대상 repo: `C:\java\assignment\spring\start-up-fe`
+대상 repo: `start-up-fe`
 
 목적:
 

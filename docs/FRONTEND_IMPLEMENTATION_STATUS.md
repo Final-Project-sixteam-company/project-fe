@@ -2,7 +2,7 @@
 
 기준일: 2026-06-11
 
-대상 repo: `C:\java\assignment\spring\start-up-fe`
+대상 repo: `start-up-fe`
 
 이 문서는 현재 Flutter 코드가 실제로 구현한 범위를 정리한다. 백엔드 최신 계약과의 차이는 후속 `FRONTEND_BACKEND_DRIFT.md`에서 별도 관리한다.
 
