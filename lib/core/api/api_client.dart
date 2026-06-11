@@ -11,15 +11,24 @@ import 'api_exception.dart';
 
 /// Authorization 헤더를 붙이지 않을 경로 목록.
 ///
-/// 인증 전용 엔드포인트에 만료/잘못된 Bearer가 실려서 401이 나는 상황을 방지한다.
-/// api-spec.md 기준 인증 불필요(unauthenticated)로 명시된 모든 auth 경로를 포함한다.
+/// 포함 기준: ANDROID_AUTH_INTEGRATION_GUIDE.md §7 을 정본으로 따른다.
+///
+/// > "Do not attach Bearer token to these auth endpoints if the HTTP client
+/// >  can exclude them: POST /api/auth/oauth, /api/auth/refresh,
+/// >  /api/auth/logout, /api/auth/dev"
+///
+/// /api/auth/logout 은 api-spec.md 상 인증 필요('O')로 표기되어 있으나,
+/// ANDROID_AUTH_INTEGRATION_GUIDE.md §7 이 명시적으로 제외를 지시하므로
+/// 해당 가이드를 우선한다. 백엔드가 logout 계약을 변경하면 재검토한다.
+///
+/// /api/auth/signup, /api/auth/login 은 두 문서 모두 인증 불필요로 일치한다.
 const _kNoAuthPaths = <String>{
-  '/api/auth/signup',   // 회원가입 — 인증 불필요
-  '/api/auth/login',    // 로그인 — 인증 불필요
-  '/api/auth/oauth',    // OAuth 소셜 로그인 — 인증 불필요
-  '/api/auth/refresh',  // 토큰 갱신 — refreshToken으로만 인증
-  '/api/auth/logout',   // 로그아웃 — refreshToken으로만 인증
-  '/api/auth/dev',      // 개발용 로그인 — 로컬/스테이징 전용
+  '/api/auth/signup',  // 인증 불필요 (api-spec.md + guide 일치)
+  '/api/auth/login',   // 인증 불필요 (api-spec.md + guide 일치)
+  '/api/auth/oauth',   // ANDROID_AUTH_INTEGRATION_GUIDE.md §7
+  '/api/auth/refresh', // ANDROID_AUTH_INTEGRATION_GUIDE.md §7
+  '/api/auth/logout',  // ANDROID_AUTH_INTEGRATION_GUIDE.md §7 (guide 우선)
+  '/api/auth/dev',     // ANDROID_AUTH_INTEGRATION_GUIDE.md §7
 };
 
 /// 페이지네이션 응답(`PageResponse<T>`) 표현.
@@ -62,8 +71,8 @@ class Page<T> {
 ///
 /// Authorization 헤더 정책:
 ///   - 실제 accessToken이 존재할 때만 `Authorization: Bearer {token}` 을 첨부한다.
-///   - _kNoAuthPaths 에 포함된 인증 전용 경로에는 헤더를 붙이지 않는다.
-///   - mock/더미 토큰은 AuthService.init()에서 걸러지므로 여기서는 null 여부만 확인한다.
+///   - _kNoAuthPaths 에 포함된 경로에는 헤더를 붙이지 않는다.
+///   - mock/더미/만료 토큰은 AuthService.init()에서 걸러지므로 여기서는 null 여부만 확인한다.
 class ApiClient {
   ApiClient._();
 
@@ -105,7 +114,7 @@ class ApiClient {
       'Accept':       'application/json',
     };
 
-    // 실제 accessToken이 있고, 인증 전용 경로가 아닐 때만 헤더를 첨부한다.
+    // 실제 accessToken이 있고, 인증 불필요 경로가 아닐 때만 헤더를 첨부한다.
     if (!_kNoAuthPaths.contains(path)) {
       final token = AuthService.instance.bearerToken;
       if (token != null && token.isNotEmpty) {
