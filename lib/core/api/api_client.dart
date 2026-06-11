@@ -9,13 +9,17 @@ import '../../services/auth_service.dart';
 import 'api_config.dart';
 import 'api_exception.dart';
 
-/// Authorization 헤더를 붙이지 않을 경로 접두사 목록.
-/// 인증 엔드포인트 자체에 만료된 Bearer가 실려서 401이 나는 상황을 방지한다.
+/// Authorization 헤더를 붙이지 않을 경로 목록.
+///
+/// 인증 전용 엔드포인트에 만료/잘못된 Bearer가 실려서 401이 나는 상황을 방지한다.
+/// api-spec.md 기준 인증 불필요(unauthenticated)로 명시된 모든 auth 경로를 포함한다.
 const _kNoAuthPaths = <String>{
-  '/api/auth/oauth',
-  '/api/auth/refresh',
-  '/api/auth/logout',
-  '/api/auth/dev',
+  '/api/auth/signup',   // 회원가입 — 인증 불필요
+  '/api/auth/login',    // 로그인 — 인증 불필요
+  '/api/auth/oauth',    // OAuth 소셜 로그인 — 인증 불필요
+  '/api/auth/refresh',  // 토큰 갱신 — refreshToken으로만 인증
+  '/api/auth/logout',   // 로그아웃 — refreshToken으로만 인증
+  '/api/auth/dev',      // 개발용 로그인 — 로컬/스테이징 전용
 };
 
 /// 페이지네이션 응답(`PageResponse<T>`) 표현.
