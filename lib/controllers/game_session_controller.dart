@@ -64,7 +64,7 @@ class GameSessionController extends ChangeNotifier {
 
   /// CL-001(데모데이 전야) 정적 샘플 데이터를 사용하는 세션인지 여부.
   /// 타임라인·힌트 텍스트 등 하드코딩 샘플 데이터를 표시해도 되는지 판단하는 게이트.
-  /// 백엔드 timeline 엔드포인트 구현 후 항상 false로 교체한다.
+  /// 프론트가 서버 timeline API를 연동하면 항상 false로 교체한다.
   bool get usesCl001SampleCaseData =>
       scenarioId == 'demoday-eve' || _backendScenarioId == 1;
 
