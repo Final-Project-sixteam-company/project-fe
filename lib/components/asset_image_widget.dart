@@ -57,7 +57,7 @@ class AssetImageWidget extends StatelessWidget {
           if (progress == null) return child;
           return _Shimmer(width: width, height: height);
         },
-        errorBuilder: (_, __, ___) =>
+        errorBuilder: (context, error, stackTrace) =>
         fallback ?? _DefaultFallback(width: width, height: height),
       );
     } else {
@@ -67,7 +67,7 @@ class AssetImageWidget extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
-        errorBuilder: (_, __, ___) =>
+        errorBuilder: (context, error, stackTrace) =>
         fallback ?? _DefaultFallback(width: width, height: height),
       );
     }
@@ -116,7 +116,7 @@ class _ShimmerState extends State<_Shimmer>
     final c = context.c;
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) => Container(
+      builder: (context, child) => Container(
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(
@@ -174,7 +174,6 @@ class CharacterPortrait extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
     final radius = borderRadius ?? AppTokens.r4;
     final initial = name.isNotEmpty ? name.characters.first : '?';
 
@@ -234,8 +233,6 @@ class EvidenceThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
-
     if (assetKey != null && assetKey!.isNotEmpty) {
       return AssetImageWidget(
         assetKey: assetKey,

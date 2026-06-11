@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../components/ms_button.dart';
-import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';

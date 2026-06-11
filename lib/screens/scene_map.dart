@@ -72,7 +72,7 @@ class SceneMapBackground extends StatelessWidget {
       fit: BoxFit.cover,
       loadingBuilder: (_, child, prog) =>
       prog == null ? child : SceneMapFallback(c: c, loading: true),
-      errorBuilder: (_, __, ___) => SceneMapFallback(c: c),
+      errorBuilder: (context, error, stackTrace) => SceneMapFallback(c: c),
     );
   }
 }

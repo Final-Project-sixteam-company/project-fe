@@ -7,7 +7,7 @@ import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 
 /// 리뷰 작성 바텀시트.
-/// 사용: showModalBottomSheet<ScenarioReview>(builder: (_) => ReviewWriteSheet(...))
+/// 사용: `showModalBottomSheet<ScenarioReview>(builder: (_) => ReviewWriteSheet(...))`
 class ReviewWriteSheet extends StatefulWidget {
   const ReviewWriteSheet({required this.scenarioId, super.key});
   final String scenarioId;
