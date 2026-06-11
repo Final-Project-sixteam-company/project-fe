@@ -21,13 +21,33 @@ class AuthService {
   String? _cachedRefreshToken;
 
   /// Authorization 헤더에 붙일 Bearer 값.
-  /// 실제 토큰이 있고 아직 유효할 때만 반환한다. 없거나 만료됐으면 null.
-  String? get bearerToken => _cachedAccessToken;
+  ///
+  /// 호출 시점에 토큰이 여전히 유효한지 재확인한다.
+  /// 앱이 장시간 포그라운드에 머물거나 백그라운드에서 복귀했을 때
+  /// init() 통과 후 만료된 토큰이 헤더에 실리는 상황을 방지한다.
+  ///
+  /// 만료가 감지되면 accessToken 캐시만 즉시 비운다.
+  /// refreshToken은 갱신 플로우(/api/auth/refresh)에서 사용할 수 있으므로 보존한다.
+  String? get bearerToken {
+    final token = _cachedAccessToken;
+    if (token == null) return null;
 
-  /// refreshToken. 갱신 플로우에서 사용한다.
+    if (!_isUsableToken(token)) {
+      // accessToken만 만료 — 메모리·저장소에서 제거하되 refreshToken은 유지한다.
+      _cachedAccessToken = null;
+      _evictStoredAccessToken();
+      return null;
+    }
+
+    return token;
+  }
+
+  /// refreshToken. 갱신 플로우(/api/auth/refresh)에서 사용한다.
+  /// accessToken이 만료된 상태에서도 유효할 수 있으므로 별도로 관리한다.
   String? get refreshToken => _cachedRefreshToken;
 
-  bool get isLoggedIn => _cachedAccessToken != null;
+  /// 실제 유효한 accessToken이 있으면 true.
+  bool get isLoggedIn => bearerToken != null;
 
   Future<void> init() async {
     final prefs   = await SharedPreferences.getInstance();
@@ -35,18 +55,24 @@ class AuthService {
     final refresh = prefs.getString(_refreshKey);
 
     if (stored != null && _isUsableToken(stored)) {
+      // accessToken이 유효하면 둘 다 복원한다.
       _cachedAccessToken  = stored;
       _cachedRefreshToken = refresh;
     } else {
-      // 더미 값이거나 만료된 토큰은 저장소에서 제거하고 null로 초기화한다.
-      // ApiClient는 bearerToken == null 이면 헤더를 붙이지 않으므로
-      // 백엔드에 잘못된 Bearer가 전달되는 상황을 방지한다.
-      if (stored != null) {
+      // accessToken이 더미이거나 만료됐으면 저장소에서 제거한다.
+      // refreshToken은 갱신 플로우에서 사용할 수 있으므로 메모리에 유지하되,
+      // accessToken이 아예 없었던 경우(더미 포함)에는 refreshToken도 함께 버린다.
+      final hasStaleAccess = stored != null;
+      if (hasStaleAccess) {
+        // 만료된 실제 JWT — accessToken만 삭제하고 refreshToken은 보존한다.
         await prefs.remove(_accessKey);
-        await prefs.remove(_refreshKey);
+        _cachedAccessToken  = null;
+        _cachedRefreshToken = refresh; // 갱신 플로우에서 사용 가능
+      } else {
+        // 저장된 토큰 자체가 없음 — 완전 미인증 상태
+        _cachedAccessToken  = null;
+        _cachedRefreshToken = null;
       }
-      _cachedAccessToken  = null;
-      _cachedRefreshToken = null;
     }
   }
 
@@ -61,6 +87,8 @@ class AuthService {
     await prefs.setString(_refreshKey, refresh);
   }
 
+  /// accessToken과 refreshToken을 모두 삭제한다.
+  /// 로그아웃 또는 refresh 실패(AUTH_004/005) 시 호출한다.
   Future<void> clearTokens() async {
     _cachedAccessToken  = null;
     _cachedRefreshToken = null;
@@ -70,6 +98,14 @@ class AuthService {
   }
 
   // ── 내부 헬퍼 ────────────────────────────────────────────────────────────
+
+  /// bearerToken getter에서 만료 감지 시 accessToken만 저장소에서 비동기 제거한다.
+  /// refreshToken은 건드리지 않는다.
+  void _evictStoredAccessToken() {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.remove(_accessKey);
+    });
+  }
 
   /// 토큰이 실제 JWT 형식이고 아직 유효한지 확인한다.
   ///
