@@ -1,4 +1,5 @@
 // lib/main.dart
+import 'package:clueroom/core/api/api_client.dart';
 import 'package:clueroom/screens/splash_screen.dart';
 import 'package:clueroom/services/auth_service.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -18,6 +19,7 @@ Future<void> main() async {
 
   // AuthService 초기화 — 저장된 토큰 로드
   await AuthService.instance.init();
+  ApiClient.instance.authTokenProvider = () => AuthService.instance.bearerToken;
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await _configureFirebaseMessaging();

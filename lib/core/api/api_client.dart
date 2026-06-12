@@ -5,7 +5,6 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-import '../../services/auth_service.dart';
 import 'api_config.dart';
 import 'api_exception.dart';
 
@@ -78,6 +77,9 @@ class ApiClient {
 
   static final ApiClient instance = ApiClient._();
 
+  /// 외부에서 토큰을 주입할 수 있도록 제공자 연결
+  String? Function()? authTokenProvider;
+
   final http.Client _http = http.Client();
 
   Future<dynamic> get(
@@ -116,7 +118,7 @@ class ApiClient {
 
     // 실제 accessToken이 있고, 인증 불필요 경로가 아닐 때만 헤더를 첨부한다.
     if (!_kNoAuthPaths.contains(path)) {
-      final token = AuthService.instance.bearerToken;
+      final token = authTokenProvider?.call();
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
       }
@@ -174,6 +176,7 @@ class ApiClient {
         code:    error['code']?.toString()    ?? 'UNKNOWN',
         message: error['message']?.toString() ?? '알 수 없는 오류가 발생했습니다.',
         status:  (error['status'] as num?)?.toInt() ?? res.statusCode,
+        details: error['details'] as Map<String, dynamic>?,
       );
     }
     throw ApiException(

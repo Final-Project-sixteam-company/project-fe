@@ -7,6 +7,7 @@ class ApiException implements Exception {
     required this.code,
     required this.message,
     this.status,
+    this.details,
   });
 
   /// 백엔드 에러 코드(예: `SCENARIO_001`, `C008`) 또는 클라이언트 코드.
@@ -17,6 +18,9 @@ class ApiException implements Exception {
 
   /// HTTP 상태 코드. 네트워크 단계 실패 시 null.
   final int? status;
+
+  /// 에러 상세 정보. (예: 409 시 activeSessionId 등)
+  final Map<String, dynamic>? details;
 
   /// 서버에 도달하지 못한 클라이언트/네트워크 오류 여부.
   bool get isNetwork => status == null;

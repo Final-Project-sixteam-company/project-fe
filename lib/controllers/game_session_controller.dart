@@ -97,12 +97,29 @@ class GameSessionController extends ChangeNotifier {
     try {
       final saved = await _readSavedSession(sid);
       if (saved != null && await _tryResume(saved, sid)) return;
+
+      final active = await _repo.activeSession(sid);
+      if (active != null && active.activeSessionId != null) {
+        if (await _tryResume(active.activeSessionId!, sid)) return;
+      }
+
       final session = await _repo.createSession(sid);
       backendSessionId = session.sessionId;
       await _saveSession(sid, session.sessionId);
       await _refreshAll();
     } on ApiException catch (e) {
       if (e.status == 409) {
+        int? activeId = e.details?['activeSessionId'] as int?;
+        if (activeId == null) {
+          final active = await _repo.activeSession(sid);
+          activeId = active?.activeSessionId;
+        }
+
+        if (activeId != null) {
+          await _saveSession(sid, activeId);
+          if (await _tryResume(activeId, sid)) return;
+        }
+
         _sessionConflict = true;
         _loadError = '이미 진행 중인 세션이 있어 새로 시작할 수 없습니다.';
       } else {
