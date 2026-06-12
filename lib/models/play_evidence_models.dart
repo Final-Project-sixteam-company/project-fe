@@ -139,6 +139,46 @@ class RelatedTimelineEvent {
       );
 }
 
+class CompareEvidenceGuidance {
+  const CompareEvidenceGuidance({required this.evidenceId, required this.reason});
+
+  final int evidenceId;
+  final String reason;
+
+  factory CompareEvidenceGuidance.fromJson(Map<String, dynamic> j) =>
+      CompareEvidenceGuidance(
+        evidenceId: (j['evidenceId'] as num).toInt(),
+        reason: j['reason'] as String? ?? '',
+      );
+}
+
+class EvidenceGuidance {
+  const EvidenceGuidance({
+    this.readingPoints = const [],
+    this.compareEvidences = const [],
+    this.suggestedQuestions = const [],
+  });
+
+  final List<String> readingPoints;
+  final List<CompareEvidenceGuidance> compareEvidences;
+  final List<String> suggestedQuestions;
+
+  factory EvidenceGuidance.fromJson(Map<String, dynamic> j) => EvidenceGuidance(
+        readingPoints: (j['readingPoints'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            const [],
+        compareEvidences: (j['compareEvidences'] as List<dynamic>?)
+                ?.map((e) => CompareEvidenceGuidance.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        suggestedQuestions: (j['suggestedQuestions'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            const [],
+      );
+}
+
 class EvidenceDetail {
   const EvidenceDetail({
     required this.evidenceId,
@@ -149,6 +189,7 @@ class EvidenceDetail {
     this.locationName,
     this.relatedSuspects = const [],
     this.relatedTimelineEvents = const [],
+    this.guidance,
   });
 
   final int evidenceId;
@@ -159,6 +200,7 @@ class EvidenceDetail {
   final String? locationName;
   final List<RelatedSuspect> relatedSuspects;
   final List<RelatedTimelineEvent> relatedTimelineEvents;
+  final EvidenceGuidance? guidance;
 
   factory EvidenceDetail.fromJson(Map<String, dynamic> j) => EvidenceDetail(
     evidenceId: (j['evidenceId'] as num).toInt(),
@@ -177,5 +219,8 @@ class EvidenceDetail {
         .map((e) =>
         RelatedTimelineEvent.fromJson(e as Map<String, dynamic>))
         .toList(),
+    guidance: j['guidance'] != null
+        ? EvidenceGuidance.fromJson(j['guidance'] as Map<String, dynamic>)
+        : null,
   );
 }

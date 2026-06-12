@@ -119,6 +119,7 @@ class ObservationCard extends StatelessWidget {
     this.description,
     this.relatedSuspects = const [],
     this.relatedTimelineEvents = const [],
+    this.guidance,
     this.loading = false,
     super.key,
   });
@@ -130,6 +131,7 @@ class ObservationCard extends StatelessWidget {
   final String? description;
   final List<RelatedSuspect> relatedSuspects;
   final List<RelatedTimelineEvent> relatedTimelineEvents;
+  final EvidenceGuidance? guidance;
   /// 상세 API 호출 중이며 description 미확보 상태.
   final bool loading;
 
@@ -182,6 +184,67 @@ class ObservationCard extends StatelessWidget {
           const SizedBox(height: AppTokens.sp2),
           ...relatedTimelineEvents
               .map((e) => EvidenceTimelineRow(time: e.time, title: e.title)),
+        ],
+        if (!effectiveLocked && guidance != null) ...[
+          if (guidance!.readingPoints.isNotEmpty) ...[
+            const SizedBox(height: AppTokens.sp4),
+            const MSKicker('주요 단서'),
+            const SizedBox(height: AppTokens.sp2),
+            ...guidance!.readingPoints.map((point) => 
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTokens.sp2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('•', style: AppText.body.copyWith(color: c.text)),
+                      const SizedBox(width: AppTokens.sp2),
+                      Expanded(child: Text(point, style: AppText.body.copyWith(color: c.text))),
+                    ],
+                  ),
+                ),
+            ),
+          ],
+          if (guidance!.compareEvidences.isNotEmpty) ...[
+            const SizedBox(height: AppTokens.sp4),
+            const MSKicker('교차 검증'),
+            const SizedBox(height: AppTokens.sp2),
+            ...guidance!.compareEvidences.map((ce) =>
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTokens.sp2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.compare_arrows, size: 16, color: c.textMute),
+                      const SizedBox(width: AppTokens.sp2),
+                      Expanded(
+                        child: Text(
+                          '증거 #${ce.evidenceId}와 비교: ${ce.reason}',
+                          style: AppText.body.copyWith(color: c.text),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ),
+          ],
+          if (guidance!.suggestedQuestions.isNotEmpty) ...[
+            const SizedBox(height: AppTokens.sp4),
+            const MSKicker('추천 질문'),
+            const SizedBox(height: AppTokens.sp2),
+            ...guidance!.suggestedQuestions.map((q) =>
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTokens.sp2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.help_outline, size: 16, color: c.textMute),
+                      const SizedBox(width: AppTokens.sp2),
+                      Expanded(child: Text(q, style: AppText.body.copyWith(color: c.text))),
+                    ],
+                  ),
+                ),
+            ),
+          ],
         ],
         const SizedBox(height: AppTokens.sp4),
         Row(children: [

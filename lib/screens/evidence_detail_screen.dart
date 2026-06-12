@@ -69,6 +69,8 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
   List<RelatedTimelineEvent> get _relatedTimelineEvents =>
       _detail?.relatedTimelineEvents ?? const [];
 
+  EvidenceGuidance? get _guidance => _detail?.guidance;
+
   @override
   void initState() {
     super.initState();
@@ -158,6 +160,7 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
                   description: _description,
                   relatedSuspects: _relatedSuspects,
                   relatedTimelineEvents: _relatedTimelineEvents,
+                  guidance: _guidance,
                   loading: _loadingDetail && _description == null,
                 ),
                 if (!_effectiveLocked && widget.onInterrogate != null) ...[
