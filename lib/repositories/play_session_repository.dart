@@ -34,6 +34,13 @@ class PlaySessionRepository {
     return DashboardInfo.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<List<PlayTimelineEvent>> timeline(int sessionId) async {
+    final data = await _api.get('/api/play-sessions/$sessionId/timeline');
+    return (data as List<dynamic>)
+        .map((e) => PlayTimelineEvent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// 증거 목록. [includeLocked]=true 면 잠긴 증거도 마스킹된 형태로 포함.
   Future<List<PlayEvidence>> evidences(
       int sessionId, {

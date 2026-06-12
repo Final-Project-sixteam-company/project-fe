@@ -44,40 +44,25 @@ class TimelineScreen extends StatefulWidget {
 class _TimelineScreenState extends State<TimelineScreen> {
   _TimelineFilter _filter = _TimelineFilter.all;
 
-  // TODO(frontend): 서버 타임라인 연동.
-  // 백엔드에는 GET /api/play-sessions/{sessionId}/timeline 이 구현되어 있다.
-  // 프론트에 repository/controller state를 추가한 뒤 sampleCase.timeline을 제거한다.
-  List<TimelineEntry> get _filtered => switch (_filter) {
-    _TimelineFilter.all => sampleCase.timeline,
+  List<TimelineEntry> _getFiltered(List<TimelineEntry> source) => switch (_filter) {
+    _TimelineFilter.all => source,
     _TimelineFilter.conflict =>
-        sampleCase.timeline.where((e) => e.conflict != null).toList(),
+        source.where((e) => e.conflict != null).toList(),
     _TimelineFilter.suspect =>
-        sampleCase.timeline.where((e) => e.conflict == null).toList(),
+        source.where((e) => e.conflict == null).toList(),
   };
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final session = context.sessionWatch;
 
-    // CL-001 외 시나리오에서는 하드코딩 타임라인이 스포일러가 되므로 숨긴다.
-    // 프론트가 서버 timeline API를 연동하면 이 게이트를 제거한다.
-    final showSample = context.sessionRead.usesCl001SampleCaseData;
-    if (!showSample) {
-      return Scaffold(
-        backgroundColor: c.bg,
-        appBar: _buildAppBar(context),
-        body: const Padding(
-          padding: EdgeInsets.only(top: AppTokens.sp10),
-          child: MSEmpty(
-            icon: Icons.schedule,
-            title: '타임라인 준비 중',
-            subtitle: '이 시나리오의 타임라인은 곧 제공될 예정입니다.',
-          ),
-        ),
-      );
+    List<TimelineEntry> rawTimeline = session.timeline;
+    if (rawTimeline.isEmpty && session.usesCl001SampleCaseData) {
+      rawTimeline = sampleCase.timeline;
     }
 
-    final entries = _filtered;
+    final entries = _getFiltered(rawTimeline);
 
     return Scaffold(
       backgroundColor: c.bg,

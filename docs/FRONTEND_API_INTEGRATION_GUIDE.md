@@ -469,7 +469,7 @@ flutter analyze
 [ ] 새 세션 시작
 [ ] local storage 삭제 후 active session 이어가기
 [ ] 409 conflict에서 dead-end 없음
-[ ] FCM token 등록 실패해도 앱 진입 가능
-[ ] timeline 표시
+[x] FCM token 등록 실패해도 앱 진입 가능
+[x] timeline 표시
 [ ] 최종 추리 제출/결과 조회 정상
 ```
