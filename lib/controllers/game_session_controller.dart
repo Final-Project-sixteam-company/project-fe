@@ -213,7 +213,7 @@ class GameSessionController extends ChangeNotifier {
       final rawTimeline = await _repo.timeline(id);
       _timeline = rawTimeline.map(_toTimelineEntry).toList();
     } catch (_) {
-      // 미제공/오류 시
+      _timeline = const [];
     }
   }
 
