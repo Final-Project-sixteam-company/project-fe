@@ -49,7 +49,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
     _TimelineFilter.conflict =>
         source.where((e) => e.conflict != null).toList(),
     _TimelineFilter.suspect =>
-        source.where((e) => e.conflict == null).toList(),
+        source.where((e) => e.eventType == 'CLAIM' || (e.eventType == null && e.conflict == null)).toList(),
   };
 
   @override

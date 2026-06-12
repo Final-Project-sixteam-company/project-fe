@@ -296,6 +296,7 @@ class GameSessionController extends ChangeNotifier {
       time: e.time,
       label: e.title,
       conflict: e.eventType == 'CONFLICT' ? (e.description ?? '모순 발견') : null,
+      eventType: e.eventType,
     );
   }
 
