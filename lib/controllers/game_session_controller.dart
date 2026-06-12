@@ -52,6 +52,9 @@ class GameSessionController extends ChangeNotifier {
   PlayLocations? _locations;
   PlayLocations? get locations => _locations;
 
+  List<TimelineEntry> _timeline = const [];
+  List<TimelineEntry> get timeline => _timeline;
+
   /// 시나리오 식별자를 정수 백엔드 ID로 변환. 변환 불가(샘플 시나리오) 시 null.
   int? get _backendScenarioId {
     final parsed = int.tryParse(scenarioId);
@@ -205,6 +208,13 @@ class GameSessionController extends ChangeNotifier {
     } catch (_) {
       // 미제공/오류 시 null 유지(화면은 '현장 정보 없음'으로 표시).
     }
+
+    try {
+      final rawTimeline = await _repo.timeline(id);
+      _timeline = rawTimeline.map(_toTimelineEntry).toList();
+    } catch (_) {
+      _timeline = const [];
+    }
   }
 
   /// 증거/대시보드(+현장)만 다시 로드(심문으로 증거 해금 후, 시간 경과 후 등).
@@ -230,6 +240,13 @@ class GameSessionController extends ChangeNotifier {
         _locations = await _repo.locations(id);
       } catch (_) {
         // 미제공/오류 시 기존 현장 정보 유지
+      }
+
+      try {
+        final rawTimeline = await _repo.timeline(id);
+        _timeline = rawTimeline.map(_toTimelineEntry).toList();
+      } catch (_) {
+        // 미제공/오류 시 기존 타임라인 정보 유지
       }
       notifyListeners();
     } catch (_) {}
@@ -273,6 +290,16 @@ class GameSessionController extends ChangeNotifier {
         proofDimensions: e.proofDimensions,
         category: e.category,
       );
+
+  TimelineEntry _toTimelineEntry(PlayTimelineEvent e) {
+    return TimelineEntry(
+      time: e.time,
+      label: e.title,
+      conflict: e.eventType == 'CONFLICT' ? (e.description ?? '모순 발견') : null,
+      eventType: e.eventType,
+      description: e.eventType != 'CONFLICT' ? e.description : null,
+    );
+  }
 
   static IconData _iconForImportance(EvidenceImportance imp) => switch (imp) {
     EvidenceImportance.core => Icons.gpp_maybe_outlined,

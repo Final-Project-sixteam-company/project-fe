@@ -109,6 +109,14 @@ class TimelineEntry {
   final String time;
   final String label;
   final String? conflict;
+  final String? eventType;
+  final String? description;
 
-  const TimelineEntry({required this.time, required this.label, this.conflict});
+  const TimelineEntry({
+    required this.time,
+    required this.label,
+    this.conflict,
+    this.eventType,
+    this.description,
+  });
 }
