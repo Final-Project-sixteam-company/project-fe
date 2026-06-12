@@ -3,7 +3,9 @@ import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
+import '../services/auth_service.dart';
 import 'app_shell.dart';
+import 'login_screen.dart';
 import 'onboarding_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -66,9 +68,15 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     final bool seen = results[1] as bool;
+    final bool loggedIn = AuthService.instance.isLoggedIn;
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => seen ? const AppShell() : const OnboardingScreen(),
+        builder: (_) {
+          if (!seen) return const OnboardingScreen();
+          if (!loggedIn) return const LoginScreen();
+          return const AppShell();
+        },
       ),
     );
   }

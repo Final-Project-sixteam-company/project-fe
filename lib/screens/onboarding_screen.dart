@@ -7,6 +7,8 @@ import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'app_shell.dart';
+import 'login_screen.dart';
+import '../services/auth_service.dart';
 import 'splash_screen.dart' show OnboardingFlag;
 
 class OnboardingScreen extends StatefulWidget {
@@ -62,7 +64,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await OnboardingFlag.markComplete();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const AppShell()),
+      MaterialPageRoute(builder: (_) => AuthService.instance.isLoggedIn ? const AppShell() : const LoginScreen()),
     );
   }
 
