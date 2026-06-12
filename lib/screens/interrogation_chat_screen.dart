@@ -1,3 +1,4 @@
+// lib/screens/interrogation_chat_screen.dart
 import 'package:flutter/material.dart';
 import '../components/game_modals.dart';
 import '../components/ms_button.dart';
@@ -37,9 +38,24 @@ const _suggestedQuestions = [
 ];
 
 class InterrogationChatScreen extends StatefulWidget {
-  const InterrogationChatScreen({required this.suspect, super.key});
+  const InterrogationChatScreen({
+    required this.suspect,
+    this.initialQuestion,
+    this.presentedEvidenceId,
+    this.presentedEvidenceTitle,
+    super.key,
+  });
 
   final Suspect suspect;
+
+  /// Guidance 추천 질문 prefill 텍스트. null이면 prefill 없음.
+  final String? initialQuestion;
+
+  /// Guidance 추천 질문에 연결된 증거 ID (EVIDENCE_PRESENTED 전송용).
+  final String? presentedEvidenceId;
+
+  /// Guidance 추천 질문에 연결된 증거 제목 (입력 바 위 표시용).
+  final String? presentedEvidenceTitle;
 
   @override
   State<InterrogationChatScreen> createState() =>
@@ -53,6 +69,11 @@ class _InterrogationChatScreenState
   final List<_Message> _messages = [];
   bool _isWaiting = false;
   bool _initialized = false;
+
+  /// Guidance prefill로 설정된 증거 ID. 첫 전송에 사용 후 null로 리셋.
+  String? _prefillEvidenceId;
+  /// Guidance prefill로 설정된 증거 이름 표시용 상태 변수.
+  String? _prefillEvidenceTitle;
 
   @override
   void didChangeDependencies() {
@@ -74,10 +95,6 @@ class _InterrogationChatScreenState
     }
 
     if (_messages.isEmpty) {
-      // 첫 진입 기본 버블: 임의의 거부 대사(하드코딩)를 띄우면 모든 용의자가
-      // 동일하게 비협조적으로 보이고, 심문 전인데 진술을 거부한 것처럼 오인된다.
-      // 서버가 제공하는 용의자 공개 진술(publicStatement)을 출처로 쓰고,
-      // 없으면 특정 알리바이/태도를 단정하지 않는 중립 안내로 연다.
       final raw = controller.rawSuspect(widget.suspect.id);
       final statement = raw?.publicStatement?.trim();
       final opening = (statement != null && statement.isNotEmpty)
@@ -85,6 +102,16 @@ class _InterrogationChatScreenState
           : '무엇이 궁금하신가요? 질문해 주세요.';
       _messages.add(_Message(text: opening, sender: _Sender.suspect));
     }
+
+    // Guidance 추천 질문 prefill — 최초 1회만 설정
+    if (widget.initialQuestion?.trim().isNotEmpty == true) {
+      _inputCtrl.text = widget.initialQuestion!.trim();
+      _inputCtrl.selection =
+          TextSelection.collapsed(offset: _inputCtrl.text.length);
+      _prefillEvidenceId = widget.presentedEvidenceId;
+      _prefillEvidenceTitle = widget.presentedEvidenceTitle ?? '선택된 증거';
+    }
+
     _scrollToBottom();
   }
 
@@ -98,8 +125,6 @@ class _InterrogationChatScreenState
   Future<void> _sendMessage(
       String text, {
         String? evidenceId,
-        // 발신 질문 유형 힌트. 증거가 제시되면 EVIDENCE_PRESENTED가 항상 우선한다.
-        // 추천 질문 칩은 RECOMMENDED를, 자유 입력은 기본 FREE를 넘긴다.
         QuestionType questionType = QuestionType.free,
       }) async {
     final trimmed = text.trim();
@@ -109,9 +134,6 @@ class _InterrogationChatScreenState
     final sessionId = controller.backendSessionId;
     final suspectIdInt = int.tryParse(widget.suspect.id);
 
-    // 증거 제시 의도가 있었는데 증거 ID가 정수로 파싱되지 않으면, 조용히 일반(FREE)
-    // 질문으로 강등시키지 않고 명확히 차단한다(잘못된 증거 제시가 서버에 평문 질문으로
-    // 나가는 것 방지). 낙관적 버블을 추가하기 전에 검증한다.
     final evidenceIdInt = evidenceId != null ? int.tryParse(evidenceId) : null;
     if (evidenceId != null && evidenceIdInt == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,12 +150,15 @@ class _InterrogationChatScreenState
       ));
       _isWaiting = true;
       _inputCtrl.clear();
+
+      // 💡 리뷰어 피드백 반영: 메시지가 발송 스택에 진입하는 즉시
+      // 이전에 머물러 있던 모든 가이드라인 prefill 상태를 안전하게 청소합니다.
+      _prefillEvidenceId = null;
+      _prefillEvidenceTitle = null;
     });
 
     _scrollToBottom();
 
-    // 서버 세션이 아직 준비되지 않았거나 용의자 ID가 정수가 아니면(샘플 시나리오)
-    // 심문을 진행할 수 없다.
     if (sessionId == null || suspectIdInt == null) {
       if (mounted) {
         setState(() {
@@ -148,15 +173,11 @@ class _InterrogationChatScreenState
       return;
     }
 
-    // 증거 제시는 항상 EVIDENCE_PRESENTED로 강제하고, 그 외에는 호출자가 넘긴
-    // 유형(추천 칩=RECOMMENDED, 자유 입력=FREE)을 그대로 사용한다.
     final resolvedType = evidenceIdInt != null
         ? QuestionType.evidencePresented
         : questionType;
 
     String answer = '...대답을 거부하고 있습니다.';
-    // 서버/네트워크 오류 메시지(영문일 수 있음)를 용의자 대사처럼 노출하지 않고,
-    // 별도 시스템 안내(SnackBar)로 전달한다.
     String? errorNotice;
     List<RelatedEvidence> unlockedEvidences = const [];
     try {
@@ -204,7 +225,6 @@ class _InterrogationChatScreenState
       );
     }
 
-    // 심문으로 새 증거가 해금되면 증거/대시보드를 다시 로드하고 안내한다.
     if (unlockedEvidences.isNotEmpty && mounted) {
       await controller.refreshEvidences();
       if (mounted) {
@@ -216,10 +236,16 @@ class _InterrogationChatScreenState
     }
   }
 
-  // 증거 제시 진입점(AppBar·입력창 양쪽에서 재사용).
   Future<void> _presentEvidence() async {
     final evidence = await showEvidencePresentModal(context);
     if (evidence != null && mounted) {
+      // 💡 리뷰어 피드백 반영: 가이드라인 상태에서 유저가 임의로 다른 증거를 제시하면
+      // 기존에 물려 있던 낡은(Stale) 추천 증거 상태를 완전히 오버라이드하여 청소합니다.
+      setState(() {
+        _prefillEvidenceId = null;
+        _prefillEvidenceTitle = null;
+      });
+
       await _sendMessage(
         '이 증거를 제시합니다: ${evidence.name}',
         evidenceId: evidence.id,
@@ -278,16 +304,29 @@ class _InterrogationChatScreenState
             ),
           ),
           _SuggestedQuestions(
-            // 추천 질문 칩은 RECOMMENDED 유형으로 전송(자유 입력 FREE와 구분).
             onSelect: (q) =>
                 _sendMessage(q, questionType: QuestionType.recommended),
             disabled: _isWaiting,
           ),
-          // 추천 질문 배지와 입력창 사이 간격 — 오탭 방지.
           const SizedBox(height: AppTokens.sp3),
           _InputBar(
             controller: _inputCtrl,
-            onSend: () => _sendMessage(_inputCtrl.text),
+            prefillEvidenceTitle: _prefillEvidenceTitle, // 💡 증거 제시 가이드 UI 연동
+            onClearPrefill: () {
+              setState(() {
+                _prefillEvidenceId = null;
+                _prefillEvidenceTitle = null;
+              });
+            },
+            onSend: () {
+              _sendMessage(
+                _inputCtrl.text,
+                evidenceId: _prefillEvidenceId,
+                questionType: _prefillEvidenceId != null
+                    ? QuestionType.evidencePresented
+                    : QuestionType.free,
+              );
+            },
             onPresentEvidence: _isWaiting ? null : _presentEvidence,
             disabled: _isWaiting,
           ),
@@ -325,7 +364,6 @@ class _InterrogationChatScreenState
         ],
       ),
       actions: [
-        // 힌트 진입점(현장 화면과 동일하게 서버 세션 기반).
         IconButton(
           tooltip: '힌트 보기',
           onPressed: () {
@@ -342,8 +380,6 @@ class _InterrogationChatScreenState
           },
           icon: Icon(Icons.lightbulb_outline, color: c.primary),
         ),
-        // 증거 제시 보조 진입점(주 진입점은 입력창 위 강조 버튼).
-        // AI 응답 대기 중 중복 전송(동시 요청) 방지.
         Padding(
           padding: const EdgeInsets.only(right: AppTokens.sp2),
           child: IconButton(
@@ -452,7 +488,6 @@ class _DetectiveBubble extends StatelessWidget {
               vertical: AppTokens.sp2,
             ),
             decoration: BoxDecoration(
-              // 증거 제시는 배경까지 success 계열로 강조해 일반 질문과 구분.
               color: isEvidence ? c.successSoft : c.primarySoft,
               border: Border.all(
                 color: isEvidence ? c.success : c.primary,
@@ -604,17 +639,21 @@ class _InputBar extends StatelessWidget {
     required this.onSend,
     required this.onPresentEvidence,
     required this.disabled,
+    this.prefillEvidenceTitle,
+    this.onClearPrefill,
   });
 
   final TextEditingController controller;
   final VoidCallback onSend;
-  // null 이면 비활성(응답 대기 중).
   final VoidCallback? onPresentEvidence;
   final bool disabled;
+  final String? prefillEvidenceTitle;
+  final VoidCallback? onClearPrefill;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final hasPrefill = prefillEvidenceTitle != null;
 
     return Container(
       decoration: BoxDecoration(
@@ -627,21 +666,59 @@ class _InputBar extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 핵심 메커닉 — 증거 제시 강조 액션(입력창 바로 위, 발견성 확보).
-            MSButton(
-              label: '증거 제시',
-              variant: MSButtonVariant.secondary,
-              icon: Icons.description_outlined,
-              onPressed: onPresentEvidence,
-            ),
-            const SizedBox(height: AppTokens.sp2),
+            // 💡 UX 피드백 반영: 가이드라인 추천 질문 연동 시 하단 패널에 명확한 연동 배너 제공
+            if (hasPrefill) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTokens.sp3,
+                  vertical: AppTokens.sp2,
+                ),
+                margin: const EdgeInsets.only(bottom: AppTokens.sp2),
+                decoration: BoxDecoration(
+                  color: c.successSoft,
+                  border: Border.all(color: c.success.withValues(alpha: 0.3)),
+                  borderRadius: BorderRadius.circular(AppTokens.r3),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.link, size: 14, color: c.success),
+                    const SizedBox(width: AppTokens.sp2),
+                    Expanded(
+                      child: Text(
+                        '증거 연동됨: $prefillEvidenceTitle',
+                        style: AppText.bodySm.copyWith(
+                          color: c.success,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close, size: 14, color: c.success),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: onClearPrefill,
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              MSButton(
+                label: '증거 제시',
+                variant: MSButtonVariant.secondary,
+                icon: Icons.description_outlined,
+                onPressed: onPresentEvidence,
+              ),
+              const SizedBox(height: AppTokens.sp2),
+            ],
             Row(
               children: [
                 Expanded(
                   child: MSTextField(
                     controller: controller,
                     hintText: '질문을 입력하세요...',
-                    // 백엔드 question 계약(maxLength 500)을 입력 단계에서 하드캡.
                     maxLength: 500,
                     onChanged: (_) {},
                   ),

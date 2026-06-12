@@ -119,6 +119,9 @@ class ObservationCard extends StatelessWidget {
     this.description,
     this.relatedSuspects = const [],
     this.relatedTimelineEvents = const [],
+    this.guidance,
+    this.onCompareEvidenceTap,
+    this.onSuggestedQuestionTap,
     this.loading = false,
     super.key,
   });
@@ -130,6 +133,11 @@ class ObservationCard extends StatelessWidget {
   final String? description;
   final List<RelatedSuspect> relatedSuspects;
   final List<RelatedTimelineEvent> relatedTimelineEvents;
+  final EvidenceGuidance? guidance;
+  /// 해금된 비교 증거 탭 콜백. evidenceId를 인자로 전달.
+  final void Function(int evidenceId)? onCompareEvidenceTap;
+  /// 추천 질문 탭 콜백. SuggestedQuestionInfo를 인자로 전달.
+  final void Function(SuggestedQuestionInfo question)? onSuggestedQuestionTap;
   /// 상세 API 호출 중이며 description 미확보 상태.
   final bool loading;
 
@@ -182,6 +190,108 @@ class ObservationCard extends StatelessWidget {
           const SizedBox(height: AppTokens.sp2),
           ...relatedTimelineEvents
               .map((e) => EvidenceTimelineRow(time: e.time, title: e.title)),
+        ],
+        if (!effectiveLocked && guidance != null) ...[
+          if (guidance!.readingPoints.isNotEmpty) ...[
+            const SizedBox(height: AppTokens.sp4),
+            const MSKicker('주요 단서'),
+            const SizedBox(height: AppTokens.sp2),
+            ...guidance!.readingPoints.map((point) => 
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTokens.sp2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('•', style: AppText.body.copyWith(color: c.text)),
+                      const SizedBox(width: AppTokens.sp2),
+                      Expanded(child: Text(point, style: AppText.body.copyWith(color: c.text))),
+                    ],
+                  ),
+                ),
+            ),
+          ],
+          if (guidance!.compareEvidences.isNotEmpty) ...[
+            const SizedBox(height: AppTokens.sp4),
+            const MSKicker('함께 볼 증거'),
+            const SizedBox(height: AppTokens.sp2),
+            ...guidance!.compareEvidences.map((ce) {
+                final row = Padding(
+                  padding: const EdgeInsets.only(bottom: AppTokens.sp2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        ce.isUnlocked ? Icons.search : Icons.lock_outline,
+                        size: 16,
+                        color: c.textMute,
+                      ),
+                      const SizedBox(width: AppTokens.sp2),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ce.isUnlocked ? '[이동 가능] ${ce.title}' : '[잠김] ${ce.title}',
+                              style: AppText.body.copyWith(
+                                color: ce.isUnlocked ? c.text : c.textMute,
+                              ),
+                            ),
+                            if (!ce.isUnlocked && ce.unlockHint != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                '해금 힌트: ${ce.unlockHint}',
+                                style: AppText.bodySm.copyWith(color: c.textSub),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (ce.isUnlocked && ce.evidenceId != null)
+                        Icon(Icons.chevron_right, size: 16, color: c.textMute),
+                    ],
+                  ),
+                );
+                if (ce.isUnlocked && ce.evidenceId != null && onCompareEvidenceTap != null) {
+                  return GestureDetector(
+                    onTap: () => onCompareEvidenceTap!(ce.evidenceId!),
+                    behavior: HitTestBehavior.opaque,
+                    child: row,
+                  );
+                }
+                return row;
+            }),
+          ],
+          if (guidance!.suggestedQuestions.isNotEmpty) ...[
+            const SizedBox(height: AppTokens.sp4),
+            const MSKicker('추천 질문'),
+            const SizedBox(height: AppTokens.sp2),
+            ...guidance!.suggestedQuestions.map((q) {
+                final targetText = q.targetName != null && q.targetName!.isNotEmpty
+                    ? '[${q.targetName}에게] '
+                    : '';
+                final row = Padding(
+                  padding: const EdgeInsets.only(bottom: AppTokens.sp2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.help_outline, size: 16, color: c.textMute),
+                      const SizedBox(width: AppTokens.sp2),
+                      Expanded(child: Text('$targetText${q.question}', style: AppText.body.copyWith(color: c.text))),
+                      if (onSuggestedQuestionTap != null)
+                        Icon(Icons.chevron_right, size: 16, color: c.textMute),
+                    ],
+                  ),
+                );
+                if (onSuggestedQuestionTap != null) {
+                  return GestureDetector(
+                    onTap: () => onSuggestedQuestionTap!(q),
+                    behavior: HitTestBehavior.opaque,
+                    child: row,
+                  );
+                }
+                return row;
+            }),
+          ],
         ],
         const SizedBox(height: AppTokens.sp4),
         Row(children: [
