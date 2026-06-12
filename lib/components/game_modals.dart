@@ -295,7 +295,7 @@ Future<Evidence?> showEvidencePresentModal(BuildContext context) {
   List<Evidence> accessible;
   int? sessionId;
   PlayEvidence? Function(String)? rawResolver;
-  GameSessionController? sessionController; // 💡 새 라우트에 전파하기 위해 컨트롤러 원본 캡처
+  GameSessionController? sessionController;
 
   try {
     final controller = GameSessionProvider.read(context);
@@ -316,7 +316,7 @@ Future<Evidence?> showEvidencePresentModal(BuildContext context) {
     isScrollControlled: true,
     builder: (_) => _EvidencePresentSheet(
       evidences: accessible,
-      controller: sessionController, // 💡 시트 내부 컴포넌트까지 컨트롤러 전달
+      controller: sessionController,
       sessionId: sessionId,
       rawResolver: rawResolver,
     ),
@@ -448,14 +448,12 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                             MaterialPageRoute(
                               builder: (_) => EvidenceDetailScreen(
                                 evidence: picked,
-                                controller: widget.controller!, // 💡 리뷰 반영: 컴파일 에러 해결 및 세션 파이프라인 전파
+                                controller: widget.controller!,
                                 sessionId: widget.sessionId,
                                 listData: widget.rawResolver?.call(picked.id),
                                 isUnlocked: !picked.isLocked,
                                 onPresent: () {
-                                  // 💡 상세 화면과 바텀 시트를 연쇄적으로 완전하게 처리하기 위해 팝 분리
-                                  Navigator.of(sheetContext).pop(); // 상세 화면 닫기
-                                  Navigator.of(sheetContext).pop(picked); // 시트 닫으며 증거 반환
+                                  Navigator.of(sheetContext).pop(picked);
                                 },
                               ),
                             ),
