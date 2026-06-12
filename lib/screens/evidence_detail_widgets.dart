@@ -120,6 +120,8 @@ class ObservationCard extends StatelessWidget {
     this.relatedSuspects = const [],
     this.relatedTimelineEvents = const [],
     this.guidance,
+    this.onCompareEvidenceTap,
+    this.onSuggestedQuestionTap,
     this.loading = false,
     super.key,
   });
@@ -132,6 +134,10 @@ class ObservationCard extends StatelessWidget {
   final List<RelatedSuspect> relatedSuspects;
   final List<RelatedTimelineEvent> relatedTimelineEvents;
   final EvidenceGuidance? guidance;
+  /// 해금된 비교 증거 탭 콜백. evidenceId를 인자로 전달.
+  final void Function(int evidenceId)? onCompareEvidenceTap;
+  /// 추천 질문 탭 콜백. SuggestedQuestionInfo를 인자로 전달.
+  final void Function(SuggestedQuestionInfo question)? onSuggestedQuestionTap;
   /// 상세 API 호출 중이며 description 미확보 상태.
   final bool loading;
 
@@ -208,8 +214,8 @@ class ObservationCard extends StatelessWidget {
             const SizedBox(height: AppTokens.sp4),
             const MSKicker('함께 볼 증거'),
             const SizedBox(height: AppTokens.sp2),
-            ...guidance!.compareEvidences.map((ce) =>
-                Padding(
+            ...guidance!.compareEvidences.map((ce) {
+                final row = Padding(
                   padding: const EdgeInsets.only(bottom: AppTokens.sp2),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,10 +246,20 @@ class ObservationCard extends StatelessWidget {
                           ],
                         ),
                       ),
+                      if (ce.isUnlocked && ce.evidenceId != null)
+                        Icon(Icons.chevron_right, size: 16, color: c.textMute),
                     ],
                   ),
-                ),
-            ),
+                );
+                if (ce.isUnlocked && ce.evidenceId != null && onCompareEvidenceTap != null) {
+                  return GestureDetector(
+                    onTap: () => onCompareEvidenceTap!(ce.evidenceId!),
+                    behavior: HitTestBehavior.opaque,
+                    child: row,
+                  );
+                }
+                return row;
+            }),
           ],
           if (guidance!.suggestedQuestions.isNotEmpty) ...[
             const SizedBox(height: AppTokens.sp4),
@@ -253,7 +269,7 @@ class ObservationCard extends StatelessWidget {
                 final targetText = q.targetName != null && q.targetName!.isNotEmpty
                     ? '[${q.targetName}에게] '
                     : '';
-                return Padding(
+                final row = Padding(
                   padding: const EdgeInsets.only(bottom: AppTokens.sp2),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,9 +277,19 @@ class ObservationCard extends StatelessWidget {
                       Icon(Icons.help_outline, size: 16, color: c.textMute),
                       const SizedBox(width: AppTokens.sp2),
                       Expanded(child: Text('$targetText${q.question}', style: AppText.body.copyWith(color: c.text))),
+                      if (onSuggestedQuestionTap != null)
+                        Icon(Icons.chevron_right, size: 16, color: c.textMute),
                     ],
                   ),
                 );
+                if (onSuggestedQuestionTap != null) {
+                  return GestureDetector(
+                    onTap: () => onSuggestedQuestionTap!(q),
+                    behavior: HitTestBehavior.opaque,
+                    child: row,
+                  );
+                }
+                return row;
             }),
           ],
         ],

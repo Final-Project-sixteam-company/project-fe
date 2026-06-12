@@ -1,5 +1,7 @@
 // lib/screens/evidence_detail_screen.dart
 import 'package:flutter/material.dart';
+import '../controllers/game_session_controller.dart';
+import '../controllers/game_session_provider.dart';
 import '../core/api/api_exception.dart';
 import '../models/case.dart';
 import '../models/play_models.dart';
@@ -9,6 +11,7 @@ import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'evidence_detail_widgets.dart';
+import 'interrogation_chat_screen.dart';
 
 export 'evidence_detail_widgets.dart'
     show EvidenceStatusRow, ProofDimensionRow, ObservationCard;
@@ -92,6 +95,67 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
     }
   }
 
+  /// 해금된 비교 증거 탭 — 해당 증거 상세 화면으로 이동.
+  void _onCompareEvidenceTap(int evidenceId) {
+    GameSessionController? ctrl;
+    try {
+      ctrl = GameSessionProvider.read(context);
+    } catch (_) {
+      return;
+    }
+    final eidStr = evidenceId.toString();
+    final evidence = ctrl.evidences
+        .where((e) => e.id == eidStr)
+        .firstOrNull;
+    if (evidence == null) return;
+
+    // 현재 증거와 동일하면 이동하지 않는다.
+    if (evidence.id == widget.evidence.id) return;
+
+    final raw = ctrl.rawEvidence(eidStr);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EvidenceDetailScreen(
+          evidence: evidence,
+          sessionId: widget.sessionId,
+          listData: raw,
+        ),
+      ),
+    );
+  }
+
+  /// 추천 질문 탭 — 대상 용의자 심문 화면으로 이동, 질문 prefill.
+  void _onSuggestedQuestionTap(SuggestedQuestionInfo q) {
+    GameSessionController? ctrl;
+    try {
+      ctrl = GameSessionProvider.read(context);
+    } catch (_) {
+      return;
+    }
+    // target suspect 유효성 검증: 세션에 존재하는 용의자여야 함.
+    if (q.targetSuspectId == null) return;
+    final suspectIdStr = q.targetSuspectId.toString();
+    final suspect = ctrl.suspects
+        .where((s) => s.id == suspectIdStr)
+        .firstOrNull;
+    if (suspect == null) return;
+
+    final presentedEidStr = q.presentedEvidenceId?.toString();
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GameSessionProvider(
+          controller: ctrl!,
+          child: InterrogationChatScreen(
+            suspect: suspect,
+            initialQuestion: q.question,
+            presentedEvidenceId: presentedEidStr,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
@@ -161,6 +225,12 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
                   relatedSuspects: _relatedSuspects,
                   relatedTimelineEvents: _relatedTimelineEvents,
                   guidance: _guidance,
+                  onCompareEvidenceTap: !_effectiveLocked
+                      ? _onCompareEvidenceTap
+                      : null,
+                  onSuggestedQuestionTap: !_effectiveLocked
+                      ? _onSuggestedQuestionTap
+                      : null,
                   loading: _loadingDetail && _description == null,
                 ),
                 if (!_effectiveLocked && widget.onInterrogate != null) ...[

@@ -37,9 +37,24 @@ const _suggestedQuestions = [
 ];
 
 class InterrogationChatScreen extends StatefulWidget {
-  const InterrogationChatScreen({required this.suspect, super.key});
+  const InterrogationChatScreen({
+    required this.suspect,
+    this.initialQuestion,
+    this.presentedEvidenceId,
+    this.presentedEvidenceTitle,
+    super.key,
+  });
 
   final Suspect suspect;
+
+  /// Guidance 추천 질문 prefill 텍스트. null이면 prefill 없음.
+  final String? initialQuestion;
+
+  /// Guidance 추천 질문에 연결된 증거 ID (EVIDENCE_PRESENTED 전송용).
+  final String? presentedEvidenceId;
+
+  /// Guidance 추천 질문에 연결된 증거 제목 (입력 바 위 표시용).
+  final String? presentedEvidenceTitle;
 
   @override
   State<InterrogationChatScreen> createState() =>
@@ -53,6 +68,9 @@ class _InterrogationChatScreenState
   final List<_Message> _messages = [];
   bool _isWaiting = false;
   bool _initialized = false;
+
+  /// Guidance prefill로 설정된 증거 ID. 첫 전송에 사용 후 null로 리셋.
+  String? _prefillEvidenceId;
 
   @override
   void didChangeDependencies() {
@@ -85,6 +103,15 @@ class _InterrogationChatScreenState
           : '무엇이 궁금하신가요? 질문해 주세요.';
       _messages.add(_Message(text: opening, sender: _Sender.suspect));
     }
+
+    // Guidance 추천 질문 prefill — 최초 1회만, 자동 전송 금지.
+    if (widget.initialQuestion?.trim().isNotEmpty == true) {
+      _inputCtrl.text = widget.initialQuestion!.trim();
+      _inputCtrl.selection =
+          TextSelection.collapsed(offset: _inputCtrl.text.length);
+      _prefillEvidenceId = widget.presentedEvidenceId;
+    }
+
     _scrollToBottom();
   }
 
@@ -287,7 +314,17 @@ class _InterrogationChatScreenState
           const SizedBox(height: AppTokens.sp3),
           _InputBar(
             controller: _inputCtrl,
-            onSend: () => _sendMessage(_inputCtrl.text),
+            onSend: () {
+              final eid = _prefillEvidenceId;
+              _prefillEvidenceId = null;
+              _sendMessage(
+                _inputCtrl.text,
+                evidenceId: eid,
+                questionType: eid != null
+                    ? QuestionType.evidencePresented
+                    : QuestionType.free,
+              );
+            },
             onPresentEvidence: _isWaiting ? null : _presentEvidence,
             disabled: _isWaiting,
           ),
