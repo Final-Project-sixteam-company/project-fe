@@ -26,6 +26,8 @@ class _Location {
     required this.icon,
     required this.clueCount,
     this.isIncident = false,
+    // Server-backed scenes may provide this; sample locations currently do not.
+    // ignore: unused_element_parameter
     this.imageAssetKey,
   });
 }

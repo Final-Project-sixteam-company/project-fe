@@ -94,15 +94,18 @@ class PlaySessionRepository {
         required String question,
         int? presentedEvidenceId,
       }) async {
+    final body = <String, dynamic>{
+      'suspectId': suspectId,
+      'questionType': questionTypeToApi(questionType),
+      'question': question,
+    };
+    if (presentedEvidenceId != null) {
+      body['presentedEvidenceId'] = presentedEvidenceId;
+    }
+
     final data = await _api.post(
       '/api/play-sessions/$sessionId/interrogations',
-      body: {
-        'suspectId': suspectId,
-        'questionType': questionTypeToApi(questionType),
-        'question': question,
-        // Collection if 문법을 통해 null이 아닐 때만 맵에 포함시킵니다.
-        if (presentedEvidenceId != null) 'presentedEvidenceId': presentedEvidenceId,
-      },
+      body: body,
       timeout: ApiConfig.aiTimeout,
     );
     return InterrogationResult.fromJson(data as Map<String, dynamic>);
@@ -113,12 +116,14 @@ class PlaySessionRepository {
       int sessionId, {
         int? suspectId,
       }) async {
+    final query = <String, dynamic>{};
+    if (suspectId != null) {
+      query['suspectId'] = suspectId;
+    }
+
     final data = await _api.get(
       '/api/play-sessions/$sessionId/interrogations',
-      // query parameter 맵 생성 시 null 체크 처리
-      query: {
-        if (suspectId != null) 'suspectId': suspectId,
-      },
+      query: query,
     );
     return (data as List<dynamic>)
         .map((e) => InterrogationResult.fromJson(e as Map<String, dynamic>))
@@ -135,16 +140,19 @@ class PlaySessionRepository {
         String? coverUpText,
         required List<int> selectedEvidenceIds,
       }) async {
+    final body = <String, dynamic>{
+      'selectedCulpritId': selectedCulpritId,
+      'motiveText': motiveText,
+      'methodText': methodText,
+      'selectedEvidenceIds': selectedEvidenceIds,
+    };
+    if (coverUpText != null) {
+      body['coverUpText'] = coverUpText;
+    }
+
     final data = await _api.post(
       '/api/play-sessions/$sessionId/final-deduction',
-      body: {
-        'selectedCulpritId': selectedCulpritId,
-        'motiveText': motiveText,
-        'methodText': methodText,
-        'selectedEvidenceIds': selectedEvidenceIds,
-        // null이 아닐 때만 body 맵에 추가
-        if (coverUpText != null) 'coverUpText': coverUpText,
-      },
+      body: body,
       timeout: ApiConfig.aiTimeout,
     );
     return FinalDeductionResult.fromJson(data as Map<String, dynamic>);
