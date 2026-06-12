@@ -55,7 +55,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final session = context.sessionWatch;
+    final session = context.session;
 
     List<TimelineEntry> rawTimeline = session.timeline;
     if (rawTimeline.isEmpty && session.usesCl001SampleCaseData) {
