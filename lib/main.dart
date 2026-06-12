@@ -67,8 +67,20 @@ Future<void> _configureFirebaseMessaging() async {
 }
 
 Future<void> _registerFcmTokenWithBackend(String token) async {
-  debugPrint('백엔드에 FCM 토큰 등록 예정: $token');
-  // TODO: AuthService 로그인 후 PATCH /api/users/me 로 fcmToken 전송
+  debugPrint('백엔드에 FCM 토큰 등록 시작: $token');
+  try {
+    // Phase 2: 실제 device-tokens 엔드포인트 호출
+    await ApiClient.instance.post(
+      '/api/device-tokens',
+      body: {
+        'token': token,
+        // 필요에 따라 'deviceType': Platform.isIOS ? 'IOS' : 'ANDROID' 추가 가능
+      },
+    );
+    debugPrint('FCM 토큰 백엔드 등록 성공');
+  } catch (e) {
+    debugPrint('FCM 토큰 백엔드 등록 실패: $e');
+  }
 }
 
 class MyApp extends StatelessWidget {

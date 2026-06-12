@@ -2,6 +2,7 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/api/api_client.dart';
 
 /// JWT 토큰 저장/조회 서비스.
 ///
@@ -89,6 +90,81 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessKey);
     await prefs.remove(_refreshKey);
+  }
+
+  // ── API 통합 ──────────────────────────────────────────────────────────────
+
+  /// Dev 로그인 (Phase 1 / MVP)
+  Future<void> loginDev(String email) async {
+    final res = await ApiClient.instance.post(
+      '/api/auth/dev',
+      body: {'email': email},
+    );
+    // 응답이 { accessToken: ..., refreshToken: ..., user: ... } 형태라고 가정
+    final access = res['accessToken'] as String?;
+    final refresh = res['refreshToken'] as String?;
+    
+    if (access != null && refresh != null) {
+      await saveTokens(access: access, refresh: refresh);
+    }
+  }
+
+  /// OAuth 로그인 (Phase 2)
+  Future<void> loginOAuth(String provider, String token) async {
+    final res = await ApiClient.instance.post(
+      '/api/auth/oauth',
+      body: {
+        'provider': provider,
+        'token': token,
+      },
+    );
+    final access = res['accessToken'] as String?;
+    final refresh = res['refreshToken'] as String?;
+    
+    if (access != null && refresh != null) {
+      await saveTokens(access: access, refresh: refresh);
+    }
+  }
+
+  /// 로그아웃
+  Future<void> logout() async {
+    try {
+      await ApiClient.instance.post('/api/auth/logout');
+    } catch (_) {
+      // 로그아웃 API 실패해도 로컬 토큰은 지운다
+    } finally {
+      await clearTokens();
+    }
+  }
+
+  /// 토큰 갱신
+  Future<bool> refresh() async {
+    final token = _cachedRefreshToken;
+    if (token == null) return false;
+
+    try {
+      final res = await ApiClient.instance.post(
+        '/api/auth/refresh',
+        body: {'refreshToken': token},
+      );
+      final access = res['accessToken'] as String?;
+      final newRefresh = res['refreshToken'] as String?;
+      
+      if (access != null && newRefresh != null) {
+        await saveTokens(access: access, refresh: newRefresh);
+        return true;
+      }
+    } catch (_) {
+      // 갱신 실패 시 로그아웃 처리
+      await clearTokens();
+    }
+    return false;
+  }
+
+  /// 내 정보 조회
+  Future<Map<String, dynamic>> fetchMe() async {
+    final res = await ApiClient.instance.get('/api/users/me');
+    return res as Map<String, dynamic>;
   }
 
   // ── 내부 헬퍼 ────────────────────────────────────────────────────────────
