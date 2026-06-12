@@ -206,7 +206,7 @@ class ObservationCard extends StatelessWidget {
           ],
           if (guidance!.compareEvidences.isNotEmpty) ...[
             const SizedBox(height: AppTokens.sp4),
-            const MSKicker('교차 검증'),
+            const MSKicker('함께 볼 증거'),
             const SizedBox(height: AppTokens.sp2),
             ...guidance!.compareEvidences.map((ce) =>
                 Padding(
@@ -214,12 +214,30 @@ class ObservationCard extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.compare_arrows, size: 16, color: c.textMute),
+                      Icon(
+                        ce.isUnlocked ? Icons.search : Icons.lock_outline,
+                        size: 16,
+                        color: c.textMute,
+                      ),
                       const SizedBox(width: AppTokens.sp2),
                       Expanded(
-                        child: Text(
-                          '증거 #${ce.evidenceId}와 비교: ${ce.reason}',
-                          style: AppText.body.copyWith(color: c.text),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ce.isUnlocked ? '[이동 가능] ${ce.title}' : '[잠김] ${ce.title}',
+                              style: AppText.body.copyWith(
+                                color: ce.isUnlocked ? c.text : c.textMute,
+                              ),
+                            ),
+                            if (!ce.isUnlocked && ce.unlockHint != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                '해금 힌트: ${ce.unlockHint}',
+                                style: AppText.bodySm.copyWith(color: c.textSub),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ],
@@ -231,19 +249,22 @@ class ObservationCard extends StatelessWidget {
             const SizedBox(height: AppTokens.sp4),
             const MSKicker('추천 질문'),
             const SizedBox(height: AppTokens.sp2),
-            ...guidance!.suggestedQuestions.map((q) =>
-                Padding(
+            ...guidance!.suggestedQuestions.map((q) {
+                final targetText = q.targetName != null && q.targetName!.isNotEmpty
+                    ? '[${q.targetName}에게] '
+                    : '';
+                return Padding(
                   padding: const EdgeInsets.only(bottom: AppTokens.sp2),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(Icons.help_outline, size: 16, color: c.textMute),
                       const SizedBox(width: AppTokens.sp2),
-                      Expanded(child: Text(q, style: AppText.body.copyWith(color: c.text))),
+                      Expanded(child: Text('$targetText${q.question}', style: AppText.body.copyWith(color: c.text))),
                     ],
                   ),
-                ),
-            ),
+                );
+            }),
           ],
         ],
         const SizedBox(height: AppTokens.sp4),

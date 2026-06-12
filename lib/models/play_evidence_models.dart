@@ -139,16 +139,56 @@ class RelatedTimelineEvent {
       );
 }
 
-class CompareEvidenceGuidance {
-  const CompareEvidenceGuidance({required this.evidenceId, required this.reason});
+class CompareEvidenceInfo {
+  const CompareEvidenceInfo({
+    this.evidenceId,
+    this.evidenceCode,
+    required this.title,
+    required this.isUnlocked,
+    this.unlockHint,
+  });
 
-  final int evidenceId;
-  final String reason;
+  final int? evidenceId;
+  final String? evidenceCode;
+  final String title;
+  final bool isUnlocked;
+  final String? unlockHint;
 
-  factory CompareEvidenceGuidance.fromJson(Map<String, dynamic> j) =>
-      CompareEvidenceGuidance(
-        evidenceId: (j['evidenceId'] as num).toInt(),
-        reason: j['reason'] as String? ?? '',
+  factory CompareEvidenceInfo.fromJson(Map<String, dynamic> j) =>
+      CompareEvidenceInfo(
+        evidenceId: (j['evidenceId'] as num?)?.toInt(),
+        evidenceCode: j['evidenceCode'] as String?,
+        title: j['title'] as String? ?? '',
+        isUnlocked: j['isUnlocked'] as bool? ?? false,
+        unlockHint: j['unlockHint'] as String?,
+      );
+}
+
+class SuggestedQuestionInfo {
+  const SuggestedQuestionInfo({
+    this.targetCharacterCode,
+    this.targetSuspectId,
+    this.targetName,
+    required this.question,
+    this.presentedEvidenceId,
+    this.questionType,
+  });
+
+  final String? targetCharacterCode;
+  final int? targetSuspectId;
+  final String? targetName;
+  final String question;
+  final int? presentedEvidenceId;
+  final String? questionType;
+
+  factory SuggestedQuestionInfo.fromJson(Map<String, dynamic> j) =>
+      SuggestedQuestionInfo(
+        targetCharacterCode: j['targetCharacterCode'] as String?,
+        targetSuspectId: (j['targetSuspectId'] as num?)?.toInt(),
+        targetName: j['targetName'] as String?,
+        question: j['question'] as String? ?? '',
+        presentedEvidenceId: (j['presentedEvidenceId'] as num?)?.toInt(),
+        questionType: j['questionType'] as String?,
       );
 }
 
@@ -160,8 +200,8 @@ class EvidenceGuidance {
   });
 
   final List<String> readingPoints;
-  final List<CompareEvidenceGuidance> compareEvidences;
-  final List<String> suggestedQuestions;
+  final List<CompareEvidenceInfo> compareEvidences;
+  final List<SuggestedQuestionInfo> suggestedQuestions;
 
   factory EvidenceGuidance.fromJson(Map<String, dynamic> j) => EvidenceGuidance(
         readingPoints: (j['readingPoints'] as List<dynamic>?)
@@ -169,11 +209,11 @@ class EvidenceGuidance {
                 .toList() ??
             const [],
         compareEvidences: (j['compareEvidences'] as List<dynamic>?)
-                ?.map((e) => CompareEvidenceGuidance.fromJson(e as Map<String, dynamic>))
+                ?.map((e) => CompareEvidenceInfo.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             const [],
         suggestedQuestions: (j['suggestedQuestions'] as List<dynamic>?)
-                ?.map((e) => e as String)
+                ?.map((e) => SuggestedQuestionInfo.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             const [],
       );
