@@ -91,6 +91,31 @@ class Briefing {
       );
 }
 
+class ActivePlaySession {
+  const ActivePlaySession({
+    required this.hasActiveSession,
+    this.activeSessionId,
+    required this.scenarioId,
+    this.status,
+    this.startedAt,
+  });
+
+  final bool hasActiveSession;
+  final int? activeSessionId;
+  final int scenarioId;
+  final PlaySessionStatus? status;
+  final DateTime? startedAt;
+
+  factory ActivePlaySession.fromJson(Map<String, dynamic> j) =>
+      ActivePlaySession(
+        hasActiveSession: j['hasActiveSession'] == true,
+        activeSessionId: (j['activeSessionId'] as num?)?.toInt(),
+        scenarioId: (j['scenarioId'] as num).toInt(),
+        status: playSessionStatusFromApi(j['status'] as String?),
+        startedAt: _parse(j['startedAt']),
+      );
+}
+
 DateTime? _parse(dynamic v) {
   if (v is String && v.isNotEmpty) return DateTime.tryParse(v);
   return null;

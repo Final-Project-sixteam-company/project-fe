@@ -19,6 +19,16 @@ class PlaySessionRepository {
     return PlaySessionInfo.fromJson(data as Map<String, dynamic>);
   }
 
+  /// 서버에서 진행 중인 활성 세션 조회.
+  Future<ActivePlaySession?> activeSession(int scenarioId) async {
+    final data = await _api.get(
+      '/api/play-sessions/active',
+      query: {'scenarioId': scenarioId},
+    );
+    final active = ActivePlaySession.fromJson(data as Map<String, dynamic>);
+    return active.hasActiveSession ? active : null;
+  }
+
   Future<DashboardInfo> dashboard(int sessionId) async {
     final data = await _api.get('/api/play-sessions/$sessionId/dashboard');
     return DashboardInfo.fromJson(data as Map<String, dynamic>);
