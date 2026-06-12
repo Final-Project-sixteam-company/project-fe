@@ -4,6 +4,7 @@ import '../components/ms_button.dart';
 import '../components/ms_kicker.dart';
 import '../components/ms_text_field.dart';
 import '../components/states.dart';
+import '../controllers/game_session_controller.dart'; // 💡 타입 명시를 위해 추가
 import '../controllers/game_session_provider.dart';
 import '../core/api/api_exception.dart';
 import '../models/case.dart';
@@ -97,17 +98,17 @@ class _HintSheetState extends State<_HintSheet> {
   }
 
   static String _levelLabel(int level) => switch (level) {
-        1 => '방향 힌트',
-        2 => '증거 연결 힌트',
-        3 => '결정적 힌트',
-        _ => '힌트',
-      };
+    1 => '방향 힌트',
+    2 => '증거 연결 힌트',
+    3 => '결정적 힌트',
+    _ => '힌트',
+  };
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final usedPenalty =
-        _hints.where((h) => h.isUsed).fold(0, (s, h) => s + h.penaltyScore);
+    _hints.where((h) => h.isUsed).fold(0, (s, h) => s + h.penaltyScore);
 
     return Container(
       decoration: BoxDecoration(
@@ -188,7 +189,7 @@ class _HintSheetState extends State<_HintSheet> {
                 )
               else
                 ..._hints.map(
-                  (h) => Padding(
+                      (h) => Padding(
                     padding: const EdgeInsets.only(bottom: AppTokens.sp3),
                     child: _HintTile(
                       hint: h,
@@ -291,19 +292,14 @@ class _HintTile extends StatelessWidget {
 // ── 증거 제시 모달 ────────────────────────────────────────────────────────────
 
 Future<Evidence?> showEvidencePresentModal(BuildContext context) {
-  // 제시 가능한(해금된) 증거를 미리 읽어서 Sheet에 전달한다.
-  // showModalBottomSheet는 새 루트 컨텍스트를 만들기 때문에
-  // Sheet 내부에서 GameSessionProvider를 찾을 수 없다.
-  //
-  // 서버 연동 세션의 evidence는 백엔드 정수 ID를 가지므로(증거 제시 API에 필요)
-  // controller.evidences 를 우선 사용하고, 비어 있거나 없으면 sampleCase로 폴백한다.
   List<Evidence> accessible;
-  // 증거 상세를 띄워 읽어본 뒤 제시할 수 있도록 세션 정보를 함께 넘긴다.
-  // (Sheet는 새 루트라 provider를 못 찾으므로 여기서 미리 캡처한다.)
   int? sessionId;
   PlayEvidence? Function(String)? rawResolver;
+  GameSessionController? sessionController; // 💡 새 라우트에 전파하기 위해 컨트롤러 원본 캡처
+
   try {
     final controller = GameSessionProvider.read(context);
+    sessionController = controller;
     final serverEvidences = controller.evidences;
     accessible = serverEvidences.isNotEmpty
         ? serverEvidences.where((e) => !e.isLocked).toList()
@@ -311,7 +307,6 @@ Future<Evidence?> showEvidencePresentModal(BuildContext context) {
     sessionId = controller.backendSessionId;
     rawResolver = controller.rawEvidence;
   } catch (_) {
-    // GameSessionProvider가 없는 컨텍스트(미리보기 등)에서는 샘플로 폴백
     accessible = sampleCase.evidences.where((e) => !e.isLocked).toList();
   }
 
@@ -321,6 +316,7 @@ Future<Evidence?> showEvidencePresentModal(BuildContext context) {
     isScrollControlled: true,
     builder: (_) => _EvidencePresentSheet(
       evidences: accessible,
+      controller: sessionController, // 💡 시트 내부 컴포넌트까지 컨트롤러 전달
       sessionId: sessionId,
       rawResolver: rawResolver,
     ),
@@ -330,17 +326,14 @@ Future<Evidence?> showEvidencePresentModal(BuildContext context) {
 class _EvidencePresentSheet extends StatefulWidget {
   const _EvidencePresentSheet({
     required this.evidences,
+    this.controller, // 💡 컨트롤러 인자 추가받음
     this.sessionId,
     this.rawResolver,
   });
 
-  /// 제시 가능한(해금된) 증거 목록. 서버 연동 시 백엔드 정수 ID를 가진다.
   final List<Evidence> evidences;
-
-  /// 증거 상세 API 호출용 세션 ID(없으면 목록 폴백 데이터로만 상세 표시).
+  final GameSessionController? controller;
   final int? sessionId;
-
-  /// 증거 ID로 목록 원본(PlayEvidence)을 찾아 상세 폴백 데이터로 쓰는 리졸버.
   final PlayEvidence? Function(String)? rawResolver;
 
   @override
@@ -358,7 +351,6 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
     super.dispose();
   }
 
-  /// 제시 가능한 증거(이미 해금된 것)에서 검색어로 필터링한다.
   List<Evidence> get _filtered {
     if (_query.isEmpty) return widget.evidences;
     return widget.evidences
@@ -420,7 +412,6 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
                         icon: Icon(Icons.close, color: c.textSub, size: 20),
-                        // 기본 48dp 최소 터치 타깃 유지(별도 padding/constraints 억제 안 함).
                       ),
                     ],
                   ),
@@ -447,22 +438,25 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                       itemCount: results.length,
                       separatorBuilder: (_, _) =>
                       const SizedBox(height: AppTokens.sp2),
-                      itemBuilder: (_, i) => _EvidencePickItem(
+                      itemBuilder: (sheetContext, i) => _EvidencePickItem( // 💡 상위 컨텍스트 식별을 위해 sheetContext 명시
                         evidence: results[i],
-                        // 바로 제시하지 않고 증거 상세를 먼저 띄운다. 상세에서
-                        // '이 증거 제시하기'를 누르면 시트를 닫고 제시를 확정한다.
                         onTap: () {
                           final picked = results[i];
-                          Navigator.of(context).push(
+                          if (widget.controller == null) return;
+
+                          Navigator.of(sheetContext).push(
                             MaterialPageRoute(
                               builder: (_) => EvidenceDetailScreen(
                                 evidence: picked,
+                                controller: widget.controller!, // 💡 리뷰 반영: 컴파일 에러 해결 및 세션 파이프라인 전파
                                 sessionId: widget.sessionId,
-                                listData:
-                                    widget.rawResolver?.call(picked.id),
+                                listData: widget.rawResolver?.call(picked.id),
                                 isUnlocked: !picked.isLocked,
-                                onPresent: () =>
-                                    Navigator.of(context).pop(picked),
+                                onPresent: () {
+                                  // 💡 상세 화면과 바텀 시트를 연쇄적으로 완전하게 처리하기 위해 팝 분리
+                                  Navigator.of(sheetContext).pop(); // 상세 화면 닫기
+                                  Navigator.of(sheetContext).pop(picked); // 시트 닫으며 증거 반환
+                                },
                               ),
                             ),
                           );
@@ -563,14 +557,13 @@ class _EvidencePickItem extends StatelessWidget {
     );
   }
 }
+
 // ── 사건 브리핑 재확인 모달 ───────────────────────────────────────────────────
-// 게임 진행 중 상단 HUD에서 사건 개요·피해자·목표를 다시 확인한다.
-// (브리핑 화면은 pushReplacement 로 진입해 스택에 없으므로 모달로 재노출)
 
 Future<void> showCaseBriefingModal(
-  BuildContext context, {
-  required DashboardInfo dashboard,
-}) {
+    BuildContext context, {
+      required DashboardInfo dashboard,
+    }) {
   return showModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.transparent,
@@ -656,8 +649,8 @@ class _BriefingSheet extends StatelessWidget {
                   ),
                   child: Text(
                     '1. 진범을 찾아라\n'
-                    '2. 살해 방법과 동기를 밝혀라\n'
-                    '3. 결정적 증거 3개를 수집하라',
+                        '2. 살해 방법과 동기를 밝혀라\n'
+                        '3. 결정적 증거 3개를 수집하라',
                     style: AppText.body.copyWith(
                       fontWeight: FontWeight.w600,
                       color: c.danger,
