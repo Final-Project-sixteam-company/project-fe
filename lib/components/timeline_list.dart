@@ -71,6 +71,17 @@ class _Row extends StatelessWidget {
                     height: 1.45,
                   ),
                 ),
+                if (entry.description != null && entry.description!.isNotEmpty) ...[
+                  const SizedBox(height: AppTokens.sp1),
+                  Text(
+                    entry.description!,
+                    style: AppText.body.copyWith(
+                      fontSize: 11,
+                      color: c.textSub,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
                 if (hasConflict) ...[
                   const SizedBox(height: AppTokens.sp2),
                   Container(
