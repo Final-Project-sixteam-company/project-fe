@@ -82,15 +82,15 @@ class _HintSheetState extends State<_HintSheet> {
       await _load(); // 사용 후 content/사용 상태 갱신
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('힌트 사용 중 오류가 발생했습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('힌트 사용 중 오류가 발생했습니다.')));
       }
     } finally {
       if (mounted) setState(() => _usingId = null);
@@ -107,8 +107,9 @@ class _HintSheetState extends State<_HintSheet> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final usedPenalty =
-    _hints.where((h) => h.isUsed).fold(0, (s, h) => s + h.penaltyScore);
+    final usedPenalty = _hints
+        .where((h) => h.isUsed)
+        .fold(0, (s, h) => s + h.penaltyScore);
 
     return Container(
       decoration: BoxDecoration(
@@ -139,10 +140,7 @@ class _HintSheetState extends State<_HintSheet> {
                 ),
               ),
               // ── 제목 ─────────────────────────────────────────────
-              Text(
-                '힌트 요청',
-                style: AppText.titleL.copyWith(color: c.text),
-              ),
+              Text('힌트 요청', style: AppText.titleL.copyWith(color: c.text)),
               const SizedBox(height: AppTokens.sp2),
               Text(
                 '힌트 사용 시 최종 점수가 감점됩니다.',
@@ -189,7 +187,7 @@ class _HintSheetState extends State<_HintSheet> {
                 )
               else
                 ..._hints.map(
-                      (h) => Padding(
+                  (h) => Padding(
                     padding: const EdgeInsets.only(bottom: AppTokens.sp3),
                     child: _HintTile(
                       hint: h,
@@ -296,18 +294,24 @@ Future<Evidence?> showEvidencePresentModal(BuildContext context) {
   int? sessionId;
   PlayEvidence? Function(String)? rawResolver;
   GameSessionController? sessionController;
+  bool isLoading = false;
 
   try {
     final controller = GameSessionProvider.read(context);
     sessionController = controller;
     final serverEvidences = controller.evidences;
-    accessible = serverEvidences.isNotEmpty
-        ? serverEvidences.where((e) => !e.isLocked).toList()
-        : sampleCase.evidences.where((e) => !e.isLocked).toList();
+    isLoading = controller.isLoading;
+    if (serverEvidences.isNotEmpty) {
+      accessible = serverEvidences.where((e) => !e.isLocked).toList();
+    } else if (controller.usesSampleCaseFallback) {
+      accessible = sampleCase.evidences.where((e) => !e.isLocked).toList();
+    } else {
+      accessible = const <Evidence>[];
+    }
     sessionId = controller.backendSessionId;
     rawResolver = controller.rawEvidence;
   } catch (_) {
-    accessible = sampleCase.evidences.where((e) => !e.isLocked).toList();
+    accessible = const <Evidence>[];
   }
 
   return showModalBottomSheet<Evidence>(
@@ -319,6 +323,7 @@ Future<Evidence?> showEvidencePresentModal(BuildContext context) {
       controller: sessionController,
       sessionId: sessionId,
       rawResolver: rawResolver,
+      isLoading: isLoading,
     ),
   );
 }
@@ -329,16 +334,17 @@ class _EvidencePresentSheet extends StatefulWidget {
     this.controller, // 💡 컨트롤러 인자 추가받음
     this.sessionId,
     this.rawResolver,
+    this.isLoading = false,
   });
 
   final List<Evidence> evidences;
   final GameSessionController? controller;
   final int? sessionId;
   final PlayEvidence? Function(String)? rawResolver;
+  final bool isLoading;
 
   @override
-  State<_EvidencePresentSheet> createState() =>
-      _EvidencePresentSheetState();
+  State<_EvidencePresentSheet> createState() => _EvidencePresentSheetState();
 }
 
 class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
@@ -354,9 +360,7 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
   List<Evidence> get _filtered {
     if (_query.isEmpty) return widget.evidences;
     return widget.evidences
-        .where(
-          (e) => e.name.contains(_query) || e.location.contains(_query),
-    )
+        .where((e) => e.name.contains(_query) || e.location.contains(_query))
         .toList();
   }
 
@@ -382,8 +386,7 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
           child: SafeArea(
             top: false,
             child: Padding(
-              padding:
-              const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
+              padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -396,8 +399,7 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                       ),
                       decoration: BoxDecoration(
                         color: c.line,
-                        borderRadius:
-                        BorderRadius.circular(AppTokens.rPill),
+                        borderRadius: BorderRadius.circular(AppTokens.rPill),
                       ),
                     ),
                   ),
@@ -424,46 +426,50 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                   ),
                   const SizedBox(height: AppTokens.sp4),
                   Expanded(
-                    child: results.isEmpty
+                    child: widget.evidences.isEmpty
+                        ? _EvidencePresentEmpty(isLoading: widget.isLoading)
+                        : results.isEmpty
                         ? Center(
-                      child: Text(
-                        '일치하는 증거가 없습니다',
-                        style: AppText.bodySm
-                            .copyWith(color: c.textSub),
-                      ),
-                    )
-                        : ListView.separated(
-                      controller: scrollController,
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: results.length,
-                      separatorBuilder: (_, _) =>
-                      const SizedBox(height: AppTokens.sp2),
-                      itemBuilder: (sheetContext, i) => _EvidencePickItem( // 💡 상위 컨텍스트 식별을 위해 sheetContext 명시
-                        evidence: results[i],
-                        onTap: () {
-                          final picked = results[i];
-                          if (widget.controller == null) return;
-
-                          Navigator.of(sheetContext).push(
-                            MaterialPageRoute(
-                              builder: (_) => EvidenceDetailScreen(
-                                evidence: picked,
-                                controller: widget.controller!,
-                                sessionId: widget.sessionId,
-                                listData: widget.rawResolver?.call(picked.id),
-                                isUnlocked: !picked.isLocked,
-                                onPresent: () {
-                                  Navigator.of(sheetContext).pop(picked);
-                                },
-                              ),
+                            child: Text(
+                              '일치하는 증거가 없습니다',
+                              style: AppText.bodySm.copyWith(color: c.textSub),
                             ),
-                          );
-                        },
-                      ),
-                      padding: const EdgeInsets.only(
-                        bottom: AppTokens.sp6,
-                      ),
-                    ),
+                          )
+                        : ListView.separated(
+                            controller: scrollController,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: results.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: AppTokens.sp2),
+                            itemBuilder: (sheetContext, i) => _EvidencePickItem(
+                              // 💡 상위 컨텍스트 식별을 위해 sheetContext 명시
+                              evidence: results[i],
+                              onTap: () {
+                                final picked = results[i];
+                                if (widget.controller == null) return;
+
+                                Navigator.of(sheetContext).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => EvidenceDetailScreen(
+                                      evidence: picked,
+                                      controller: widget.controller!,
+                                      sessionId: widget.sessionId,
+                                      listData: widget.rawResolver?.call(
+                                        picked.id,
+                                      ),
+                                      isUnlocked: !picked.isLocked,
+                                      onPresent: () {
+                                        Navigator.of(sheetContext).pop(picked);
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            padding: const EdgeInsets.only(
+                              bottom: AppTokens.sp6,
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -475,13 +481,44 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
   }
 }
 
+class _EvidencePresentEmpty extends StatelessWidget {
+  const _EvidencePresentEmpty({required this.isLoading});
+
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    if (isLoading) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const MSSpinner(size: 22),
+            const SizedBox(height: AppTokens.sp3),
+            Text(
+              '증거를 불러오는 중입니다',
+              style: AppText.bodySm.copyWith(color: c.textSub),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Center(
+      child: Text(
+        '제시할 수 있는 증거가 아직 없습니다',
+        style: AppText.bodySm.copyWith(color: c.textSub),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
 // ── 증거 선택 아이템 ──────────────────────────────────────────────────────────
 
 class _EvidencePickItem extends StatelessWidget {
-  const _EvidencePickItem({
-    required this.evidence,
-    required this.onTap,
-  });
+  const _EvidencePickItem({required this.evidence, required this.onTap});
 
   final Evidence evidence;
   final VoidCallback onTap;
@@ -559,9 +596,9 @@ class _EvidencePickItem extends StatelessWidget {
 // ── 사건 브리핑 재확인 모달 ───────────────────────────────────────────────────
 
 Future<void> showCaseBriefingModal(
-    BuildContext context, {
-      required DashboardInfo dashboard,
-    }) {
+  BuildContext context, {
+  required DashboardInfo dashboard,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.transparent,
@@ -647,8 +684,8 @@ class _BriefingSheet extends StatelessWidget {
                   ),
                   child: Text(
                     '1. 진범을 찾아라\n'
-                        '2. 살해 방법과 동기를 밝혀라\n'
-                        '3. 결정적 증거 3개를 수집하라',
+                    '2. 살해 방법과 동기를 밝혀라\n'
+                    '3. 결정적 증거 3개를 수집하라',
                     style: AppText.body.copyWith(
                       fontWeight: FontWeight.w600,
                       color: c.danger,
@@ -686,10 +723,7 @@ class _BriefingInfoRow extends StatelessWidget {
       children: [
         SizedBox(
           width: 72,
-          child: Text(
-            label,
-            style: AppText.bodySm.copyWith(color: c.textMute),
-          ),
+          child: Text(label, style: AppText.bodySm.copyWith(color: c.textMute)),
         ),
         Expanded(
           child: Text(value, style: AppText.body.copyWith(color: c.text)),

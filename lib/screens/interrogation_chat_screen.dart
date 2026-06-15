@@ -30,11 +30,11 @@ class _Message {
 }
 
 const _suggestedQuestions = [
-  '어젯밤 10시에 어디 있었나요?',
-  '피해자와의 관계는?',
-  '마지막으로 피해자를 본 건 언제인가요?',
+  '그 시간대에 어디에 있었나요?',
+  '사건 관계자와 어떤 관계인가요?',
+  '마지막으로 관련자를 본 건 언제인가요?',
   '알리바이를 증명할 수 있나요?',
-  '그날 밤 데모룸에 다시 들어간 적 있나요?',
+  '확인해야 할 다른 정황이 있나요?',
 ];
 
 class InterrogationChatScreen extends StatefulWidget {
@@ -108,12 +108,19 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
 
     // Guidance 추천 질문 prefill — 최초 1회만 설정
     if (widget.initialQuestion?.trim().isNotEmpty == true) {
+      final presentedEvidenceId = widget.presentedEvidenceId?.trim();
+      final hasPresentedEvidence =
+          presentedEvidenceId != null && presentedEvidenceId.isNotEmpty;
       _inputCtrl.text = widget.initialQuestion!.trim();
       _inputCtrl.selection = TextSelection.collapsed(
         offset: _inputCtrl.text.length,
       );
-      _prefillEvidenceId = widget.presentedEvidenceId;
-      _prefillEvidenceTitle = widget.presentedEvidenceTitle ?? '선택된 증거';
+      _prefillEvidenceId = hasPresentedEvidence ? presentedEvidenceId : null;
+      _prefillEvidenceTitle = hasPresentedEvidence
+          ? (widget.presentedEvidenceTitle?.trim().isNotEmpty == true
+                ? widget.presentedEvidenceTitle!.trim()
+                : '선택된 증거')
+          : null;
     }
 
     _scrollToBottom();
@@ -275,13 +282,16 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
   }) {
     final trimmed = question.trim();
     if (trimmed.isEmpty || _isWaiting) return;
+    final normalizedEvidenceId = evidenceId?.trim();
+    final hasEvidence =
+        normalizedEvidenceId != null && normalizedEvidenceId.isNotEmpty;
     setState(() {
       _inputCtrl.text = trimmed;
       _inputCtrl.selection = TextSelection.collapsed(
         offset: _inputCtrl.text.length,
       );
-      _prefillEvidenceId = evidenceId;
-      _prefillEvidenceTitle = evidenceId != null
+      _prefillEvidenceId = hasEvidence ? normalizedEvidenceId : null;
+      _prefillEvidenceTitle = hasEvidence
           ? (evidenceTitle?.trim().isNotEmpty == true
                 ? evidenceTitle!.trim()
                 : '선택된 증거')

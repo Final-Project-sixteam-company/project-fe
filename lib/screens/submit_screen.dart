@@ -148,7 +148,7 @@ class _SubmitScreenState extends State<SubmitScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
 
-      if (e.code == 'FINAL_DEDUCTION_ALREADY_SUBMITTED') {
+      if (e.code == 'AI010' || e.code == 'FINAL_DEDUCTION_ALREADY_SUBMITTED') {
         _snack('이미 제출됐습니다. 결과 화면으로 이동합니다.', dur: const Duration(seconds: 2));
         await Future.delayed(const Duration(milliseconds: 1800));
         navigatingToResult = true;
