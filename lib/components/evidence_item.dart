@@ -32,20 +32,17 @@ class EvidenceItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppTokens.r4),
             boxShadow: evidence.isNew
                 ? [
-              BoxShadow(
-                color: c.primarySoft,
-                spreadRadius: 2,
-                blurRadius: 0,
-              )
-            ]
+                    BoxShadow(
+                      color: c.primarySoft,
+                      spreadRadius: 2,
+                      blurRadius: 0,
+                    ),
+                  ]
                 : null,
           ),
           child: Row(
             children: [
-              _Thumb(
-                icon: evidence.icon,
-                color: evidence.isAnalyzed ? c.success : c.primary,
-              ),
+              _Thumb(icon: evidence.icon, color: c.primary),
               const SizedBox(width: AppTokens.sp3),
               Expanded(
                 child: Column(
@@ -75,14 +72,7 @@ class EvidenceItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppTokens.sp2),
-              // 확보됨/핵심 증거 — 증거 탭 필터 칩·상세 상태 필과 동일 어휘.
-              // (트리거 없는 'NEW'/'대기' 가짜 단계 라벨 제거.)
-              MSPill(
-                evidence.isAnalyzed ? '핵심 증거' : '확보됨',
-                tone: evidence.isAnalyzed
-                    ? MSPillTone.success
-                    : MSPillTone.primary,
-              ),
+              const MSPill('확보됨', tone: MSPillTone.primary),
             ],
           ),
         ),

@@ -62,8 +62,7 @@ class InterrogationChatScreen extends StatefulWidget {
       _InterrogationChatScreenState();
 }
 
-class _InterrogationChatScreenState
-    extends State<InterrogationChatScreen> {
+class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
   final TextEditingController _inputCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final List<_Message> _messages = [];
@@ -72,6 +71,7 @@ class _InterrogationChatScreenState
 
   /// Guidance prefill로 설정된 증거 ID. 첫 전송에 사용 후 null로 리셋.
   String? _prefillEvidenceId;
+
   /// Guidance prefill로 설정된 증거 이름 표시용 상태 변수.
   String? _prefillEvidenceTitle;
 
@@ -83,14 +83,17 @@ class _InterrogationChatScreenState
 
     // 같은 세션 내에서 이전에 이 용의자와 나눈 심문 기록을 복원한다.
     final controller = context.sessionRead;
-    final priorLogs = controller.interrogationLogs
-        .where((log) => log.suspectId == widget.suspect.id);
+    final priorLogs = controller.interrogationLogs.where(
+      (log) => log.suspectId == widget.suspect.id,
+    );
     for (final log in priorLogs) {
-      _messages.add(_Message(
-        text: log.question,
-        sender: _Sender.detective,
-        presentedEvidenceId: log.presentedEvidenceId,
-      ));
+      _messages.add(
+        _Message(
+          text: log.question,
+          sender: _Sender.detective,
+          presentedEvidenceId: log.presentedEvidenceId,
+        ),
+      );
       _messages.add(_Message(text: log.answer, sender: _Sender.suspect));
     }
 
@@ -106,8 +109,9 @@ class _InterrogationChatScreenState
     // Guidance 추천 질문 prefill — 최초 1회만 설정
     if (widget.initialQuestion?.trim().isNotEmpty == true) {
       _inputCtrl.text = widget.initialQuestion!.trim();
-      _inputCtrl.selection =
-          TextSelection.collapsed(offset: _inputCtrl.text.length);
+      _inputCtrl.selection = TextSelection.collapsed(
+        offset: _inputCtrl.text.length,
+      );
       _prefillEvidenceId = widget.presentedEvidenceId;
       _prefillEvidenceTitle = widget.presentedEvidenceTitle ?? '선택된 증거';
     }
@@ -123,10 +127,10 @@ class _InterrogationChatScreenState
   }
 
   Future<void> _sendMessage(
-      String text, {
-        String? evidenceId,
-        QuestionType questionType = QuestionType.free,
-      }) async {
+    String text, {
+    String? evidenceId,
+    QuestionType questionType = QuestionType.free,
+  }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isWaiting) return;
 
@@ -143,11 +147,13 @@ class _InterrogationChatScreenState
     }
 
     setState(() {
-      _messages.add(_Message(
-        text: trimmed,
-        sender: _Sender.detective,
-        presentedEvidenceId: evidenceId,
-      ));
+      _messages.add(
+        _Message(
+          text: trimmed,
+          sender: _Sender.detective,
+          presentedEvidenceId: evidenceId,
+        ),
+      );
       _isWaiting = true;
       _inputCtrl.clear();
 
@@ -162,10 +168,12 @@ class _InterrogationChatScreenState
     if (sessionId == null || suspectIdInt == null) {
       if (mounted) {
         setState(() {
-          _messages.add(const _Message(
-            text: '세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.',
-            sender: _Sender.suspect,
-          ));
+          _messages.add(
+            const _Message(
+              text: '세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.',
+              sender: _Sender.suspect,
+            ),
+          );
           _isWaiting = false;
         });
         _scrollToBottom();
@@ -220,18 +228,18 @@ class _InterrogationChatScreenState
     }
 
     if (errorNotice != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorNotice)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorNotice)));
     }
 
     if (unlockedEvidences.isNotEmpty && mounted) {
       await controller.refreshEvidences();
       if (mounted) {
         final names = unlockedEvidences.map((e) => e.title).join(', ');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('새로운 증거 확보: $names')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('새로운 증거 확보: $names')));
       }
     }
   }
@@ -239,16 +247,10 @@ class _InterrogationChatScreenState
   Future<void> _presentEvidence() async {
     final evidence = await showEvidencePresentModal(context);
     if (evidence != null && mounted) {
-      // 💡 리뷰어 피드백 반영: 가이드라인 상태에서 유저가 임의로 다른 증거를 제시하면
-      // 기존에 물려 있던 낡은(Stale) 추천 증거 상태를 완전히 오버라이드하여 청소합니다.
-      setState(() {
-        _prefillEvidenceId = null;
-        _prefillEvidenceTitle = null;
-      });
-
-      await _sendMessage(
+      _prefillQuestion(
         '이 증거를 제시합니다: ${evidence.name}',
         evidenceId: evidence.id,
+        evidenceTitle: evidence.name,
       );
     }
   }
@@ -264,6 +266,31 @@ class _InterrogationChatScreenState
         );
       });
     });
+  }
+
+  void _prefillQuestion(
+    String question, {
+    String? evidenceId,
+    String? evidenceTitle,
+  }) {
+    final trimmed = question.trim();
+    if (trimmed.isEmpty || _isWaiting) return;
+    setState(() {
+      _inputCtrl.text = trimmed;
+      _inputCtrl.selection = TextSelection.collapsed(
+        offset: _inputCtrl.text.length,
+      );
+      _prefillEvidenceId = evidenceId;
+      _prefillEvidenceTitle = evidenceId != null
+          ? (evidenceTitle?.trim().isNotEmpty == true
+                ? evidenceTitle!.trim()
+                : '선택된 증거')
+          : null;
+    });
+  }
+
+  void _prefillSuggestedQuestion(String question) {
+    _prefillQuestion(question);
   }
 
   @override
@@ -284,28 +311,23 @@ class _InterrogationChatScreenState
                 vertical: AppTokens.sp4,
               ),
               itemCount: _messages.length + (_isWaiting ? 1 : 0),
-              separatorBuilder: (_, _) =>
-              const SizedBox(height: AppTokens.sp2),
+              separatorBuilder: (_, _) => const SizedBox(height: AppTokens.sp2),
               itemBuilder: (_, i) {
                 if (i == _messages.length && _isWaiting) {
                   return const _WaitingBubble();
                 }
                 final msg = _messages[i];
                 return msg.sender == _Sender.suspect
-                    ? _SuspectBubble(
-                  text: msg.text,
-                  suspect: widget.suspect,
-                )
+                    ? _SuspectBubble(text: msg.text, suspect: widget.suspect)
                     : _DetectiveBubble(
-                  text: msg.text,
-                  evidenceId: msg.presentedEvidenceId,
-                );
+                        text: msg.text,
+                        evidenceId: msg.presentedEvidenceId,
+                      );
               },
             ),
           ),
           _SuggestedQuestions(
-            onSelect: (q) =>
-                _sendMessage(q, questionType: QuestionType.recommended),
+            onSelect: _prefillSuggestedQuestion,
             disabled: _isWaiting,
           ),
           const SizedBox(height: AppTokens.sp3),
@@ -394,10 +416,7 @@ class _InterrogationChatScreenState
 }
 
 class _SuspectBubble extends StatelessWidget {
-  const _SuspectBubble({
-    required this.text,
-    required this.suspect,
-  });
+  const _SuspectBubble({required this.text, required this.suspect});
 
   final String text;
   final Suspect suspect;
@@ -405,8 +424,9 @@ class _SuspectBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final initial =
-    suspect.name.isNotEmpty ? suspect.name.characters.first : '?';
+    final initial = suspect.name.isNotEmpty
+        ? suspect.name.characters.first
+        : '?';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -464,10 +484,7 @@ class _SuspectBubble extends StatelessWidget {
 }
 
 class _DetectiveBubble extends StatelessWidget {
-  const _DetectiveBubble({
-    required this.text,
-    this.evidenceId,
-  });
+  const _DetectiveBubble({required this.text, this.evidenceId});
 
   final String text;
   final String? evidenceId;
@@ -489,9 +506,7 @@ class _DetectiveBubble extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: isEvidence ? c.successSoft : c.primarySoft,
-              border: Border.all(
-                color: isEvidence ? c.success : c.primary,
-              ),
+              border: Border.all(color: isEvidence ? c.success : c.primary),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(AppTokens.r4),
                 topRight: Radius.circular(AppTokens.r1),
@@ -584,10 +599,7 @@ class _WaitingBubble extends StatelessWidget {
 }
 
 class _SuggestedQuestions extends StatelessWidget {
-  const _SuggestedQuestions({
-    required this.onSelect,
-    required this.disabled,
-  });
+  const _SuggestedQuestions({required this.onSelect, required this.disabled});
 
   final ValueChanged<String> onSelect;
   final bool disabled;
@@ -608,10 +620,7 @@ class _SuggestedQuestions extends StatelessWidget {
           return GestureDetector(
             onTap: disabled ? null : () => onSelect(_suggestedQuestions[i]),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 border: Border.all(color: c.line),

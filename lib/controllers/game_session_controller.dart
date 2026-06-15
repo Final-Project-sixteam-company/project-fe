@@ -10,7 +10,7 @@ import '../repositories/play_session_repository.dart';
 
 class GameSessionController extends ChangeNotifier {
   GameSessionController({required this.scenarioId, PlaySessionRepository? repo})
-      : _repo = repo ?? playSessionRepo;
+    : _repo = repo ?? playSessionRepo;
 
   final String scenarioId;
   final PlaySessionRepository _repo;
@@ -34,10 +34,10 @@ class GameSessionController extends ChangeNotifier {
   /// 전체 캐릭터 목록 (용의자 + 증인).
   List<Suspect> get suspects => _suspects;
 
-  /// 범인 지목 가능한 용의자만(culpritEligible). 증인·레드헤링 등 지목불가 캐릭터 제외.
+  /// 최종 지목 후보. public witness 상태만 제외하고 모든 public suspect를 노출한다.
   /// SubmitScreen 드롭다운과 BottomBar 버튼 모두 이 getter를 사용한다.
   List<Suspect> get accusableSuspects =>
-      _suspects.where((s) => s.culpritEligible).toList();
+      _suspects.where((s) => !s.isWitness).toList();
 
   final Map<String, PlaySuspect> _suspectRaw = {};
   PlaySuspect? rawSuspect(String id) => _suspectRaw[id];
@@ -172,7 +172,8 @@ class GameSessionController extends ChangeNotifier {
       return;
     }
     // 저장된 세션이 없으면 자동 복구 불가 — 안내 문구를 명확히 갱신한다.
-    _loadError = '이 기기에서 시작한 세션 기록이 없어 자동으로 정리할 수 없습니다. '
+    _loadError =
+        '이 기기에서 시작한 세션 기록이 없어 자동으로 정리할 수 없습니다. '
         '다른 기기/창에서 진행 중인 수사를 마치거나 중단한 뒤 다시 시도해 주세요.';
     notifyListeners();
   }
@@ -190,15 +191,15 @@ class GameSessionController extends ChangeNotifier {
     final rawSuspects = results[1] as List<PlaySuspect>;
     _suspectRaw
       ..clear()
-      ..addEntries(
-          rawSuspects.map((s) => MapEntry(s.suspectId.toString(), s)));
+      ..addEntries(rawSuspects.map((s) => MapEntry(s.suspectId.toString(), s)));
     _suspects = rawSuspects.map(_toSuspect).toList();
 
     final rawEvidences = results[2] as List<PlayEvidence>;
     _evidenceRaw
       ..clear()
       ..addEntries(
-          rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)));
+        rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)),
+      );
     _evidences = rawEvidences.map(_toEvidence).toList();
     _syncUnlockedFromServer(rawEvidences);
 
@@ -231,7 +232,8 @@ class GameSessionController extends ChangeNotifier {
       _evidenceRaw
         ..clear()
         ..addEntries(
-            rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)));
+          rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)),
+        );
       _evidences = rawEvidences.map(_toEvidence).toList();
       _syncUnlockedFromServer(rawEvidences);
       // 현장 탭의 장소별 해금 카운트도 HUD 총합과 어긋나지 않도록 함께 갱신한다.
@@ -255,41 +257,33 @@ class GameSessionController extends ChangeNotifier {
   void _syncUnlockedFromServer(List<PlayEvidence> raw) {
     _unlockedEvidenceIds
       ..clear()
-      ..addAll(raw
-          .where((e) => e.isUnlocked)
-          .map((e) => e.evidenceId.toString()));
+      ..addAll(
+        raw.where((e) => e.isUnlocked).map((e) => e.evidenceId.toString()),
+      );
   }
 
   // ── 모델 변환 ─────────────────────────────────────────────────────────────
 
   Suspect _toSuspect(PlaySuspect s) => Suspect(
-        id: s.suspectId.toString(),
-        name: s.name,
-        role: s.role ?? '',
-        suspicion: s.suspicionLevel,
-        interrogationCount: s.interrogationCount,
-        portraitUrl: s.portraitAssetKey,
-        portraitAssetKey: s.portraitAssetKey,
-        isWitness: s.isWitness,
-        culpritEligible: s.culpritEligible,
-      );
+    id: s.suspectId.toString(),
+    name: s.name,
+    role: s.role ?? '',
+    interrogationCount: s.interrogationCount,
+    portraitUrl: s.portraitImageUrl,
+    isWitness: s.isWitness,
+  );
 
   Evidence _toEvidence(PlayEvidence e) => Evidence(
-        id: e.evidenceId.toString(),
-        name: e.title,
-        location: e.locationName ?? (e.isUnlocked ? '미상' : '???'),
-        icon: _iconForImportance(e.importance),
-        isLocked: !e.isUnlocked,
-        // 핵심(CORE) 증거는 '핵심 증거' 필터에 노출되도록 표시
-        isAnalyzed: e.importance == EvidenceImportance.core,
-        oneLine: e.oneLine,
-        imageUrl: e.imageUrl,
-        imageAssetKey: e.imageAssetKey,
-        categoryLabel: e.categoryLabel,
-        phase: e.phase,
-        proofDimensions: e.proofDimensions,
-        category: e.category,
-      );
+    id: e.evidenceId.toString(),
+    name: e.title,
+    location: e.locationName ?? (e.isUnlocked ? '미상' : '???'),
+    icon: _iconForEvidence(e.category),
+    isLocked: !e.isUnlocked,
+    oneLine: e.oneLine,
+    imageUrl: e.imageUrl,
+    categoryLabel: e.categoryLabel,
+    category: e.category,
+  );
 
   TimelineEntry _toTimelineEntry(PlayTimelineEvent e) {
     return TimelineEntry(
@@ -301,10 +295,11 @@ class GameSessionController extends ChangeNotifier {
     );
   }
 
-  static IconData _iconForImportance(EvidenceImportance imp) => switch (imp) {
-    EvidenceImportance.core => Icons.gpp_maybe_outlined,
-    EvidenceImportance.high => Icons.priority_high,
-    EvidenceImportance.fake => Icons.block_outlined,
+  static IconData _iconForEvidence(String? category) => switch (category) {
+    'PHYSICAL' => Icons.inventory_2_outlined,
+    'DOCUMENT' => Icons.description_outlined,
+    'DIGITAL_LOG' => Icons.dns_outlined,
+    'TESTIMONY' => Icons.record_voice_over_outlined,
     _ => Icons.description_outlined,
   };
 
@@ -321,8 +316,7 @@ class GameSessionController extends ChangeNotifier {
 
   // ── 해금 증거 ─────────────────────────────────────────────────────────────
   final Set<String> _unlockedEvidenceIds = {};
-  Set<String> get unlockedEvidenceIds =>
-      Set.unmodifiable(_unlockedEvidenceIds);
+  Set<String> get unlockedEvidenceIds => Set.unmodifiable(_unlockedEvidenceIds);
 
   int get unlockedCount =>
       _dashboard?.unlockedEvidenceCount ?? _unlockedEvidenceIds.length;

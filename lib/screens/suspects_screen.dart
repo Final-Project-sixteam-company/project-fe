@@ -46,13 +46,12 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
     final sorted = List<Suspect>.from(source)
       ..sort((a, b) {
         if (a.isWitness != b.isWitness) return a.isWitness ? 1 : -1;
-        return b.suspicion.compareTo(a.suspicion);
+        return a.name.compareTo(b.name);
       });
 
     return sorted.where((s) {
-      final matchesQuery = _query.isEmpty ||
-          s.name.contains(_query) ||
-          s.role.contains(_query);
+      final matchesQuery =
+          _query.isEmpty || s.name.contains(_query) || s.role.contains(_query);
       final matchesFilter = switch (_filter) {
         _SuspectFilter.all => true,
         _SuspectFilter.suspect => !s.isWitness,
@@ -60,12 +59,6 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
       };
       return matchesQuery && matchesFilter;
     }).toList();
-  }
-
-  int _maxSuspicion(List<Suspect> source) {
-    final suspects = source.where((s) => !s.isWitness).toList();
-    if (suspects.isEmpty) return 0;
-    return suspects.map((s) => s.suspicion).reduce((a, b) => a > b ? a : b);
   }
 
   @override
@@ -117,10 +110,10 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
                   MSStatRow([
                     StatCell('용의자', '$suspectCount명'),
                     if (witnessCount > 0) StatCell('증인', '$witnessCount명'),
-                    StatCell('심문 횟수',
-                        '${ctrl.dashboard?.interrogationCount ?? 0}회'),
-                    StatCell('최고 의심도', '${_maxSuspicion(all)}%',
-                        tone: StatTone.warn),
+                    StatCell(
+                      '심문 횟수',
+                      '${ctrl.dashboard?.interrogationCount ?? 0}회',
+                    ),
                   ]),
                   const SizedBox(height: AppTokens.sp4),
                   const MSKicker('모든 인물'),
@@ -136,10 +129,10 @@ class _SuspectsScreenState extends State<SuspectsScreen> {
   }
 
   Widget _buildBody(
-      BuildContext context,
-      GameSessionController ctrl,
-      List<Suspect> results,
-      ) {
+    BuildContext context,
+    GameSessionController ctrl,
+    List<Suspect> results,
+  ) {
     if (ctrl.isLoading && results.isEmpty) {
       return const MSListSkeleton(itemHeight: 84);
     }

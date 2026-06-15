@@ -13,14 +13,12 @@ import '../theme/app_theme.dart';
 import 'evidence_detail_widgets.dart';
 import 'interrogation_chat_screen.dart';
 
-export 'evidence_detail_widgets.dart'
-    show EvidenceStatusRow, ProofDimensionRow, ObservationCard;
+export 'evidence_detail_widgets.dart' show EvidenceStatusRow, ObservationCard;
 
 class EvidenceDetailScreen extends StatefulWidget {
   const EvidenceDetailScreen({
     required this.evidence,
     required this.controller, // 💡 리뷰 반영: 새로운 라우트에서도 상태를 유지하기 위해 컨트롤러 필수 주입
-
     /// 목록에서 받아 둔 원본 DTO — 상세 API 실패/미호출 시 폴백 소스.
     this.listData,
 
@@ -59,10 +57,9 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
   bool get _effectiveLocked => widget.evidence.isLocked && !widget.isUnlocked;
 
   String get _statusLabel {
-    if (widget.isUnlocked && widget.evidence.isLocked) return 'UNLOCKED';
-    if (_effectiveLocked) return 'LOCKED';
-    if (widget.evidence.isAnalyzed) return 'ANALYZED';
-    return widget.evidence.isNew ? 'NEW' : 'PENDING';
+    if (widget.isUnlocked && widget.evidence.isLocked) return '해금';
+    if (_effectiveLocked) return '잠김';
+    return widget.evidence.isNew ? '신규' : '확보됨';
   }
 
   String? get _description =>
@@ -74,7 +71,33 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
   List<RelatedTimelineEvent> get _relatedTimelineEvents =>
       _detail?.relatedTimelineEvents ?? const [];
 
-  EvidenceGuidance? get _guidance => _detail?.guidance;
+  EvidenceGuidance? get _guidance {
+    final guidance = _detail?.guidance;
+    if (guidance == null) return null;
+
+    final publicSuspectIds = widget.controller.suspects
+        .map((s) => s.id)
+        .toSet();
+    final questions = guidance.suggestedQuestions.where((q) {
+      final targetId = q.targetSuspectId?.toString();
+      return targetId != null &&
+          publicSuspectIds.contains(targetId) &&
+          q.question.trim().isNotEmpty;
+    }).toList();
+
+    final compareEvidences = guidance.compareEvidences
+        .where((e) => e.title.trim().isNotEmpty)
+        .toList();
+
+    return EvidenceGuidance(
+      readingPoints: guidance.readingPoints
+          .map((p) => p.trim())
+          .where((p) => p.isNotEmpty)
+          .toList(),
+      compareEvidences: compareEvidences,
+      suggestedQuestions: questions,
+    );
+  }
 
   @override
   void initState() {
@@ -89,7 +112,10 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
 
     setState(() => _loadingDetail = true);
     try {
-      final detail = await playSessionRepo.evidenceDetail(sessionId, evidenceId);
+      final detail = await playSessionRepo.evidenceDetail(
+        sessionId,
+        evidenceId,
+      );
       if (!mounted) return; // 💡 비동기 작업 후 위젯 해제 여부 체크
       setState(() => _detail = detail);
     } on ApiException catch (e) {
@@ -111,9 +137,7 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
     // 💡 주입받은 controller를 사용하여 context 예외 방지 및 안전성 확보
     final ctrl = widget.controller;
     final eidStr = evidenceId.toString();
-    final evidence = ctrl.evidences
-        .where((e) => e.id == eidStr)
-        .firstOrNull;
+    final evidence = ctrl.evidences.where((e) => e.id == eidStr).firstOrNull;
     if (evidence == null) return;
 
     // 현재 증거와 동일하면 이동하지 않는다.
@@ -158,6 +182,9 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
             suspect: suspect,
             initialQuestion: q.question,
             presentedEvidenceId: presentedEidStr,
+            presentedEvidenceTitle: presentedEidStr != null
+                ? widget.evidence.name
+                : null,
           ),
         ),
       ),
@@ -179,8 +206,10 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
           icon: Icon(Icons.arrow_back, color: c.text),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('EVIDENCE',
-            style: AppText.monoLabel.copyWith(color: c.textMute)),
+        title: Text(
+          'EVIDENCE',
+          style: AppText.monoLabel.copyWith(color: c.textMute),
+        ),
       ),
       body: SafeArea(
         child: Padding(
@@ -213,22 +242,11 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: AppTokens.sp6),
-                EvidenceStatusRow(
-                  statusLabel: _statusLabel,
-                  phase: widget.evidence.phase,
-                  effectiveLocked: _effectiveLocked,
-                ),
-                if (!_effectiveLocked &&
-                    widget.evidence.proofDimensions.isNotEmpty) ...[
-                  const SizedBox(height: AppTokens.sp3),
-                  ProofDimensionRow(
-                      dimensions: widget.evidence.proofDimensions),
-                ],
+                EvidenceStatusRow(statusLabel: _statusLabel),
                 const SizedBox(height: AppTokens.sp6),
                 ObservationCard(
                   evidence: widget.evidence,
                   effectiveLocked: _effectiveLocked,
-                  statusLabel: _statusLabel,
                   description: _description,
                   relatedSuspects: _relatedSuspects,
                   relatedTimelineEvents: _relatedTimelineEvents,
@@ -304,11 +322,13 @@ class _CtaButton extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: c.primary),
             const SizedBox(width: AppTokens.sp2),
-            Text(label,
-                style: AppText.body.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: c.primary,
-                )),
+            Text(
+              label,
+              style: AppText.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: c.primary,
+              ),
+            ),
           ],
         ),
       ),

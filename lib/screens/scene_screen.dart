@@ -19,14 +19,12 @@ class _Location {
   final IconData icon;
   final int clueCount;
   final bool isIncident;
-  final String? imageAssetKey;
 
   const _Location({
     required this.name,
     required this.icon,
     required this.clueCount,
     this.isIncident = false,
-    this.imageAssetKey,
   });
 }
 
@@ -37,31 +35,11 @@ const _locations = [
     clueCount: 3,
     isIncident: true,
   ),
-  _Location(
-    name: '재무팀 사무실',
-    icon: Icons.business_outlined,
-    clueCount: 2,
-  ),
-  _Location(
-    name: '서버실',
-    icon: Icons.storage_outlined,
-    clueCount: 2,
-  ),
-  _Location(
-    name: '카페',
-    icon: Icons.local_cafe_outlined,
-    clueCount: 1,
-  ),
-  _Location(
-    name: '비상계단',
-    icon: Icons.stairs_outlined,
-    clueCount: 1,
-  ),
-  _Location(
-    name: '보안실',
-    icon: Icons.security_outlined,
-    clueCount: 1,
-  ),
+  _Location(name: '재무팀 사무실', icon: Icons.business_outlined, clueCount: 2),
+  _Location(name: '서버실', icon: Icons.storage_outlined, clueCount: 2),
+  _Location(name: '카페', icon: Icons.local_cafe_outlined, clueCount: 1),
+  _Location(name: '비상계단', icon: Icons.stairs_outlined, clueCount: 1),
+  _Location(name: '보안실', icon: Icons.security_outlined, clueCount: 1),
 ];
 
 const _victimPinOffset = Offset(0.58, 0.42);
@@ -142,17 +120,6 @@ class _SceneScreenState extends State<SceneScreen> {
                   () => _selectedIndex = _selectedIndex == i ? null : i,
                 ),
               ),
-              // ── 3. 선택된 장소 이미지 ──────────────────────────
-              if (_selectedIndex != null &&
-                  _selectedIndex! < _locations.length &&
-                  _locations[_selectedIndex!].imageAssetKey != null) ...[
-                const SizedBox(height: AppTokens.sp4),
-                _LocationImageCard(
-                  imageUrl: _locations[_selectedIndex!].imageAssetKey,
-                  name: _locations[_selectedIndex!].name,
-                  icon: _locations[_selectedIndex!].icon,
-                ),
-              ],
             ] else if (session.isLoading) ...[
               const Padding(
                 padding: EdgeInsets.only(top: AppTokens.sp6),
@@ -298,10 +265,7 @@ class _MapPlaceholder extends StatelessWidget {
         children: [
           Icon(Icons.map_outlined, size: 48, color: c.textMute),
           const SizedBox(height: AppTokens.sp3),
-          Text(
-            '건물 평면도 영역',
-            style: AppText.bodySm.copyWith(color: c.textMute),
-          ),
+          Text('건물 평면도 영역', style: AppText.bodySm.copyWith(color: c.textMute)),
         ],
       ),
     );
@@ -369,7 +333,7 @@ class _LocationImageCard extends StatelessWidget {
     required this.icon,
   });
 
-  /// 이미지 URL 또는 로컬 assetKey. AssetImageWidget이 양쪽을 모두 처리한다.
+  /// 공개 이미지 URL. 없으면 플레이스홀더를 표시한다.
   final String? imageUrl;
   final String name;
   final IconData icon;
@@ -456,10 +420,7 @@ class _LocationList extends StatelessWidget {
 // 백엔드 locations 엔드포인트 미구현 시나리오에서 사용한다.
 
 class _SampleLocationList extends StatelessWidget {
-  const _SampleLocationList({
-    required this.selectedIndex,
-    required this.onTap,
-  });
+  const _SampleLocationList({required this.selectedIndex, required this.onTap});
 
   final int? selectedIndex;
   final ValueChanged<int> onTap;
@@ -495,7 +456,6 @@ class _SampleLocationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final bool hasImage = location.imageAssetKey != null;
 
     return AnimatedContainer(
       duration: AppMotion.dur2,
@@ -536,17 +496,10 @@ class _SampleLocationCard extends StatelessWidget {
                 const SizedBox(width: AppTokens.sp2),
                 MSPill(
                   '단서 ${location.clueCount}',
-                  tone: location.isIncident ? MSPillTone.danger : MSPillTone.mute,
+                  tone: location.isIncident
+                      ? MSPillTone.danger
+                      : MSPillTone.mute,
                 ),
-                // 이미지 있음 표시
-                if (hasImage) ...[
-                  const SizedBox(width: AppTokens.sp2),
-                  Icon(
-                    Icons.photo_outlined,
-                    size: 14,
-                    color: c.textMute,
-                  ),
-                ],
               ],
             ),
           ),
@@ -593,11 +546,7 @@ class _LocationCard extends StatelessWidget {
             padding: const EdgeInsets.all(AppTokens.sp3),
             child: Row(
               children: [
-                Icon(
-                  Icons.place_outlined,
-                  size: 18,
-                  color: c.primary,
-                ),
+                Icon(Icons.place_outlined, size: 18, color: c.primary),
                 const SizedBox(width: AppTokens.sp3),
                 Expanded(
                   child: Column(
@@ -630,11 +579,7 @@ class _LocationCard extends StatelessWidget {
                 // 이미지 있음 표시
                 if (hasImage) ...[
                   const SizedBox(width: AppTokens.sp2),
-                  Icon(
-                    Icons.photo_outlined,
-                    size: 14,
-                    color: c.textMute,
-                  ),
+                  Icon(Icons.photo_outlined, size: 14, color: c.textMute),
                 ],
               ],
             ),

@@ -7,26 +7,19 @@ import 'package:clueroom/models/play_models.dart';
 
 void main() {
   group('enum 변환', () {
-    test('evidenceImportanceFromApi — 알려진 값/미상/null 폴백', () {
-      expect(evidenceImportanceFromApi('LOW'), EvidenceImportance.low);
-      expect(evidenceImportanceFromApi('HIGH'), EvidenceImportance.high);
-      expect(evidenceImportanceFromApi('CORE'), EvidenceImportance.core);
-      expect(evidenceImportanceFromApi('FAKE'), EvidenceImportance.fake);
-      // 'NORMAL'은 명시적으로 매핑되지 않고 default로 normal이 된다.
-      expect(evidenceImportanceFromApi('NORMAL'), EvidenceImportance.normal);
-      expect(evidenceImportanceFromApi('UNKNOWN'), EvidenceImportance.normal);
-      expect(evidenceImportanceFromApi(null), EvidenceImportance.normal);
-    });
-
     test('questionType — toApi / fromApi 왕복 + 폴백', () {
       expect(questionTypeToApi(QuestionType.free), 'FREE');
       expect(questionTypeToApi(QuestionType.recommended), 'RECOMMENDED');
       expect(
-          questionTypeToApi(QuestionType.evidencePresented), 'EVIDENCE_PRESENTED');
+        questionTypeToApi(QuestionType.evidencePresented),
+        'EVIDENCE_PRESENTED',
+      );
 
       expect(questionTypeFromApi('RECOMMENDED'), QuestionType.recommended);
-      expect(questionTypeFromApi('EVIDENCE_PRESENTED'),
-          QuestionType.evidencePresented);
+      expect(
+        questionTypeFromApi('EVIDENCE_PRESENTED'),
+        QuestionType.evidencePresented,
+      );
       // 미상/null은 free로 폴백.
       expect(questionTypeFromApi('FREE'), QuestionType.free);
       expect(questionTypeFromApi('???'), QuestionType.free);
@@ -34,9 +27,18 @@ void main() {
     });
 
     test('playSessionStatusFromApi — 알려진 값/폴백', () {
-      expect(playSessionStatusFromApi('SUBMITTED'), PlaySessionStatus.submitted);
-      expect(playSessionStatusFromApi('COMPLETED'), PlaySessionStatus.completed);
-      expect(playSessionStatusFromApi('ABANDONED'), PlaySessionStatus.abandoned);
+      expect(
+        playSessionStatusFromApi('SUBMITTED'),
+        PlaySessionStatus.submitted,
+      );
+      expect(
+        playSessionStatusFromApi('COMPLETED'),
+        PlaySessionStatus.completed,
+      );
+      expect(
+        playSessionStatusFromApi('ABANDONED'),
+        PlaySessionStatus.abandoned,
+      );
       // PLAYING/미상/null은 playing으로 폴백.
       expect(playSessionStatusFromApi('PLAYING'), PlaySessionStatus.playing);
       expect(playSessionStatusFromApi('xyz'), PlaySessionStatus.playing);
@@ -53,6 +55,8 @@ void main() {
         'isUnlocked': true,
         'description': '조작된 회계 장부',
         'locationName': '대표실',
+        'imageUrl': 'https://cdn.example.com/evidence.png',
+        'imageAssetKey': 'internal/evidence-core.png',
         'unlockHint': null,
         'relatedSuspects': [
           {'suspectId': 1, 'name': '박재민'},
@@ -62,9 +66,9 @@ void main() {
 
       expect(e.evidenceId, 7);
       expect(e.title, '회계 파일');
-      expect(e.importance, EvidenceImportance.core);
       expect(e.isUnlocked, true);
       expect(e.locationName, '대표실');
+      expect(e.imageUrl, 'https://cdn.example.com/evidence.png');
       expect(e.relatedSuspects, hasLength(2));
       expect(e.relatedSuspects.first.suspectId, 1);
       expect(e.relatedSuspects.first.name, '박재민');
@@ -75,10 +79,48 @@ void main() {
 
       expect(e.evidenceId, 1);
       expect(e.title, '');
-      expect(e.importance, EvidenceImportance.normal);
       expect(e.isUnlocked, false);
       expect(e.description, isNull);
       expect(e.relatedSuspects, isEmpty);
+    });
+
+    test('raw imageAssetKey만 있으면 이미지 URL로 사용하지 않는다', () {
+      final e = PlayEvidence.fromJson({
+        'evidenceId': 9,
+        'title': '내부 키 증거',
+        'imageAssetKey': 'internal/secret.png',
+      });
+
+      expect(e.imageUrl, isNull);
+    });
+  });
+
+  group('PlaySuspect.fromJson', () {
+    test('spoiler metadata 없이 공개 필드만 파싱한다', () {
+      final s = PlaySuspect.fromJson({
+        'suspectId': 3,
+        'name': '한도윤',
+        'role': '보안팀장',
+        'interrogationCount': 2,
+        'portraitImageUrl': 'https://cdn.example.com/suspect.png',
+      });
+
+      expect(s.suspectId, 3);
+      expect(s.name, '한도윤');
+      expect(s.role, '보안팀장');
+      expect(s.interrogationCount, 2);
+      expect(s.portraitImageUrl, 'https://cdn.example.com/suspect.png');
+      expect(s.isWitness, false);
+    });
+
+    test('raw portraitAssetKey만 있으면 프로필 URL로 사용하지 않는다', () {
+      final s = PlaySuspect.fromJson({
+        'suspectId': 4,
+        'name': '최아영',
+        'portraitAssetKey': 'internal/suspect.png',
+      });
+
+      expect(s.portraitImageUrl, isNull);
     });
   });
 
@@ -126,11 +168,7 @@ void main() {
         'sessionId': 25,
         'score': 30,
         'grade': 'D',
-        'correctCulprit': {
-          'suspectId': 1,
-          'name': '박재민',
-          'role': 'CFO / 재무이사',
-        },
+        'correctCulprit': {'suspectId': 1, 'name': '박재민', 'role': 'CFO / 재무이사'},
         'matched': {
           'culprit': true,
           'motive': false,
@@ -139,10 +177,7 @@ void main() {
           'keyEvidences': 0,
         },
         'matchedParts': ['범인을 정확히 지목했습니다.'],
-        'missedParts': [
-          '범행 방법을 파악하지 못했습니다.',
-          '범행 동기를 파악하지 못했습니다.',
-        ],
+        'missedParts': ['범행 방법을 파악하지 못했습니다.', '범행 동기를 파악하지 못했습니다.'],
         'feedback': '핵심 추리는 정확합니다.',
         'fullExplanation': '범인은 CFO 박재민이다.',
         'keyEvidences': [
