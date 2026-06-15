@@ -17,6 +17,7 @@ class AuthService {
 
   static const String _accessKey = 'access_token';
   static const String _refreshKey = 'refresh_token';
+  static const Set<String> _invalidRefreshTokenCodes = {'AUTH_004', 'AUTH_005'};
 
   /// 만료 임박 판단 여유 시간. 이 시간 이내로 남은 토큰은 만료로 취급한다.
   static const Duration _expiryBuffer = Duration(seconds: 30);
@@ -174,19 +175,9 @@ class AuthService {
   Future<void> logout() async {
     final refresh = _cachedRefreshToken;
 
-    // refresh 요청이 이미 진행 중이어도 로그아웃 이후 응답은 저장하지 못하게 한다.
+    // 이미 진행 중인 refresh가 이후 새 토큰을 받으면 저장하지 않고 서버 revoke한다.
     await _clearTokens();
-
-    try {
-      if (refresh != null && refresh.isNotEmpty) {
-        await ApiClient.instance.post(
-          '/api/auth/logout',
-          body: {'refreshToken': refresh},
-        );
-      }
-    } catch (_) {
-      // 로그아웃 API 실패해도 로컬 토큰은 지운다
-    }
+    await _revokeRefreshToken(refresh);
   }
 
   /// 토큰 갱신
@@ -220,18 +211,25 @@ class AuthService {
       final newRefresh = res['refreshToken'] as String?;
 
       if (access != null && newRefresh != null) {
-        return _saveRefreshTokensIfCurrent(
+        final saved = await _saveRefreshTokensIfCurrent(
           generation: generation,
           expectedRefreshToken: token,
           access: access,
           refresh: newRefresh,
         );
+        if (!saved) {
+          await _revokeRefreshToken(newRefresh);
+        }
+        return saved;
       }
-    } catch (_) {
-      // 갱신 실패 시 로그아웃 처리
-      if (_isCurrentRefresh(generation, token)) {
+    } on ApiException catch (e) {
+      // refresh token이 실제로 무효/만료된 응답일 때만 로컬 세션을 정리한다.
+      if (_isInvalidRefreshTokenError(e) &&
+          _isCurrentRefresh(generation, token)) {
         await _clearTokens();
       }
+    } catch (_) {
+      // 네트워크/예상 밖 실패는 유효할 수 있는 refresh token을 보존한다.
     }
     return false;
   }
@@ -307,6 +305,23 @@ class AuthService {
   bool _isCurrentRefresh(int generation, String expectedRefreshToken) {
     return generation == _authGeneration &&
         _cachedRefreshToken == expectedRefreshToken;
+  }
+
+  bool _isInvalidRefreshTokenError(ApiException exception) {
+    return _invalidRefreshTokenCodes.contains(exception.code);
+  }
+
+  Future<void> _revokeRefreshToken(String? refresh) async {
+    if (refresh == null || refresh.isEmpty) return;
+
+    try {
+      await ApiClient.instance.post(
+        '/api/auth/logout',
+        body: {'refreshToken': refresh},
+      );
+    } catch (_) {
+      // 로그아웃 API 실패해도 로컬 토큰은 지운 상태를 유지한다.
+    }
   }
 
   /// bearerToken getter에서 만료 감지 시 accessToken만 저장소에서 비동기 제거한다.
