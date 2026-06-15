@@ -92,7 +92,7 @@ class AuthService {
 
   /// accessToken과 refreshToken을 모두 삭제한다.
   /// 로그아웃 또는 refresh 실패(AUTH_004/005) 시 호출한다.
-  Future<void> clearTokens() async {
+  Future<void> _clearTokens() async {
     _cachedAccessToken = null;
     _cachedRefreshToken = null;
     final prefs = await SharedPreferences.getInstance();
@@ -178,7 +178,7 @@ class AuthService {
     } catch (_) {
       // 로그아웃 API 실패해도 로컬 토큰은 지운다
     } finally {
-      await clearTokens();
+      await _clearTokens();
     }
   }
 
@@ -204,7 +204,7 @@ class AuthService {
       }
     } catch (_) {
       // 갱신 실패 시 로그아웃 처리
-      await clearTokens();
+      await _clearTokens();
     }
     return false;
   }

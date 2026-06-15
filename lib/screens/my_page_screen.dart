@@ -171,7 +171,7 @@ class _MenuItem extends StatelessWidget {
         variant: MSButtonVariant.danger,
         onPressed: () async {
           Navigator.of(context).pop();
-          await AuthService.instance.clearTokens();
+          await AuthService.instance.logout();
           if (!context.mounted) return;
           // 로그인 화면 도입 전까지는 진입 플로(Splash)로 스택을 리셋한다.
           // 추후 로그인 게이팅은 SplashScreen 한 곳에서 처리.
