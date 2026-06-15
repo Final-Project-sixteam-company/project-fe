@@ -174,10 +174,12 @@ class AuthService {
   /// 로그아웃
   Future<void> logout() async {
     final refresh = _cachedRefreshToken;
+    final inFlightRefresh = _refreshInFlight;
 
     // 이미 진행 중인 refresh가 이후 새 토큰을 받으면 저장하지 않고 서버 revoke한다.
     await _clearTokens();
     await _revokeRefreshToken(refresh);
+    await _waitForRefreshRevoke(inFlightRefresh);
   }
 
   /// 토큰 갱신
@@ -321,6 +323,16 @@ class AuthService {
       );
     } catch (_) {
       // 로그아웃 API 실패해도 로컬 토큰은 지운 상태를 유지한다.
+    }
+  }
+
+  Future<void> _waitForRefreshRevoke(Future<bool>? inFlightRefresh) async {
+    if (inFlightRefresh == null) return;
+
+    try {
+      await inFlightRefresh;
+    } catch (_) {
+      // refresh 실패는 logout 결과를 되돌리지 않는다.
     }
   }
 
