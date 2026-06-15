@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 import '../components/game_modals.dart';
 import '../controllers/game_session_provider.dart';
 import '../core/api/api_exception.dart';
-import '../models/play_evidence_models.dart';
 import '../models/play_models.dart';
 import '../models/session_models.dart';
 import '../repositories/play_session_repository.dart';
 import '../theme/app_theme.dart';
 
-// 언더바(_)를 제거하여 외부 파일(Screen)에서 접근할 수 있도록 수정
 enum InterrogationSender { detective, suspect }
 
 class InterrogationMessage {
@@ -34,13 +32,17 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
   ScrollController get scrollCtrl;
 
   // ── 내부 상태 (mixin 사용 측 State에서 선언) ───────────────────────────────
-  List<InterrogationMessage> get messages; // 타입 변경
+  List<InterrogationMessage> get messages;
   bool get isWaiting;
   set isWaiting(bool v);
   String? get prefillEvidenceId;
   set prefillEvidenceId(String? v);
   String? get prefillEvidenceTitle;
   set prefillEvidenceTitle(String? v);
+
+  // 💡 리뷰어 피드백 반영: 프리필된 추천 질문 타입을 보관할 필드 추가
+  QuestionType? get prefillQuestionType;
+  set prefillQuestionType(QuestionType? v);
 
   // ── 메시지 전송 ─────────────────────────────────────────────────────────────
   Future<void> sendMessage(
@@ -73,6 +75,7 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
       inputCtrl.clear();
       prefillEvidenceId = null;
       prefillEvidenceTitle = null;
+      prefillQuestionType = null; // 전송 시작 시 프리필 타입 초기화
     });
     scrollToBottom();
 
@@ -98,9 +101,7 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
       final res = await playSessionRepo.interrogate(
         sessionId,
         suspectId: suspectIdInt,
-        questionType: evidenceIdInt != null
-            ? QuestionType.evidencePresented
-            : questionType,
+        questionType: questionType, // 최종 판별된 타입으로 API 요청
         question: trimmed,
         presentedEvidenceId: evidenceIdInt,
       );
@@ -158,10 +159,12 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
       setState(() {
         prefillEvidenceId = null;
         prefillEvidenceTitle = null;
+        prefillQuestionType = null;
       });
       await sendMessage(
         '이 증거를 제시합니다: ${evidence.name}',
         evidenceId: evidence.id,
+        questionType: QuestionType.evidencePresented,
       );
     }
   }
@@ -173,6 +176,8 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
       inputCtrl.selection = TextSelection.collapsed(offset: inputCtrl.text.length);
       prefillEvidenceId = sq.presentedEvidenceId?.toString();
       prefillEvidenceTitle = sq.presentedEvidenceId != null ? sq.targetName : null;
+
+      prefillQuestionType = sq.questionType as QuestionType?;
     });
   }
 
