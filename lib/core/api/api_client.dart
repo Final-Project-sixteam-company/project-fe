@@ -195,7 +195,9 @@ class ApiClient {
     if (!path.startsWith(prefix)) return false;
 
     final scenarioId = path.substring(prefix.length);
-    return scenarioId.isNotEmpty && !scenarioId.contains('/');
+    return scenarioId.isNotEmpty &&
+        !scenarioId.contains('/') &&
+        int.tryParse(scenarioId) != null;
   }
 
   Future<http.Response> _sendOnce(
