@@ -27,6 +27,8 @@ Future<void> main() async {
   // AuthService 초기화 — 저장된 토큰 로드
   await AuthService.instance.init();
   ApiClient.instance.authTokenProvider = () => AuthService.instance.bearerToken;
+  ApiClient.instance.authRefreshProvider = () =>
+      AuthService.instance.refreshTokens();
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await _configureFirebaseMessaging();

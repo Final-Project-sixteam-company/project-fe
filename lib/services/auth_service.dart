@@ -22,6 +22,7 @@ class AuthService {
 
   String? _cachedAccessToken;
   String? _cachedRefreshToken;
+  Future<bool>? _refreshInFlight;
 
   /// Authorization 헤더에 붙일 Bearer 값.
   ///
@@ -185,7 +186,20 @@ class AuthService {
   /// 토큰 갱신
   Future<bool> refresh() => refreshTokens();
 
-  Future<bool> refreshTokens() async {
+  Future<bool> refreshTokens() {
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) return inFlight;
+
+    final future = _refreshTokensInternal();
+    _refreshInFlight = future;
+    return future.whenComplete(() {
+      if (identical(_refreshInFlight, future)) {
+        _refreshInFlight = null;
+      }
+    });
+  }
+
+  Future<bool> _refreshTokensInternal() async {
     final token = _cachedRefreshToken;
     if (token == null) return false;
 
