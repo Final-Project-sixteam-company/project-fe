@@ -160,9 +160,15 @@ class ApiClient {
       }
     }
 
-    if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
+    if (token == null || token.isEmpty) {
+      throw const ApiException(
+        code: 'AUTH_REQUIRED',
+        message: '로그인이 필요합니다.',
+        status: 401,
+      );
     }
+
+    headers['Authorization'] = 'Bearer $token';
 
     return headers;
   }
