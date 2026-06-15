@@ -36,6 +36,9 @@ class Scenario {
   final String? coverAssetKey;
   final String? mapAssetKey;
   final ScenarioGenre? genre;
+  /// API Spec §6.1, §6.2 — 서버가 내려주는 플레이 가능 여부.
+  /// false 이면 플레이 버튼 비활성. 클라이언트 하드코딩 ID 목록으로 판단하지 않는다.
+  final bool canPlay;
 
   const Scenario({
     required this.id,
@@ -56,6 +59,7 @@ class Scenario {
     this.coverAssetKey,
     this.mapAssetKey,
     this.genre,
+    this.canPlay = false,
   });
 
   String get difficultyLabel => switch (difficulty) {
