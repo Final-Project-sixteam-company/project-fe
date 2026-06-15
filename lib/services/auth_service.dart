@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_exception.dart';
-import '../core/oauth/oauth_config.dart';
+import '../core/device/device_id_provider.dart';
 
 /// JWT 토큰 저장/조회 서비스.
 ///
@@ -29,14 +29,14 @@ class AuthService {
   /// 앱이 장시간 포그라운드에 머물거나 백그라운드에서 복귀했을 때
   /// init() 통과 후 만료된 토큰이 헤더에 실리는 상황을 방지한다.
   ///
-  /// 만료가 감지되면 accessToken 캐시만 즉시 비운다.
-  /// refreshToken은 갱신 플로우(/api/auth/refresh)에서 사용할 수 있으므로 보존한다.
+  /// 만료가 감지되면 accessToken 캐시만 즉시 비운다. refreshToken은 보존해
+  /// startup silent refresh 또는 명시적인 refresh 플로우에서 사용할 수 있게 한다.
   String? get bearerToken {
     final token = _cachedAccessToken;
     if (token == null) return null;
 
     if (!_isUsableToken(token)) {
-      // accessToken만 만료 — 메모리·저장소에서 제거하되 refreshToken은 유지한다.
+      // accessToken만 만료 - 메모리/저장소에서 제거하되 refreshToken은 유지한다.
       _cachedAccessToken = null;
       _evictStoredAccessToken();
       return null;
@@ -57,17 +57,23 @@ class AuthService {
     final stored = prefs.getString(_accessKey);
     final refresh = prefs.getString(_refreshKey);
 
-    if (stored != null) {
-      if (_isUsableToken(stored)) {
-        // accessToken이 유효하면 둘 다 복원한다.
-        _cachedAccessToken = stored;
-        _cachedRefreshToken = refresh;
-      } else {
-        // accessToken이 만료되었거나 유효하지 않으면 access/refresh 모두 완전 삭제
-        await clearTokens();
-      }
+    if (stored != null && _isUsableToken(stored)) {
+      // accessToken이 유효하면 둘 다 복원한다.
+      _cachedAccessToken = stored;
+      _cachedRefreshToken = refresh;
+      return;
+    }
+
+    _cachedAccessToken = null;
+    _cachedRefreshToken = refresh;
+    await prefs.remove(_accessKey);
+
+    if (refresh != null && refresh.isNotEmpty) {
+      // accessToken이 만료되었더라도 refreshToken이 있으면 먼저 세션 복원을 시도한다.
+      final refreshed = await refreshTokens();
+      if (refreshed) return;
     } else {
-      // 저장된 토큰 자체가 없음 — 완전 미인증 상태
+      // 저장된 토큰 자체가 없음 - 완전 미인증 상태
       _cachedAccessToken = null;
       _cachedRefreshToken = null;
     }
@@ -98,9 +104,10 @@ class AuthService {
 
   /// Dev 로그인 (Phase 1 / MVP)
   Future<void> loginDev(String email) async {
+    final deviceId = await DeviceIdProvider.getOrCreate();
     final res = await ApiClient.instance.post(
       '/api/auth/dev',
-      body: {'email': email},
+      body: {'email': email, 'deviceId': deviceId},
     );
     // 응답이 { accessToken: ..., refreshToken: ..., user: ... } 형태라고 가정
     final access = res['accessToken'] as String?;
@@ -119,7 +126,6 @@ class AuthService {
     required String provider,
     String? idToken,
     String? accessToken,
-    String deviceId = OAuthConfig.deviceId,
   }) async {
     if (provider == 'GOOGLE' && (idToken == null || idToken.isEmpty)) {
       throw const ApiException(
@@ -134,6 +140,7 @@ class AuthService {
       );
     }
 
+    final deviceId = await DeviceIdProvider.getOrCreate();
     final body = <String, dynamic>{'provider': provider, 'deviceId': deviceId};
     if (idToken != null && idToken.isNotEmpty) {
       body['idToken'] = idToken;
@@ -159,8 +166,15 @@ class AuthService {
 
   /// 로그아웃
   Future<void> logout() async {
+    final refresh = _cachedRefreshToken;
+
     try {
-      await ApiClient.instance.post('/api/auth/logout');
+      if (refresh != null && refresh.isNotEmpty) {
+        await ApiClient.instance.post(
+          '/api/auth/logout',
+          body: {'refreshToken': refresh},
+        );
+      }
     } catch (_) {
       // 로그아웃 API 실패해도 로컬 토큰은 지운다
     } finally {
@@ -169,14 +183,17 @@ class AuthService {
   }
 
   /// 토큰 갱신
-  Future<bool> refresh() async {
+  Future<bool> refresh() => refreshTokens();
+
+  Future<bool> refreshTokens() async {
     final token = _cachedRefreshToken;
     if (token == null) return false;
 
     try {
+      final deviceId = await DeviceIdProvider.getOrCreate();
       final res = await ApiClient.instance.post(
         '/api/auth/refresh',
-        body: {'refreshToken': token},
+        body: {'refreshToken': token, 'deviceId': deviceId},
       );
       final access = res['accessToken'] as String?;
       final newRefresh = res['refreshToken'] as String?;
@@ -194,7 +211,7 @@ class AuthService {
 
   /// 내 정보 조회
   Future<Map<String, dynamic>> fetchMe() async {
-    final res = await ApiClient.instance.get('/api/users/me');
+    final res = await ApiClient.instance.get('/api/auth/me');
     return res as Map<String, dynamic>;
   }
 

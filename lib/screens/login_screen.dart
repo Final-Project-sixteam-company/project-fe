@@ -85,7 +85,6 @@ class _LoginScreenState extends State<LoginScreen> {
       await AuthService.instance.loginOAuth(
         provider: 'GOOGLE',
         idToken: idToken,
-        deviceId: OAuthConfig.deviceId,
       );
       await _finishLogin();
     } on GoogleSignInException catch (e) {
@@ -111,7 +110,6 @@ class _LoginScreenState extends State<LoginScreen> {
       await AuthService.instance.loginOAuth(
         provider: 'KAKAO',
         accessToken: kakaoToken.accessToken,
-        deviceId: OAuthConfig.deviceId,
       );
       await _finishLogin();
     } on KakaoClientException catch (e) {
@@ -201,6 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    const showDevLogin = OAuthConfig.enableDevLogin;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -259,65 +258,69 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 48),
 
-              // Dev Login form
-              Text(
-                '개발자 로그인 (Dev Login)',
-                style: AppText.bodySm.copyWith(color: c.textMute),
-              ),
-              const SizedBox(height: AppTokens.sp2),
-              TextField(
-                controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                style: AppText.body.copyWith(color: c.text),
-                decoration: InputDecoration(
-                  hintText: '이메일을 입력하세요 (예: user@example.com)',
-                  hintStyle: AppText.body.copyWith(color: c.textMute),
-                  filled: true,
-                  fillColor: c.bgElev,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppTokens.r4),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppTokens.r4),
-                    borderSide: BorderSide(color: c.primary, width: 1.5),
+              if (showDevLogin) ...[
+                Text(
+                  '개발자 로그인 (Dev Login)',
+                  style: AppText.bodySm.copyWith(color: c.textMute),
+                ),
+                const SizedBox(height: AppTokens.sp2),
+                TextField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  style: AppText.body.copyWith(color: c.text),
+                  decoration: InputDecoration(
+                    hintText: '이메일을 입력하세요 (예: user@example.com)',
+                    hintStyle: AppText.body.copyWith(color: c.textMute),
+                    filled: true,
+                    fillColor: c.bgElev,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppTokens.r4),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppTokens.r4),
+                      borderSide: BorderSide(color: c.primary, width: 1.5),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: AppTokens.sp6),
+                MSButton(
+                  label: '로그인',
+                  variant: MSButtonVariant.primary,
+                  expanded: true,
+                  loading: _loadingAction == _LoginAction.dev,
+                  onPressed: _isLoading ? null : _loginDev,
+                ),
+                const SizedBox(height: AppTokens.sp8),
+              ],
+
               if (_errorMsg != null) ...[
                 const SizedBox(height: AppTokens.sp2),
                 Text(
                   _errorMsg!,
                   style: AppText.caption.copyWith(color: AppColors.roseBase),
                 ),
+                const SizedBox(height: AppTokens.sp6),
               ],
-              const SizedBox(height: AppTokens.sp6),
-              MSButton(
-                label: '로그인',
-                variant: MSButtonVariant.primary,
-                expanded: true,
-                loading: _loadingAction == _LoginAction.dev,
-                onPressed: _isLoading ? null : _loginDev,
-              ),
-              const SizedBox(height: AppTokens.sp8),
 
-              // Divider
-              Row(
-                children: [
-                  Expanded(child: Divider(color: c.line)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppTokens.sp4,
+              if (showDevLogin) ...[
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: c.line)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppTokens.sp4,
+                      ),
+                      child: Text(
+                        '또는',
+                        style: AppText.caption.copyWith(color: c.textMute),
+                      ),
                     ),
-                    child: Text(
-                      '또는',
-                      style: AppText.caption.copyWith(color: c.textMute),
-                    ),
-                  ),
-                  Expanded(child: Divider(color: c.line)),
-                ],
-              ),
-              const SizedBox(height: AppTokens.sp8),
+                    Expanded(child: Divider(color: c.line)),
+                  ],
+                ),
+                const SizedBox(height: AppTokens.sp8),
+              ],
 
               MSButton(
                 label: 'Google 로그인',

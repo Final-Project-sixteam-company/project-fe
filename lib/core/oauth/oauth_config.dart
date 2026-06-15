@@ -16,8 +16,8 @@ abstract final class OAuthConfig {
     defaultValue: '17ecda588dc1798c2dd902f5dd1084f1',
   );
 
-  static const String deviceId = String.fromEnvironment(
-    'OAUTH_DEVICE_ID',
-    defaultValue: 'android-debug',
+  static const bool enableDevLogin = bool.fromEnvironment(
+    'ENABLE_DEV_LOGIN',
+    defaultValue: false,
   );
 }
