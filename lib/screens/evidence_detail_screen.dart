@@ -85,9 +85,10 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
           q.question.trim().isNotEmpty;
     }).toList();
 
-    final compareEvidences = guidance.compareEvidences
-        .where((e) => e.title.trim().isNotEmpty)
-        .toList();
+    final compareEvidences = guidance.compareEvidences.where((e) {
+      if (!e.isUnlocked) return true;
+      return e.title.trim().isNotEmpty;
+    }).toList();
 
     return EvidenceGuidance(
       readingPoints: guidance.readingPoints
