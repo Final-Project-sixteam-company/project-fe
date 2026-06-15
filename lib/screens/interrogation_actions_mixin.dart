@@ -40,7 +40,7 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
   String? get prefillEvidenceTitle;
   set prefillEvidenceTitle(String? v);
 
-  // 💡 리뷰어 피드백 반영: 프리필된 추천 질문 타입을 보관할 필드 추가
+  // 리뷰어 피드백 반영: 프리필된 추천 질문 타입을 보관할 필드
   QuestionType? get prefillQuestionType;
   set prefillQuestionType(QuestionType? v);
 
@@ -101,7 +101,7 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
       final res = await playSessionRepo.interrogate(
         sessionId,
         suspectId: suspectIdInt,
-        questionType: questionType, // 최종 판별된 타입으로 API 요청
+        questionType: questionType, // 판별된 최적의 타입으로 요청 수행
         question: trimmed,
         presentedEvidenceId: evidenceIdInt,
       );
@@ -177,7 +177,8 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
       prefillEvidenceId = sq.presentedEvidenceId?.toString();
       prefillEvidenceTitle = sq.presentedEvidenceId != null ? sq.targetName : null;
 
-      prefillQuestionType = sq.questionType as QuestionType?;
+      // 💡 리뷰어 피드백 최종 조치: String을 모델 내부 파싱 유틸리티를 활용해 안전하게 매핑
+      prefillQuestionType = questionTypeFromApi(sq.questionType);
     });
   }
 
