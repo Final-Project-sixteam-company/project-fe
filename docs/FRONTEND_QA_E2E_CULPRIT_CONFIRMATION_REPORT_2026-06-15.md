@@ -3,9 +3,10 @@
 ## 0. Scope
 
 이 문서는 2026-06-15 Flutter Android emulator 실행과 운영 API fallback QA 결과를 프론트엔드 관점에서 정리한 보고서다.
+앱 UI E2E 성공 보고서가 아니라, 앱 로그인 blocker와 API fallback 성공/한계를 함께 기록한 QA 보고서다.
 
 ```text
-Frontend repo: C:\java\assignment\spring\start-up-fe
+Frontend repo: local checkout
 Frontend branch/commit: develop / 51a1ac8
 Backend API: https://api.clueroom.xyz
 Device: Pixel_10 Android emulator, Android 17 API 37
@@ -149,6 +150,7 @@ flutter build apk --debug --dart-define=API_BASE_URL=https://api.clueroom.xyz: P
 flutter test: PASS
 flutter analyze: FAIL, 기존 lint/info 4건
 git status before docs: pubspec.yaml/pubspec.lock pre-existing changes present
+bidi/hidden control character scan: PASS
 destructive command: 실행하지 않음
 feature code edit: 없음
 ```
