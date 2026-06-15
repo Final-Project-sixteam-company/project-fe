@@ -11,10 +11,10 @@ class StatCell {
   final StatTone tone;
 
   const StatCell(
-    this.label,
-    this.value, {
-    this.tone = StatTone.neutral,
-  });
+      this.label,
+      this.value, {
+        this.tone = StatTone.neutral,
+      });
 }
 
 class MSStatRow extends StatelessWidget {
@@ -96,10 +96,10 @@ class MSStatRow extends StatelessWidget {
           Text(
             cell.label.toUpperCase(),
             style: AppText.monoLabel.copyWith(
-              fontSize: 9,
-              letterSpacing: 9 * 0.14,
+              fontSize: AppTokens.fsXs,
+              letterSpacing: AppTokens.fsXs * 0.14,
               color: c.textMute,
-              height: 1.0,
+              height: AppTokens.lhLabel,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -109,10 +109,10 @@ class MSStatRow extends StatelessWidget {
           Text(
             cell.value,
             style: AppText.monoNum.copyWith(
-              fontSize: 15,
+              fontSize: AppTokens.fsXl,
               fontWeight: FontWeight.w600,
               color: valueColor,
-              height: 1.0,
+              height: AppTokens.lhLabel,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -133,7 +133,7 @@ class MSStatRowExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(AppTokens.sp4),
       child: Column(
         children: const [
           MSStatRow([
@@ -141,7 +141,7 @@ class MSStatRowExample extends StatelessWidget {
             StatCell('확보 단서', '8/12', tone: StatTone.good),
             StatCell('위험도', '94%', tone: StatTone.warn),
           ]),
-          SizedBox(height: 16),
+          const SizedBox(height: AppTokens.sp4),
           MSStatRow([
             StatCell('알리바이', '불확실', tone: StatTone.warn),
             StatCell('혈액형', 'AB'),
