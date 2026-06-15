@@ -17,7 +17,12 @@ class AuthService {
 
   static const String _accessKey = 'access_token';
   static const String _refreshKey = 'refresh_token';
-  static const Set<String> _invalidRefreshTokenCodes = {'AUTH_004', 'AUTH_005'};
+  static const Set<String> _terminalRefreshFailureCodes = {
+    'AUTH_004',
+    'AUTH_005',
+    'AUTH_006',
+    'AUTH_007',
+  };
 
   /// 만료 임박 판단 여유 시간. 이 시간 이내로 남은 토큰은 만료로 취급한다.
   static const Duration _expiryBuffer = Duration(seconds: 30);
@@ -95,7 +100,7 @@ class AuthService {
   }
 
   /// accessToken과 refreshToken을 모두 삭제한다.
-  /// 로그아웃 또는 refresh 실패(AUTH_004/005) 시 호출한다.
+  /// 로그아웃 또는 terminal refresh 실패(AUTH_004~007) 시 호출한다.
   Future<void> _clearTokens() async {
     _invalidateInFlightRefreshes();
     await _withTokenStoreLock(() async {
@@ -226,7 +231,7 @@ class AuthService {
       }
     } on ApiException catch (e) {
       // refresh token이 실제로 무효/만료된 응답일 때만 로컬 세션을 정리한다.
-      if (_isInvalidRefreshTokenError(e) &&
+      if (_isTerminalRefreshFailure(e) &&
           _isCurrentRefresh(generation, token)) {
         await _clearTokens();
       }
@@ -309,8 +314,8 @@ class AuthService {
         _cachedRefreshToken == expectedRefreshToken;
   }
 
-  bool _isInvalidRefreshTokenError(ApiException exception) {
-    return _invalidRefreshTokenCodes.contains(exception.code);
+  bool _isTerminalRefreshFailure(ApiException exception) {
+    return _terminalRefreshFailureCodes.contains(exception.code);
   }
 
   Future<void> _revokeRefreshToken(String? refresh) async {
