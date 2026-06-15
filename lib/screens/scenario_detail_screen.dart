@@ -12,10 +12,7 @@ import '../theme/app_theme.dart';
 import 'case_briefing_screen.dart';
 import 'scenario_detail_widgets.dart';
 
-/// 로컬 플레이 허용 ID 목록 (백엔드 canPlay 필드 미지원 시 fallback).
-/// 백엔드 canPlay: true 를 신뢰하도록 전환 전까지 여기에 추가한다.
-const _kLocalPlayableIds = {'1', '4', '5', '10', '11'};
-const _kBookmarkPrefix   = 'bookmark_';
+const _kBookmarkPrefix = 'bookmark_';
 
 class ScenarioDetailScreen extends StatefulWidget {
   const ScenarioDetailScreen({required this.scenario, super.key});
@@ -30,8 +27,8 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
   bool _isLoading = false;
   late Scenario _detailedScenario; // 전체 상세 데이터를 담을 변수
 
-  /// canPlay 필드가 Scenario 모델에 추가되면 그 값으로 교체한다.
-  bool get _isPlayable => _kLocalPlayableIds.contains(widget.scenario.id);
+  /// API Spec §6.1, §6.2 — 서버 canPlay 값 사용. 상세 로딩 완료 전에는 false.
+  bool get _isPlayable => _detailedScenario.canPlay;
 
   @override
   void initState() {
@@ -122,7 +119,7 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
               padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
               child: _isLoading
                   ? const Center(
-                child: Padding(
+                child: const Padding(
                   padding: EdgeInsets.all(AppTokens.sp10),
                   child: CircularProgressIndicator(),
                 ),
