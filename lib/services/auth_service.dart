@@ -23,6 +23,7 @@ class AuthService {
   String? _cachedAccessToken;
   String? _cachedRefreshToken;
   Future<bool>? _refreshInFlight;
+  int _authGeneration = 0;
 
   /// Authorization 헤더에 붙일 Bearer 값.
   ///
@@ -84,16 +85,14 @@ class AuthService {
     required String access,
     required String refresh,
   }) async {
-    _cachedAccessToken = access;
-    _cachedRefreshToken = refresh;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_accessKey, access);
-    await prefs.setString(_refreshKey, refresh);
+    _invalidateInFlightRefreshes();
+    await _persistTokens(access: access, refresh: refresh);
   }
 
   /// accessToken과 refreshToken을 모두 삭제한다.
   /// 로그아웃 또는 refresh 실패(AUTH_004/005) 시 호출한다.
   Future<void> _clearTokens() async {
+    _invalidateInFlightRefreshes();
     _cachedAccessToken = null;
     _cachedRefreshToken = null;
     final prefs = await SharedPreferences.getInstance();
@@ -169,6 +168,9 @@ class AuthService {
   Future<void> logout() async {
     final refresh = _cachedRefreshToken;
 
+    // refresh 요청이 이미 진행 중이어도 로그아웃 이후 응답은 저장하지 못하게 한다.
+    await _clearTokens();
+
     try {
       if (refresh != null && refresh.isNotEmpty) {
         await ApiClient.instance.post(
@@ -178,8 +180,6 @@ class AuthService {
       }
     } catch (_) {
       // 로그아웃 API 실패해도 로컬 토큰은 지운다
-    } finally {
-      await _clearTokens();
     }
   }
 
@@ -190,7 +190,8 @@ class AuthService {
     final inFlight = _refreshInFlight;
     if (inFlight != null) return inFlight;
 
-    final future = _refreshTokensInternal();
+    final generation = _authGeneration;
+    final future = _refreshTokensInternal(generation);
     _refreshInFlight = future;
     return future.whenComplete(() {
       if (identical(_refreshInFlight, future)) {
@@ -199,9 +200,9 @@ class AuthService {
     });
   }
 
-  Future<bool> _refreshTokensInternal() async {
+  Future<bool> _refreshTokensInternal(int generation) async {
     final token = _cachedRefreshToken;
-    if (token == null) return false;
+    if (token == null || token.isEmpty) return false;
 
     try {
       final deviceId = await DeviceIdProvider.getOrCreate();
@@ -213,8 +214,12 @@ class AuthService {
       final newRefresh = res['refreshToken'] as String?;
 
       if (access != null && newRefresh != null) {
-        await saveTokens(access: access, refresh: newRefresh);
-        return true;
+        return _saveRefreshTokensIfCurrent(
+          generation: generation,
+          expectedRefreshToken: token,
+          access: access,
+          refresh: newRefresh,
+        );
       }
     } catch (_) {
       // 갱신 실패 시 로그아웃 처리
@@ -230,6 +235,55 @@ class AuthService {
   }
 
   // ── 내부 헬퍼 ────────────────────────────────────────────────────────────
+
+  void _invalidateInFlightRefreshes() {
+    _authGeneration += 1;
+    _refreshInFlight = null;
+  }
+
+  Future<void> _persistTokens({
+    required String access,
+    required String refresh,
+  }) async {
+    _cachedAccessToken = access;
+    _cachedRefreshToken = refresh;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accessKey, access);
+    await prefs.setString(_refreshKey, refresh);
+  }
+
+  Future<bool> _saveRefreshTokensIfCurrent({
+    required int generation,
+    required String expectedRefreshToken,
+    required String access,
+    required String refresh,
+  }) async {
+    if (!_isCurrentRefresh(generation, expectedRefreshToken)) {
+      return false;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    if (!_isCurrentRefresh(generation, expectedRefreshToken)) {
+      return false;
+    }
+
+    await prefs.setString(_accessKey, access);
+    await prefs.setString(_refreshKey, refresh);
+    if (!_isCurrentRefresh(generation, expectedRefreshToken)) {
+      await prefs.remove(_accessKey);
+      await prefs.remove(_refreshKey);
+      return false;
+    }
+
+    _cachedAccessToken = access;
+    _cachedRefreshToken = refresh;
+    return true;
+  }
+
+  bool _isCurrentRefresh(int generation, String expectedRefreshToken) {
+    return generation == _authGeneration &&
+        _cachedRefreshToken == expectedRefreshToken;
+  }
 
   /// bearerToken getter에서 만료 감지 시 accessToken만 저장소에서 비동기 제거한다.
   /// refreshToken은 건드리지 않는다.
