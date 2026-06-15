@@ -13,6 +13,7 @@
 | [FRONTEND_BACKEND_DRIFT.md](FRONTEND_BACKEND_DRIFT.md) | CURRENT | 백엔드 최신 계약 대비 drift와 수정 우선순위 |
 | [FRONTEND_API_INTEGRATION_GUIDE.md](FRONTEND_API_INTEGRATION_GUIDE.md) | CURRENT | 백엔드 최신 계약 반영을 위한 프론트 구현 가이드 |
 | [FRONTEND_GUIDANCE_UX_IMPLEMENTATION_PLAN.md](FRONTEND_GUIDANCE_UX_IMPLEMENTATION_PLAN.md) | CURRENT | evidence guidance와 suggested question UX 구현 계획 |
+| [FRONTEND_QA_E2E_CULPRIT_CONFIRMATION_REPORT_2026-06-15.md](FRONTEND_QA_E2E_CULPRIT_CONFIRMATION_REPORT_2026-06-15.md) | CURRENT | 2026-06-15 Android E2E login blocker와 API fallback 범인 확정 QA 보고서 |
 | [../README.md](../README.md) | CURRENT | ClueRoom Flutter 앱 실행/구조/백엔드 drift 요약 |
 | [../api-spec.md](../api-spec.md) | CURRENT | 최신 API 정본 위치를 안내하는 notice |
 | [archive/README.md](archive/README.md) | CURRENT | 흡수 완료된 과거 프론트 문서 archive index |
