@@ -61,11 +61,11 @@ class MSKickerExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(AppTokens.sp4),
       child: Column(
         children: [
           MSKicker('suspect timeline'),
-          SizedBox(height: 32),
+          const SizedBox(height: AppTokens.sp8),
           MSKicker('evidence logs'),
         ],
       ),
