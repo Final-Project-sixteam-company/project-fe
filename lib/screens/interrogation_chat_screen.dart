@@ -75,6 +75,12 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
   /// Guidance prefill로 설정된 증거 이름 표시용 상태 변수.
   String? _prefillEvidenceTitle;
 
+  /// Chip/guidance prefill로 설정된 질문 타입. 전송 후 기본 FREE로 리셋한다.
+  QuestionType _prefillQuestionType = QuestionType.free;
+
+  /// Prefill 원문. 사용자가 내용을 바꾸면 추천 질문 타입을 FREE로 되돌린다.
+  String? _prefillQuestionText;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -121,6 +127,10 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
                 ? widget.presentedEvidenceTitle!.trim()
                 : '선택된 증거')
           : null;
+      _prefillQuestionType = hasPresentedEvidence
+          ? QuestionType.evidencePresented
+          : QuestionType.free;
+      _prefillQuestionText = _inputCtrl.text;
     }
 
     _scrollToBottom();
@@ -168,6 +178,8 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
       // 이전에 머물러 있던 모든 가이드라인 prefill 상태를 안전하게 청소합니다.
       _prefillEvidenceId = null;
       _prefillEvidenceTitle = null;
+      _prefillQuestionType = QuestionType.free;
+      _prefillQuestionText = null;
     });
 
     _scrollToBottom();
@@ -279,6 +291,7 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
     String question, {
     String? evidenceId,
     String? evidenceTitle,
+    QuestionType questionType = QuestionType.free,
   }) {
     final trimmed = question.trim();
     if (trimmed.isEmpty || _isWaiting) return;
@@ -296,11 +309,24 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
                 ? evidenceTitle!.trim()
                 : '선택된 증거')
           : null;
+      _prefillQuestionType = hasEvidence
+          ? QuestionType.evidencePresented
+          : questionType;
+      _prefillQuestionText = trimmed;
     });
   }
 
   void _prefillSuggestedQuestion(String question) {
-    _prefillQuestion(question);
+    _prefillQuestion(question, questionType: QuestionType.recommended);
+  }
+
+  QuestionType _questionTypeForCurrentInput() {
+    if (_prefillEvidenceId != null) return QuestionType.evidencePresented;
+    if (_prefillQuestionType == QuestionType.recommended &&
+        _prefillQuestionText == _inputCtrl.text.trim()) {
+      return QuestionType.recommended;
+    }
+    return QuestionType.free;
   }
 
   @override
@@ -348,15 +374,15 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen> {
               setState(() {
                 _prefillEvidenceId = null;
                 _prefillEvidenceTitle = null;
+                _prefillQuestionType = QuestionType.free;
+                _prefillQuestionText = null;
               });
             },
             onSend: () {
               _sendMessage(
                 _inputCtrl.text,
                 evidenceId: _prefillEvidenceId,
-                questionType: _prefillEvidenceId != null
-                    ? QuestionType.evidencePresented
-                    : QuestionType.free,
+                questionType: _questionTypeForCurrentInput(),
               );
             },
             onPresentEvidence: _isWaiting ? null : _presentEvidence,
