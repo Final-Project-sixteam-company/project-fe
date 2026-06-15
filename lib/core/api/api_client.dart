@@ -72,6 +72,7 @@ class Page<T> {
 /// Authorization 헤더 정책:
 ///   - 실제 accessToken이 존재할 때만 `Authorization: Bearer {token}` 을 첨부한다.
 ///   - _kNoAuthPaths 에 포함된 경로에는 헤더를 붙이지 않는다.
+///   - public scenario 조회는 토큰이 없어도 backend public 응답을 그대로 사용한다.
 ///   - mock/더미/만료 토큰은 AuthService.init()에서 걸러지므로 여기서는 null 여부만 확인한다.
 class ApiClient {
   ApiClient._();
@@ -113,10 +114,10 @@ class ApiClient {
     Duration? timeout,
   }) async {
     final uri = _buildUri(path, query);
-    final requiresAuth = !_kNoAuthPaths.contains(path);
+    final requiresAuth = _requiresAuth(method, path);
     final encodedBody = body == null ? null : jsonEncode(body);
 
-    var headers = await _headersFor(path);
+    var headers = await _headersFor(method, path);
     var res = await _sendOnce(
       method,
       uri,
@@ -126,7 +127,7 @@ class ApiClient {
     );
 
     if (requiresAuth && res.statusCode == 401 && await _tryRefresh()) {
-      headers = await _headersFor(path, refreshIfMissing: false);
+      headers = await _headersFor(method, path, refreshIfMissing: false);
       res = await _sendOnce(
         method,
         uri,
@@ -140,6 +141,7 @@ class ApiClient {
   }
 
   Future<Map<String, String>> _headersFor(
+    String method,
     String path, {
     bool refreshIfMissing = true,
   }) async {
@@ -153,6 +155,13 @@ class ApiClient {
     }
 
     var token = authTokenProvider?.call();
+    if (_isPublicScenarioRead(method, path)) {
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      return headers;
+    }
+
     if ((token == null || token.isEmpty) && refreshIfMissing) {
       final refreshed = await _tryRefresh();
       if (refreshed) {
@@ -171,6 +180,22 @@ class ApiClient {
     headers['Authorization'] = 'Bearer $token';
 
     return headers;
+  }
+
+  bool _requiresAuth(String method, String path) {
+    return !_kNoAuthPaths.contains(path) &&
+        !_isPublicScenarioRead(method, path);
+  }
+
+  bool _isPublicScenarioRead(String method, String path) {
+    if (method != 'GET') return false;
+    if (path == '/api/scenarios') return true;
+
+    const prefix = '/api/scenarios/';
+    if (!path.startsWith(prefix)) return false;
+
+    final scenarioId = path.substring(prefix.length);
+    return scenarioId.isNotEmpty && !scenarioId.contains('/');
   }
 
   Future<http.Response> _sendOnce(

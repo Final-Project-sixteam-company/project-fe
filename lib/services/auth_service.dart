@@ -223,7 +223,9 @@ class AuthService {
       }
     } catch (_) {
       // 갱신 실패 시 로그아웃 처리
-      await _clearTokens();
+      if (_isCurrentRefresh(generation, token)) {
+        await _clearTokens();
+      }
     }
     return false;
   }
