@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../components/game_modals.dart';
 import '../controllers/game_session_provider.dart';
 import '../core/api/api_exception.dart';
+import '../models/play_interrogation_models.dart';
 import '../models/play_models.dart';
 import '../models/session_models.dart';
 import '../repositories/play_session_repository.dart';
@@ -174,10 +175,19 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
     setState(() {
       inputCtrl.text = sq.question;
       inputCtrl.selection = TextSelection.collapsed(offset: inputCtrl.text.length);
-      prefillEvidenceId = sq.presentedEvidenceId?.toString();
-      prefillEvidenceTitle = sq.presentedEvidenceId != null ? sq.targetName : null;
 
-      // 💡 리뷰어 피드백 최종 조치: String을 모델 내부 파싱 유틸리티를 활용해 안전하게 매핑
+      final evidenceIdStr = sq.presentedEvidenceId?.toString();
+      prefillEvidenceId = evidenceIdStr;
+
+      if (evidenceIdStr != null) {
+        prefillEvidenceTitle = (sq.targetName != null && sq.targetName!.trim().isNotEmpty)
+            ? sq.targetName
+            : '연관된 증거';
+      } else {
+        prefillEvidenceTitle = null;
+      }
+
+      // String을 모델 내부 파싱 유틸리티를 활용해 안전하게 매핑
       prefillQuestionType = questionTypeFromApi(sq.questionType);
     });
   }
