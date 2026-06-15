@@ -1,10 +1,13 @@
 // lib/main.dart
 import 'package:clueroom/core/api/api_client.dart';
+import 'package:clueroom/core/oauth/oauth_config.dart';
 import 'package:clueroom/screens/splash_screen.dart';
 import 'package:clueroom/services/auth_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'theme/app_theme.dart';
 
 @pragma('vm:entry-point')
@@ -15,6 +18,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await KakaoSdk.init(nativeAppKey: OAuthConfig.kakaoNativeAppKey);
+  await GoogleSignIn.instance.initialize(
+    serverClientId: OAuthConfig.googleServerClientId,
+  );
   await Firebase.initializeApp();
 
   // AuthService 초기화 — 저장된 토큰 로드
@@ -31,9 +38,7 @@ Future<void> _configureFirebaseMessaging() async {
   final messaging = FirebaseMessaging.instance;
 
   final settings = await messaging.requestPermission();
-  debugPrint(
-    'FCM 알림 권한: ${settings.authorizationStatus.name}',
-  );
+  debugPrint('FCM 알림 권한: ${settings.authorizationStatus.name}');
 
   final token = await messaging.getToken();
   debugPrint('FCM token: $token');
@@ -47,22 +52,16 @@ Future<void> _configureFirebaseMessaging() async {
   });
 
   FirebaseMessaging.onMessage.listen((message) {
-    debugPrint(
-      'FCM 포그라운드 수신: ${message.messageId}, data: ${message.data}',
-    );
+    debugPrint('FCM 포그라운드 수신: ${message.messageId}, data: ${message.data}');
   });
 
   FirebaseMessaging.onMessageOpenedApp.listen((message) {
-    debugPrint(
-      'FCM 알림 탭: ${message.messageId}, data: ${message.data}',
-    );
+    debugPrint('FCM 알림 탭: ${message.messageId}, data: ${message.data}');
   });
 
   final initialMessage = await messaging.getInitialMessage();
   if (initialMessage != null) {
-    debugPrint(
-      'FCM 초기 메시지: ${initialMessage.messageId}',
-    );
+    debugPrint('FCM 초기 메시지: ${initialMessage.messageId}');
   }
 }
 

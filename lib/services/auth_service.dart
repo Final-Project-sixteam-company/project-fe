@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api/api_client.dart';
+import '../core/api/api_exception.dart';
+import '../core/oauth/oauth_config.dart';
 
 /// JWT 토큰 저장/조회 서비스.
 ///
@@ -12,7 +14,7 @@ class AuthService {
   AuthService._privateConstructor();
   static final AuthService instance = AuthService._privateConstructor();
 
-  static const String _accessKey  = 'access_token';
+  static const String _accessKey = 'access_token';
   static const String _refreshKey = 'refresh_token';
 
   /// 만료 임박 판단 여유 시간. 이 시간 이내로 남은 토큰은 만료로 취급한다.
@@ -51,14 +53,14 @@ class AuthService {
   bool get isLoggedIn => bearerToken != null;
 
   Future<void> init() async {
-    final prefs   = await SharedPreferences.getInstance();
-    final stored  = prefs.getString(_accessKey);
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString(_accessKey);
     final refresh = prefs.getString(_refreshKey);
 
     if (stored != null) {
       if (_isUsableToken(stored)) {
         // accessToken이 유효하면 둘 다 복원한다.
-        _cachedAccessToken  = stored;
+        _cachedAccessToken = stored;
         _cachedRefreshToken = refresh;
       } else {
         // accessToken이 만료되었거나 유효하지 않으면 access/refresh 모두 완전 삭제
@@ -66,7 +68,7 @@ class AuthService {
       }
     } else {
       // 저장된 토큰 자체가 없음 — 완전 미인증 상태
-      _cachedAccessToken  = null;
+      _cachedAccessToken = null;
       _cachedRefreshToken = null;
     }
   }
@@ -75,17 +77,17 @@ class AuthService {
     required String access,
     required String refresh,
   }) async {
-    _cachedAccessToken  = access;
+    _cachedAccessToken = access;
     _cachedRefreshToken = refresh;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_accessKey,  access);
+    await prefs.setString(_accessKey, access);
     await prefs.setString(_refreshKey, refresh);
   }
 
   /// accessToken과 refreshToken을 모두 삭제한다.
   /// 로그아웃 또는 refresh 실패(AUTH_004/005) 시 호출한다.
   Future<void> clearTokens() async {
-    _cachedAccessToken  = null;
+    _cachedAccessToken = null;
     _cachedRefreshToken = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessKey);
@@ -103,27 +105,56 @@ class AuthService {
     // 응답이 { accessToken: ..., refreshToken: ..., user: ... } 형태라고 가정
     final access = res['accessToken'] as String?;
     final refresh = res['refreshToken'] as String?;
-    
+
     if (access != null && refresh != null) {
       await saveTokens(access: access, refresh: refresh);
     }
   }
 
   /// OAuth 로그인 (Phase 2)
-  Future<void> loginOAuth(String provider, String token) async {
-    final res = await ApiClient.instance.post(
-      '/api/auth/oauth',
-      body: {
-        'provider': provider,
-        'token': token,
-      },
-    );
+  ///
+  /// Google은 SDK가 반환한 ID Token을 `idToken`으로, Kakao는 SDK가 반환한
+  /// Access Token을 `accessToken`으로 백엔드에 전달한다.
+  Future<void> loginOAuth({
+    required String provider,
+    String? idToken,
+    String? accessToken,
+    String deviceId = OAuthConfig.deviceId,
+  }) async {
+    if (provider == 'GOOGLE' && (idToken == null || idToken.isEmpty)) {
+      throw const ApiException(
+        code: 'GOOGLE_ID_TOKEN_EMPTY',
+        message: 'Google ID Token을 받지 못했습니다.',
+      );
+    }
+    if (provider == 'KAKAO' && (accessToken == null || accessToken.isEmpty)) {
+      throw const ApiException(
+        code: 'KAKAO_ACCESS_TOKEN_EMPTY',
+        message: 'Kakao Access Token을 받지 못했습니다.',
+      );
+    }
+
+    final body = <String, dynamic>{'provider': provider, 'deviceId': deviceId};
+    if (idToken != null && idToken.isNotEmpty) {
+      body['idToken'] = idToken;
+    }
+    if (accessToken != null && accessToken.isNotEmpty) {
+      body['accessToken'] = accessToken;
+    }
+
+    final res = await ApiClient.instance.post('/api/auth/oauth', body: body);
     final access = res['accessToken'] as String?;
     final refresh = res['refreshToken'] as String?;
-    
+
     if (access != null && refresh != null) {
       await saveTokens(access: access, refresh: refresh);
+      return;
     }
+
+    throw const ApiException(
+      code: 'AUTH_RESPONSE_INVALID',
+      message: '로그인 응답에 토큰이 없습니다.',
+    );
   }
 
   /// 로그아웃
@@ -149,7 +180,7 @@ class AuthService {
       );
       final access = res['accessToken'] as String?;
       final newRefresh = res['refreshToken'] as String?;
-      
+
       if (access != null && newRefresh != null) {
         await saveTokens(access: access, refresh: newRefresh);
         return true;
@@ -194,13 +225,13 @@ class AuthService {
 
       // Base64Url 패딩 보정 후 payload 디코딩
       final payload = parts[1];
-      final padded  = payload.padRight(
+      final padded = payload.padRight(
         payload.length + (4 - payload.length % 4) % 4,
         '=',
       );
-      final decoded = jsonDecode(
-        utf8.decode(base64Url.decode(padded)),
-      ) as Map<String, dynamic>?;
+      final decoded =
+          jsonDecode(utf8.decode(base64Url.decode(padded)))
+              as Map<String, dynamic>?;
 
       if (decoded == null) return false;
 
