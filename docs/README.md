@@ -15,6 +15,7 @@
 | [FRONTEND_GUIDANCE_UX_IMPLEMENTATION_PLAN.md](FRONTEND_GUIDANCE_UX_IMPLEMENTATION_PLAN.md) | CURRENT | evidence guidance와 suggested question UX 구현 계획 |
 | [FRONTEND_E2E_QA_2026-06-11_CODEX.md](FRONTEND_E2E_QA_2026-06-11_CODEX.md) | REFERENCE | 2026-06-11 frontend E2E QA 기준 리포트. 6/12 문서에서 변경 상태를 추적 |
 | [FRONTEND_E2E_QA_2026-06-12_CODEX.md](FRONTEND_E2E_QA_2026-06-12_CODEX.md) | CURRENT | active session recovery 중심 2026-06-12 emulator E2E QA 결과 |
+| [FRONTEND_QA_E2E_CULPRIT_CONFIRMATION_REPORT_2026-06-15.md](FRONTEND_QA_E2E_CULPRIT_CONFIRMATION_REPORT_2026-06-15.md) | CURRENT | 2026-06-15 Android E2E login blocker와 API fallback 범인 확정 QA 보고서 |
 | [../README.md](../README.md) | CURRENT | ClueRoom Flutter 앱 실행/구조/백엔드 drift 요약 |
 | [../api-spec.md](../api-spec.md) | CURRENT | 최신 API 정본 위치를 안내하는 notice |
 | [archive/README.md](archive/README.md) | CURRENT | 흡수 완료된 과거 프론트 문서 archive index |

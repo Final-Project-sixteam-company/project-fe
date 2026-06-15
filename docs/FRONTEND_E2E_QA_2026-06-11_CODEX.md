@@ -1,20 +1,29 @@
 # ClueRoom Frontend E2E QA - 2026-06-11
 
+> Current develop note - 2026-06-15:
+> This document is a historical 2026-06-11 baseline. After the later develop
+> updates, server active-session recovery, `GET /api/play-sessions/{sessionId}/timeline`,
+> and evidence guidance model/rendering/navigation are implemented. Treat the
+> original rows for those areas as superseded; still-open frontend QA items are
+> suggested-question auto-send, spoiler-adjacent metadata usage, locked evidence
+> title UX, and full final submit/result E2E.
+
 ## 0. Final Judgment
 
 ```text
-전체 판단: Basic app smoke는 PASS, QA 프롬프트의 guidance/chip/timeline/active 복구 기준은 FAIL/PARTIAL.
-가장 큰 blocker: 추천 질문 chip 자동 전송과 evidence guidance 미구현.
+전체 판단(2026-06-11 기준): Basic app smoke는 PASS, QA 프롬프트의 guidance/chip/timeline/active 복구 기준은 FAIL/PARTIAL.
+최신 develop 반영 후 변경: active recovery, evidence guidance, timeline API는 후속 PR에서 구현됨.
+현재도 남은 큰 blocker: 추천 질문 chip 자동 전송과 spoiler-adjacent metadata UI 사용.
 정답 누설 위험: candidate/importance 계열 metadata를 UI가 직접 사용한다.
 최종 제출: 화면 진입만 확인, 실제 제출은 수행하지 않음.
-30~50턴 추리 동선: 프론트 UI 기준으로는 guidance 미구현과 자동 전송 때문에 측정 부적합.
+30~50턴 추리 동선: 최신 코드 기준으로 guidance/timeline은 재검증 필요, chip 자동 전송과 metadata 의존은 여전히 측정 blocker.
 ```
 
 ## 1. Scope
 
 | Item | Value |
 |---|---|
-| Frontend repo | `C:\java\assignment\spring\start-up-fe` |
+| Frontend repo | local checkout |
 | Branch / commit | `docs/frontend-consolidation-20260611` / `31671f3` |
 | API base URL | `https://api.clueroom.xyz` |
 | Build | Debug APK with `--dart-define=API_BASE_URL=https://api.clueroom.xyz` |
@@ -73,9 +82,9 @@ Debug build versionCode is 1, so downgrade install was required for this QA run.
 | Scenario detail | PASS | Detail screen opened |
 | Briefing | PASS | Briefing screen opened |
 | Session start | PASS | Case screen entered, evidence counter shown |
-| Evidence list/detail | PARTIAL | Data loads, but guidance is not rendered |
+| Evidence list/detail | PARTIAL | 2026-06-11 baseline: data loads, but guidance is not rendered. Latest develop implements guidance rendering |
 | Interrogation | PARTIAL | Chat opens and AI responds, but chip auto-sends |
-| Timeline | FAIL | Shows "timeline preparing", not server timeline |
+| Timeline | FAIL | 2026-06-11 baseline: shows "timeline preparing", not server timeline. Latest develop integrates timeline API |
 | Submit screen | PASS | Final deduction form opens |
 | Actual final submit/result | NOT RUN | Avoided changing session to terminal state during FE smoke |
 
@@ -85,10 +94,10 @@ Debug build versionCode is 1, so downgrade install was required for this QA run.
 |---|---|---|---|---|---|---|---|
 | P0 | Spoiler safety | UI consumes candidate/answer-adjacent metadata | Suspect list/detail and final submit use `culpritEligible`; evidence list/filter uses `importance` | User should not receive backend truth/candidate narrowing metadata | App filters/labels candidates and core evidence from server-provided metadata | Player can narrow candidates by UI affordance instead of deduction | Remove truth-adjacent fields from public API or map them to non-spoiler UI-only states server-side |
 | P1 | Suggested question UX | Chip tap auto-sends an AI call | Open suspect interrogation, tap first suggested chip | Chip should prefill input only; user must press send | User message bubble appears immediately and AI response is requested | User loses control of AI calls; QA prompt C fails | Replace hardcoded chip auto-send with prefill-only flow and draft confirm |
-| P1 | Evidence guidance | Guidance is not parsed or rendered | Open unlocked evidence detail | Show readingPoints, compareEvidences, suggestedQuestions | Detail shows description/timeline/internal fields only | 2026-06-10 "what to read/compare/ask" issue remains unresolved in app | Add guidance models, render sections, and wire suggested question navigation |
+| Resolved after 6/11 | Evidence guidance | Historical baseline: guidance was not parsed or rendered | Open unlocked evidence detail | Show readingPoints, compareEvidences, suggestedQuestions | 6/11 detail showed description/timeline/internal fields only | Superseded by latest develop after #23 | Keep guidance full E2E/widget coverage as follow-up |
 | P1 | Locked evidence masking | Locked evidence titles are visible in evidence list | Open Evidence tab after fresh session | Locked evidence should avoid spoiler-specific titles or show generic locked label | Locked rows show concrete titles with lock icon and masked description | Locked future investigation path is exposed early | Backend should mask locked titles or frontend should display generic copy for locked rows |
-| P1 | Active session recovery | Server active endpoint is not used | Code review of session load path | Use `GET /api/play-sessions/active?scenarioId=` before/after create conflict | Only local `SharedPreferences` session id is used; 409 has limited recovery | Different device/app reinstall can strand user in conflict state | Add repository method and recovery UX for server active session |
-| P1 | Timeline | Server timeline API is unused | Open Timeline tab during official scenario | Display backend timeline data | UI shows "timeline preparing" | QA prompt A/E timeline-based deduction support fails | Add timeline repository/controller/model and remove sample/placeholder gate |
+| Resolved after 6/11 | Active session recovery | Historical baseline: server active endpoint was not used | Code review of session load path | Use `GET /api/play-sessions/active?scenarioId=` before/after create conflict | 6/11 only used local `SharedPreferences` session id | Covered by 6/12 active-session recovery tests | Keep regression tests and prod-QA spot check |
+| Resolved after 6/11 | Timeline | Historical baseline: server timeline API was unused | Open Timeline tab during official scenario | Display backend timeline data | 6/11 UI showed "timeline preparing" | Superseded by latest develop after #22 | Keep timeline full E2E as follow-up |
 | P2 | Evidence detail UI | Internal fields are displayed | Open evidence detail | Show user-facing clue info and guidance | `EVIDENCE ID` and `STATUS` are shown | Debug/internal vocabulary leaks into product UX | Remove or hide internal ids/status from user screen |
 | P2 | Initial suspicion score | Suspicion numbers start visible | Open suspect list/detail | Candidate ranking should emerge from play | UI shows numeric suspicion immediately | App feels like it pre-ranks suspects | Hide initial suspicion or make it derived from player actions only |
 | P2 | Static analysis | Analyzer is failing | Run `flutter analyze` | PR quality gate should pass | 25 issues found | CI/review signal is noisy | Separate lint cleanup PR |
@@ -101,12 +110,12 @@ Debug build versionCode is 1, so downgrade install was required for this QA run.
 | hardcoded suggested questions | `lib/screens/interrogation_chat_screen.dart:31` |
 | chip auto-send | `lib/screens/interrogation_chat_screen.dart:283` |
 | `RECOMMENDED` question type still modeled | `lib/models/play_interrogation_models.dart:65` |
-| evidence guidance absent from model | `lib/models/play_evidence_models.dart:142` |
+| evidence guidance absent from model on 6/11, superseded in latest develop | `lib/models/play_evidence_models.dart`, `lib/screens/evidence_detail_widgets.dart` |
 | evidence list uses `includeLocked=true` | `lib/controllers/game_session_controller.dart:166`, `lib/controllers/game_session_controller.dart:200` |
 | culprit eligibility filters candidates | `lib/controllers/game_session_controller.dart:40`, `lib/screens/submit_screen.dart:157`, `lib/screens/suspect_detail_bottom_bar.dart:31` |
-| local-only active session key | `lib/controllers/game_session_controller.dart:72` |
-| create session 409 without server active recovery | `lib/controllers/game_session_controller.dart:100`, `lib/controllers/game_session_controller.dart:105` |
-| timeline placeholder/sample gate | `lib/screens/timeline_screen.dart:48` |
+| local-only active session path on 6/11, superseded by server active lookup | `lib/controllers/game_session_controller.dart`, `lib/repositories/play_session_repository.dart` |
+| create session 409 without server active recovery on 6/11, superseded by active fallback | `lib/controllers/game_session_controller.dart` |
+| timeline placeholder/sample gate on 6/11, superseded by timeline API integration | `lib/screens/timeline_screen.dart`, `lib/models/play_timeline_models.dart` |
 | local playable allowlist | `lib/screens/scenario_detail_screen.dart:17` |
 | auth token provider not wired | `lib/core/api/api_client.dart:61` |
 | FCM backend registration TODO | `lib/main.dart:67` |
@@ -118,7 +127,8 @@ Home -> Library -> Scenario Detail -> Case Briefing -> Start Investigation:
   PASS. App reached playing case screen and showed evidence count 7/25.
 
 Evidence:
-  PARTIAL. List/detail load, but locked titles are visible and guidance is absent.
+  2026-06-11 baseline PARTIAL. List/detail loaded, but locked titles were visible and guidance was absent.
+  Current develop update: guidance model/rendering/navigation is implemented; locked title UX still needs product decision.
 
 Suspects:
   PARTIAL. Suspect list/detail load, but suspicion score and candidate eligibility create early ranking/selection signals.
@@ -127,7 +137,8 @@ Interrogation:
   PARTIAL. Chat works and AI response returns, but suggested chip sends immediately.
 
 Timeline:
-  FAIL. Official scenario timeline displays placeholder instead of backend data.
+  2026-06-11 baseline FAIL. Official scenario timeline displayed placeholder instead of backend data.
+  Current develop update: timeline API integration is implemented; full app E2E still needs a current run.
 
 Submit:
   PASS for screen entry. Actual final submission intentionally not executed.
@@ -138,23 +149,23 @@ Submit:
 These frontend results strengthen issues already seen in the API/blind QA:
 
 ```text
-1. Guidance coverage issue is not just backend data coverage; frontend does not render guidance at all.
-2. Suggested question prefill-only requirement is explicitly violated by app behavior.
+1. Guidance coverage was a frontend rendering gap on 6/11; latest develop implements the model/rendering/navigation path, so this is no longer an open implementation blocker.
+2. Suggested question prefill-only requirement is still violated by hardcoded chip auto-send.
 3. Locked evidence exposure persists into actual UI, not just API response.
 4. Candidate narrowing metadata is consumed by frontend controls, not only present in API.
-5. Timeline remains unavailable to the player, so timeline-based deduction must be done from scattered evidence text.
+5. Timeline was unavailable on 6/11; latest develop integrates the timeline API, so this needs current E2E confirmation rather than implementation work.
 ```
 
 ## 9. Recommended Fix Order
 
 1. Remove answer-adjacent public metadata from UI/API contract: `culpritEligible`, `importance=CORE/FAKE`, role-derived candidate controls.
 2. Stop chip auto-send immediately: tap should only fill input and require explicit send.
-3. Implement evidence guidance model/rendering/navigation.
+3. Evidence guidance model/rendering/navigation: implemented after this baseline; keep current E2E/widget coverage.
 4. Mask locked evidence titles or replace with generic locked labels in the app.
-5. Add server active session recovery.
-6. Integrate timeline API.
+5. Server active session recovery: implemented and covered by the 6/12 regression tests.
+6. Timeline API: implemented after this baseline; keep current E2E coverage.
 7. Hide internal evidence id/status from user-facing evidence detail.
-8. Add widget/E2E tests for chip, guidance, timeline, and active recovery.
+8. Add/keep widget/E2E tests for chip, guidance, timeline, and active recovery.
 9. Clean analyzer warnings.
 
 ## 10. Residual Risk
@@ -162,5 +173,5 @@ These frontend results strengthen issues already seen in the API/blind QA:
 ```text
 This was an emulator UI smoke plus code/API-contract review, not a full 30~50 turn deduction run.
 The full deduction run was already covered by the backend/API blind retest.
-Frontend cannot be judged PASS for the blind QA prompt until guidance and chip behavior are fixed.
+Frontend cannot be judged PASS for the blind QA prompt until chip behavior, spoiler-adjacent metadata usage, and final submit/result E2E are addressed. Guidance/timeline are implemented in latest develop but still need current full-flow QA coverage.
 ```

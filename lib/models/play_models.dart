@@ -12,3 +12,4 @@ export 'play_evidence_models.dart';
 export 'play_suspect_models.dart';
 export 'play_interrogation_models.dart';
 export 'play_result_models.dart';
+export 'play_timeline_models.dart';
