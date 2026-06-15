@@ -28,7 +28,7 @@ class ResultMatchCard extends StatelessWidget {
           _MatchRow(label: '범행 방법', matched: matched.method),
           _MatchRow(label: '은폐 방법', matched: matched.coverUp),
           _MatchRow(
-            label: '핵심 증거',
+            label: '증거 일치',
             matched: matched.keyEvidences > 0,
             trailing: '${matched.keyEvidences}개 일치',
           ),

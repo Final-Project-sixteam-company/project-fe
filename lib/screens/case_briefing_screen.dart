@@ -38,14 +38,12 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
   void initState() {
     super.initState();
     // scenario가 전달되지 않으면 CL-001을 fallback으로 사용
-    _scenario = widget.scenario ??
+    _scenario =
+        widget.scenario ??
         sampleScenarios.firstWhere((s) => s.id == 'demoday-eve');
 
     for (int i = 0; i < _sectionCount; i++) {
-      final ctrl = AnimationController(
-        vsync: this,
-        duration: AppMotion.dur3,
-      );
+      final ctrl = AnimationController(vsync: this, duration: AppMotion.dur3);
       final opacity = CurvedAnimation(parent: ctrl, curve: AppMotion.easeOut);
       final slide = Tween<Offset>(
         begin: const Offset(0, 10),
@@ -84,9 +82,7 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => CaseScreen(scenarioId: _scenario.id),
-        ),
+        MaterialPageRoute(builder: (_) => CaseScreen(scenarioId: _scenario.id)),
       );
     });
   }
@@ -96,10 +92,8 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
       opacity: _opacities[index],
       child: AnimatedBuilder(
         animation: _slides[index],
-        builder: (_, c) => Transform.translate(
-          offset: _slides[index].value,
-          child: c,
-        ),
+        builder: (_, c) =>
+            Transform.translate(offset: _slides[index].value, child: c),
         child: child,
       ),
     );
@@ -182,13 +176,14 @@ class _CaseBriefingScreenState extends State<CaseBriefingScreen>
                               decoration: BoxDecoration(
                                 color: c.dangerSoft,
                                 border: Border.all(color: c.danger),
-                                borderRadius:
-                                BorderRadius.circular(AppTokens.r4),
+                                borderRadius: BorderRadius.circular(
+                                  AppTokens.r4,
+                                ),
                               ),
                               child: Text(
                                 '1. 진범을 찾아라\n'
-                                    '2. 살해 방법과 동기를 밝혀라\n'
-                                    '3. 결정적 증거 3개를 수집하라',
+                                '2. 살해 방법과 동기를 밝혀라\n'
+                                '3. 최종 추리를 뒷받침할 증거를 확보하라',
                                 style: AppText.body.copyWith(
                                   fontWeight: FontWeight.w600,
                                   color: c.danger,
@@ -315,10 +310,7 @@ class _VictimRow extends StatelessWidget {
           ),
           child: Text(
             locationLabel,
-            style: AppText.monoLabel.copyWith(
-              color: c.danger,
-              height: 1.0,
-            ),
+            style: AppText.monoLabel.copyWith(color: c.danger, height: 1.0),
           ),
         ),
       ],

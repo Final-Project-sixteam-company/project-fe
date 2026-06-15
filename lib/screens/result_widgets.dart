@@ -169,7 +169,7 @@ class _ServerSections extends StatelessWidget {
       ),
       if (data.keyEvidences.isNotEmpty) ...[
         const SizedBox(height: AppTokens.sp8),
-        const MSKicker('핵심 증거'),
+        const MSKicker('확인된 증거'),
         const SizedBox(height: AppTokens.sp3),
         Wrap(
           spacing: AppTokens.sp2,

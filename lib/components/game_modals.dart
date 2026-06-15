@@ -685,7 +685,7 @@ class _BriefingSheet extends StatelessWidget {
                   child: Text(
                     '1. 진범을 찾아라\n'
                     '2. 살해 방법과 동기를 밝혀라\n'
-                    '3. 결정적 증거 3개를 수집하라',
+                    '3. 최종 추리를 뒷받침할 증거를 확보하라',
                     style: AppText.body.copyWith(
                       fontWeight: FontWeight.w600,
                       color: c.danger,
