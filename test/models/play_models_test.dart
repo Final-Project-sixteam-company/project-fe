@@ -95,6 +95,29 @@ void main() {
     });
   });
 
+  group('EvidenceGuidance.fromJson', () {
+    test('suggestedQuestions는 targetSuspectId만 대상 식별자로 사용한다', () {
+      final guidance = EvidenceGuidance.fromJson({
+        'suggestedQuestions': [
+          {
+            'targetSuspectId': 4,
+            'targetName': '최아영',
+            'question': '이 증거를 본 적이 있나요?',
+            'presentedEvidenceId': 9,
+            'questionType': 'EVIDENCE_PRESENTED',
+          },
+        ],
+      });
+
+      final q = guidance.suggestedQuestions.single;
+      expect(q.targetSuspectId, 4);
+      expect(q.targetName, '최아영');
+      expect(q.question, '이 증거를 본 적이 있나요?');
+      expect(q.presentedEvidenceId, 9);
+      expect(q.questionType, 'EVIDENCE_PRESENTED');
+    });
+  });
+
   group('PlaySuspect.fromJson', () {
     test('spoiler metadata 없이 공개 필드만 파싱한다', () {
       final s = PlaySuspect.fromJson({

@@ -116,7 +116,6 @@ class CompareEvidenceInfo {
 
 class SuggestedQuestionInfo {
   const SuggestedQuestionInfo({
-    this.targetCharacterCode,
     this.targetSuspectId,
     this.targetName,
     required this.question,
@@ -124,7 +123,6 @@ class SuggestedQuestionInfo {
     this.questionType,
   });
 
-  final String? targetCharacterCode;
   final int? targetSuspectId;
   final String? targetName;
   final String question;
@@ -133,7 +131,6 @@ class SuggestedQuestionInfo {
 
   factory SuggestedQuestionInfo.fromJson(Map<String, dynamic> j) =>
       SuggestedQuestionInfo(
-        targetCharacterCode: j['targetCharacterCode'] as String?,
         targetSuspectId: (j['targetSuspectId'] as num?)?.toInt(),
         targetName: j['targetName'] as String?,
         question: j['question'] as String? ?? '',

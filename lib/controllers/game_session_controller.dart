@@ -65,11 +65,15 @@ class GameSessionController extends ChangeNotifier {
 
   bool get isServerBacked => _backendScenarioId != null;
 
-  /// CL-001(데모데이 전야) 정적 샘플 데이터를 사용하는 세션인지 여부.
-  /// 타임라인·힌트 텍스트 등 하드코딩 샘플 데이터를 표시해도 되는지 판단하는 게이트.
-  /// 프론트가 서버 timeline API를 연동하면 항상 false로 교체한다.
-  bool get usesCl001SampleCaseData =>
-      scenarioId == 'demoday-eve' || _backendScenarioId == 1;
+  static const bool _enableSampleCaseFallback = bool.fromEnvironment(
+    'ENABLE_SAMPLE_CASE_FALLBACK',
+    defaultValue: false,
+  );
+
+  /// 로컬 컴포넌트 프리뷰용 중립 샘플 데이터를 표시해도 되는지 판단하는 게이트.
+  /// production/server-backed flow에서는 항상 서버 public API 응답만 사용한다.
+  bool get usesSampleCaseFallback =>
+      _enableSampleCaseFallback && !isServerBacked;
 
   // ── 세션 영속화 ───────────────────────────────────────────────────────────
   static String _activeSessionKey(int scenarioId) =>
@@ -164,6 +168,14 @@ class GameSessionController extends ChangeNotifier {
     if (saved != null) {
       try {
         await _repo.abandon(saved);
+      } on ApiException catch (e) {
+        if (e.code == 'P003') {
+          backendSessionId = saved;
+          await _saveSession(sid, saved);
+          await _refreshAfterAbandonBlocked();
+          return;
+        }
+        // 정리 실패(이미 종료/네트워크 등)는 무시 — 아래에서 신규 생성을 시도한다.
       } catch (_) {
         // 정리 실패(이미 종료/네트워크 등)는 무시 — 아래에서 신규 생성을 시도한다.
       }
@@ -334,8 +346,16 @@ class GameSessionController extends ChangeNotifier {
 
   bool _isStarted = false;
   bool _isCompleted = false;
+  bool _finalDeductionSubmitting = false;
   bool get isStarted => _isStarted;
   bool get isCompleted => _isCompleted;
+  bool get isFinalDeductionSubmitting => _finalDeductionSubmitting;
+
+  void setFinalDeductionSubmitting(bool value) {
+    if (_finalDeductionSubmitting == value) return;
+    _finalDeductionSubmitting = value;
+    notifyListeners();
+  }
 
   // ── 탭 전환 인텐트 ────────────────────────────────────────────────────────
   // 증거 상세(별도 push 라우트)는 CaseScreen 의 GameSessionProvider 하위가 아니라
@@ -398,14 +418,16 @@ class GameSessionController extends ChangeNotifier {
 
   void completeSession() {
     _isCompleted = true;
+    _finalDeductionSubmitting = false;
     _timer?.cancel();
     final sid = _backendScenarioId;
     if (sid != null) _clearSavedSession(sid);
     notifyListeners();
   }
 
-  Future<void> abandonSession() async {
-    if (_isCompleted) return;
+  Future<bool> abandonSession() async {
+    if (_isCompleted) return false;
+    if (_finalDeductionSubmitting) return false;
     // 세션 생성이 진행 중이면 완료를 기다린 후 abandon을 실행한다.
     // fire-and-forget으로 두면 backendSessionId가 아직 null인 채로
     // abandon이 실행되어 /abandon 호출을 건너뛰고, 이후 in-flight load가
@@ -413,26 +435,57 @@ class GameSessionController extends ChangeNotifier {
     if (_loadFuture != null) {
       await _loadFuture!.catchError((_) {});
     }
-    _timer?.cancel();
     final id = backendSessionId;
     final sid = _backendScenarioId;
 
     if (id != null) {
       try {
         await _repo.abandon(id);
+        _timer?.cancel();
         // abandon 성공 시에만 로컬 세션 키를 삭제한다.
         // 실패하면 백엔드 세션이 PLAYING으로 남으므로 키를 보존해
         // 다음 진입 시 _tryResume 경로로 재개할 수 있게 한다.
         // 키를 지우면 createSession → 409 + 복구 불가 상태가 된다.
         backendSessionId = null;
         if (sid != null) await _clearSavedSession(sid);
+      } on ApiException catch (e) {
+        if (e.code == 'P003') {
+          backendSessionId = id;
+          if (sid != null) await _saveSession(sid, id);
+          await _refreshAfterAbandonBlocked();
+          return false;
+        }
+        _timer?.cancel();
+        // best-effort: 서버 정리 실패 → 키 보존, 타이머만 정리.
+        backendSessionId = null;
+        // sid 키는 의도적으로 유지.
       } catch (_) {
+        _timer?.cancel();
         // best-effort: 서버 정리 실패 → 키 보존, 타이머만 정리.
         backendSessionId = null;
         // sid 키는 의도적으로 유지.
       }
     } else {
+      _timer?.cancel();
       backendSessionId = null;
+    }
+    return true;
+  }
+
+  Future<void> _refreshAfterAbandonBlocked() async {
+    try {
+      final id = backendSessionId;
+      if (id == null) return;
+      _dashboard = await _repo.dashboard(id);
+      if (_dashboard?.status == PlaySessionStatus.playing) {
+        await _refreshAll();
+      }
+      _loadError = null;
+      _sessionConflict = false;
+    } catch (_) {
+      _loadError = '최종 추리 처리 중입니다. 잠시 후 결과를 다시 확인해 주세요.';
+    } finally {
+      notifyListeners();
     }
   }
 

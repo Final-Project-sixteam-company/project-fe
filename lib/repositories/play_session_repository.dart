@@ -146,18 +146,16 @@ class PlaySessionRepository {
     required int selectedCulpritId,
     required String motiveText,
     required String methodText,
-    String? coverUpText,
+    required String coverUpText,
     required List<int> selectedEvidenceIds,
   }) async {
     final body = <String, dynamic>{
       'selectedCulpritId': selectedCulpritId,
       'motiveText': motiveText,
       'methodText': methodText,
+      'coverUpText': coverUpText,
       'selectedEvidenceIds': selectedEvidenceIds,
     };
-    if (coverUpText != null) {
-      body['coverUpText'] = coverUpText;
-    }
 
     final data = await _api.post(
       '/api/play-sessions/$sessionId/final-deduction',

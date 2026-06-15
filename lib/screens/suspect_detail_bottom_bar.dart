@@ -136,7 +136,7 @@ class SuspectAccuseDialog extends StatelessWidget {
             const SizedBox(height: AppTokens.sp3),
             Text(
               '${suspect.name}을(를) 범인으로 지목하고 최종 추리를 작성합니다.\n'
-              '범행 동기·방법·결정적 증거를 입력해야 제출할 수 있습니다.',
+              '범행 동기·방법·제출 증거를 입력해야 제출할 수 있습니다.',
               style: AppText.body.copyWith(color: c.textSub, height: 1.6),
             ),
             const SizedBox(height: AppTokens.sp6),
