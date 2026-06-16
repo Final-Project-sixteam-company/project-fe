@@ -43,13 +43,13 @@ Future<void> _configureFirebaseMessaging() async {
   debugPrint('FCM 알림 권한: ${settings.authorizationStatus.name}');
 
   final token = await messaging.getToken();
-  debugPrint('FCM token: $token');
+  debugPrint('FCM token: ${_describeFcmToken(token)}');
   if (token != null) {
     await _registerFcmTokenWithBackend(token);
   }
 
   messaging.onTokenRefresh.listen((newToken) async {
-    debugPrint('FCM token 갱신: $newToken');
+    debugPrint('FCM token 갱신: ${_describeFcmToken(newToken)}');
     await _registerFcmTokenWithBackend(newToken);
   });
 
@@ -68,7 +68,7 @@ Future<void> _configureFirebaseMessaging() async {
 }
 
 Future<void> _registerFcmTokenWithBackend(String token) async {
-  debugPrint('백엔드에 FCM 토큰 등록 시작: $token');
+  debugPrint('백엔드에 FCM 토큰 등록 시작: ${_describeFcmToken(token)}');
   try {
     // Phase 2: 실제 device-tokens 엔드포인트 호출
     await ApiClient.instance.post(
@@ -82,6 +82,22 @@ Future<void> _registerFcmTokenWithBackend(String token) async {
   } catch (e) {
     debugPrint('FCM 토큰 백엔드 등록 실패: $e');
   }
+}
+
+String _describeFcmToken(String? token) {
+  if (token == null || token.isEmpty) {
+    return 'present=false, length=0';
+  }
+
+  return 'present=true, length=${token.length}, sample=${_maskToken(token)}';
+}
+
+String _maskToken(String token) {
+  if (token.length <= 8) {
+    return '<redacted:${token.length}>';
+  }
+
+  return '${token.substring(0, 4)}...${token.substring(token.length - 4)}';
 }
 
 class MyApp extends StatelessWidget {

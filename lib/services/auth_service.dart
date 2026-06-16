@@ -7,6 +7,30 @@ import '../core/api/api_client.dart';
 import '../core/api/api_exception.dart';
 import '../core/device/device_id_provider.dart';
 
+typedef AuthTokenStoreProvider = Future<AuthTokenStore> Function();
+
+abstract class AuthTokenStore {
+  String? getString(String key);
+  Future<bool> setString(String key, String value);
+  Future<bool> remove(String key);
+}
+
+class _SharedPreferencesAuthTokenStore implements AuthTokenStore {
+  _SharedPreferencesAuthTokenStore(this._prefs);
+
+  final SharedPreferences _prefs;
+
+  @override
+  String? getString(String key) => _prefs.getString(key);
+
+  @override
+  Future<bool> setString(String key, String value) =>
+      _prefs.setString(key, value);
+
+  @override
+  Future<bool> remove(String key) => _prefs.remove(key);
+}
+
 /// JWT 토큰 저장/조회 서비스.
 ///
 /// Phase 1(Mock) 단계에서는 토큰이 없으므로 Authorization 헤더를 붙이지 않는다.
@@ -31,7 +55,11 @@ class AuthService {
   String? _cachedRefreshToken;
   Future<bool>? _refreshInFlight;
   Future<void> _tokenStoreLock = Future.value();
+  AuthTokenStoreProvider _tokenStoreProvider = _defaultTokenStoreProvider;
   int _authGeneration = 0;
+
+  static Future<AuthTokenStore> _defaultTokenStoreProvider() async =>
+      _SharedPreferencesAuthTokenStore(await SharedPreferences.getInstance());
 
   /// Authorization 헤더에 붙일 Bearer 값.
   ///
@@ -63,9 +91,9 @@ class AuthService {
   bool get isLoggedIn => bearerToken != null;
 
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString(_accessKey);
-    final refresh = prefs.getString(_refreshKey);
+    final store = await _tokenStore();
+    final stored = store.getString(_accessKey);
+    final refresh = store.getString(_refreshKey);
 
     if (stored != null && _isUsableToken(stored)) {
       // accessToken이 유효하면 둘 다 복원한다.
@@ -76,7 +104,7 @@ class AuthService {
 
     _cachedAccessToken = null;
     _cachedRefreshToken = refresh;
-    await prefs.remove(_accessKey);
+    await store.remove(_accessKey);
 
     if (refresh != null && refresh.isNotEmpty) {
       // accessToken이 만료되었더라도 refreshToken이 있으면 먼저 세션 복원을 시도한다.
@@ -106,9 +134,9 @@ class AuthService {
     await _withTokenStoreLock(() async {
       _cachedAccessToken = null;
       _cachedRefreshToken = null;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_accessKey);
-      await prefs.remove(_refreshKey);
+      final store = await _tokenStore();
+      await store.remove(_accessKey);
+      await store.remove(_refreshKey);
     });
   }
 
@@ -272,11 +300,14 @@ class AuthService {
     required String access,
     required String refresh,
   }) async {
+    final store = await _tokenStore();
+    await _writeTokenPairOrClear(
+      store: store,
+      access: access,
+      refresh: refresh,
+    );
     _cachedAccessToken = access;
     _cachedRefreshToken = refresh;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_accessKey, access);
-    await prefs.setString(_refreshKey, refresh);
   }
 
   Future<bool> _saveRefreshTokensIfCurrent({
@@ -290,16 +321,19 @@ class AuthService {
         return false;
       }
 
-      final prefs = await SharedPreferences.getInstance();
+      final store = await _tokenStore();
       if (!_isCurrentRefresh(generation, expectedRefreshToken)) {
         return false;
       }
 
-      await prefs.setString(_accessKey, access);
-      await prefs.setString(_refreshKey, refresh);
+      await _writeTokenPairOrClear(
+        store: store,
+        access: access,
+        refresh: refresh,
+      );
       if (!_isCurrentRefresh(generation, expectedRefreshToken)) {
-        await _removeIfStillEqual(prefs, _accessKey, access);
-        await _removeIfStillEqual(prefs, _refreshKey, refresh);
+        await _removeIfStillEqual(store, _accessKey, access);
+        await _removeIfStillEqual(store, _refreshKey, refresh);
         return false;
       }
 
@@ -344,22 +378,66 @@ class AuthService {
   /// bearerToken getter에서 만료 감지 시 accessToken만 저장소에서 비동기 제거한다.
   /// refreshToken은 건드리지 않는다.
   Future<void> _removeIfStillEqual(
-    SharedPreferences prefs,
+    AuthTokenStore store,
     String key,
     String expectedValue,
   ) async {
-    if (prefs.getString(key) == expectedValue) {
-      await prefs.remove(key);
+    if (store.getString(key) == expectedValue) {
+      await store.remove(key);
     }
   }
 
   void _evictStoredAccessToken(String expiredToken) {
     unawaited(
       _withTokenStoreLock(() async {
-        final prefs = await SharedPreferences.getInstance();
-        await _removeIfStillEqual(prefs, _accessKey, expiredToken);
+        final store = await _tokenStore();
+        await _removeIfStillEqual(store, _accessKey, expiredToken);
       }),
     );
+  }
+
+  Future<AuthTokenStore> _tokenStore() => _tokenStoreProvider();
+
+  Future<void> _writeTokenPairOrClear({
+    required AuthTokenStore store,
+    required String access,
+    required String refresh,
+  }) async {
+    try {
+      await store.setString(_accessKey, access);
+      await store.setString(_refreshKey, refresh);
+    } catch (_) {
+      _cachedAccessToken = null;
+      _cachedRefreshToken = null;
+      await _removeTokenPairIgnoringErrors(store);
+      rethrow;
+    }
+  }
+
+  Future<void> _removeTokenPairIgnoringErrors(AuthTokenStore store) async {
+    try {
+      await store.remove(_accessKey);
+    } catch (_) {
+      // 저장 실패 후 partial state 정리가 목적이므로 정리 실패는 원 예외를 유지한다.
+    }
+    try {
+      await store.remove(_refreshKey);
+    } catch (_) {
+      // 저장 실패 후 partial state 정리가 목적이므로 정리 실패는 원 예외를 유지한다.
+    }
+  }
+
+  void setTokenStoreProviderForTesting(AuthTokenStoreProvider provider) {
+    _tokenStoreProvider = provider;
+  }
+
+  void resetForTesting() {
+    _cachedAccessToken = null;
+    _cachedRefreshToken = null;
+    _refreshInFlight = null;
+    _tokenStoreLock = Future.value();
+    _authGeneration = 0;
+    _tokenStoreProvider = _defaultTokenStoreProvider;
   }
 
   /// 토큰이 실제 JWT 형식이고 아직 유효한지 확인한다.
