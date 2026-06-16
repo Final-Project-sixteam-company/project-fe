@@ -82,14 +82,45 @@ void main() {
     expect(AuthService.instance.refreshToken, isNull);
     expect(AuthService.instance.isLoggedIn, isFalse);
   });
+
+  test('logout completes when token store creation fails', () async {
+    AuthService.instance.setTokenStoreProviderForTesting(
+      () async => throw StateError('secure storage unavailable'),
+    );
+
+    await AuthService.instance.logout();
+
+    expect(AuthService.instance.bearerToken, isNull);
+    expect(AuthService.instance.refreshToken, isNull);
+    expect(AuthService.instance.isLoggedIn, isFalse);
+  });
+
+  test('logout completes when token store delete fails', () async {
+    final store = _FakeTokenStore(throwOnRemove: true)
+      ..values[accessKey] = 'old-access'
+      ..values[refreshKey] = 'old-refresh';
+    AuthService.instance.setTokenStoreProviderForTesting(() async => store);
+
+    await AuthService.instance.logout();
+
+    expect(AuthService.instance.bearerToken, isNull);
+    expect(AuthService.instance.refreshToken, isNull);
+    expect(AuthService.instance.isLoggedIn, isFalse);
+  });
 }
 
 class _FakeTokenStore implements AuthTokenStore {
-  _FakeTokenStore({this.failOnKey, this.falseOnKey, this.throwOnGet = false});
+  _FakeTokenStore({
+    this.failOnKey,
+    this.falseOnKey,
+    this.throwOnGet = false,
+    this.throwOnRemove = false,
+  });
 
   final String? failOnKey;
   final String? falseOnKey;
   final bool throwOnGet;
+  final bool throwOnRemove;
   final Map<String, String> values = {};
 
   @override
@@ -114,6 +145,9 @@ class _FakeTokenStore implements AuthTokenStore {
 
   @override
   Future<bool> remove(String key) async {
+    if (throwOnRemove) {
+      throw StateError('remove failed for $key');
+    }
     values.remove(key);
     return true;
   }

@@ -284,9 +284,12 @@ class AuthService {
     await _withTokenStoreLock(() async {
       _cachedAccessToken = null;
       _cachedRefreshToken = null;
-      final store = await _tokenStore();
-      await store.remove(_accessKey);
-      await store.remove(_refreshKey);
+      try {
+        final store = await _tokenStore();
+        await _removeTokenPairIgnoringErrors(store);
+      } catch (_) {
+        // Secure storage가 복원/손상 상태여도 logout/revoke 흐름은 계속 진행한다.
+      }
     });
   }
 
