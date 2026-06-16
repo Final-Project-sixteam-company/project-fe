@@ -20,10 +20,7 @@ class MSKicker extends StatelessWidget {
           // unbounded 컨텍스트에서는 Divider 없이 라벨만 렌더링
           return Text(
             label.toUpperCase(),
-            style: AppText.monoLabel.copyWith(
-              color: c.textMute,
-              height: 1.0,
-            ),
+            style: AppText.monoLabel.copyWith(color: c.textMute, height: 1.0),
           );
         }
 
@@ -32,19 +29,10 @@ class MSKicker extends StatelessWidget {
           children: [
             Text(
               label.toUpperCase(),
-              style: AppText.monoLabel.copyWith(
-                color: c.textMute,
-                height: 1.0,
-              ),
+              style: AppText.monoLabel.copyWith(color: c.textMute, height: 1.0),
             ),
             const SizedBox(width: AppTokens.sp2),
-            Expanded(
-              child: Divider(
-                color: c.line,
-                thickness: 1,
-                height: 1,
-              ),
-            ),
+            Expanded(child: Divider(color: c.line, thickness: 1, height: 1)),
           ],
         );
       },
@@ -61,11 +49,11 @@ class MSKickerExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(AppTokens.sp4),
       child: Column(
         children: [
           MSKicker('suspect timeline'),
-          SizedBox(height: 32),
+          SizedBox(height: AppTokens.sp8),
           MSKicker('evidence logs'),
         ],
       ),

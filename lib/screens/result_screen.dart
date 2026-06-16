@@ -8,47 +8,12 @@ import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 import 'result_widgets.dart';
 
-class ScoreItem {
-  const ScoreItem({required this.label, required this.score, required this.maxScore});
-  final String label;
-  final int score;
-  final int maxScore;
-}
-
-class CaseResult {
-  const CaseResult({required this.grade, required this.totalScore,
-    required this.maxScore, required this.scoreItems,
-    required this.culpritName, required this.revelation});
-  final String grade;
-  final int totalScore;
-  final int maxScore;
-  final List<ScoreItem> scoreItems;
-  final String culpritName;
-  final String revelation;
-}
-
-const _sample = CaseResult(
-  grade: 'S', totalScore: 95, maxScore: 100,
-  scoreItems: [
-    ScoreItem(label: '진범 지목',   score: 30,  maxScore: 30),
-    ScoreItem(label: '범행 방법',   score: 23,  maxScore: 25),
-    ScoreItem(label: '범행 동기',   score: 20,  maxScore: 20),
-    ScoreItem(label: '은폐 방법',   score: 10,  maxScore: 10),
-    ScoreItem(label: '결정적 증거', score: 15,  maxScore: 15),
-    ScoreItem(label: '힌트 감점',   score: -3,  maxScore: 0),
-  ],
-  culpritName: '박재민',
-  revelation: '박재민 CTO는 투자 유치 실패와 지분 갈등으로 인해 범행을 계획했다. '
-      '데모룸 행사 당일 밤 퇴장 기록을 조작한 뒤 서버실에 재진입해 USB를 파쇄했다.',
-);
-
-const _kMaxPoll   = 5;
+const _kMaxPoll = 5;
 const _kPollDelay = Duration(seconds: 3);
 
 class ResultScreen extends StatefulWidget {
-  const ResultScreen({this.sessionId, this.result = _sample, super.key});
+  const ResultScreen({this.sessionId, super.key});
   final int? sessionId;
-  final CaseResult result;
   @override
   State<ResultScreen> createState() => _ResultScreenState();
 }
@@ -67,19 +32,28 @@ class _ResultScreenState extends State<ResultScreen>
   @override
   void initState() {
     super.initState();
-    _ctrl  = AnimationController(vsync: this, duration: AppMotion.dur3);
-    _fade  = CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut);
-    _slide = Tween<Offset>(begin: const Offset(0, 10), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut));
+    _ctrl = AnimationController(vsync: this, duration: AppMotion.dur3);
+    _fade = CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 10),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut));
     widget.sessionId != null ? _startPoll(widget.sessionId!) : _ctrl.forward();
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _startPoll(int id) async {
     if (!mounted) return;
-    setState(() { _loading = true; _error = null; _exhausted = false; });
+    setState(() {
+      _loading = true;
+      _error = null;
+      _exhausted = false;
+    });
     await _poll(id, 0);
   }
 
@@ -88,7 +62,10 @@ class _ResultScreenState extends State<ResultScreen>
     try {
       final r = await playSessionRepo.result(id);
       if (!mounted) return;
-      setState(() { _data = r; _loading = false; });
+      setState(() {
+        _data = r;
+        _loading = false;
+      });
       _ctrl.forward();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -103,9 +80,7 @@ class _ResultScreenState extends State<ResultScreen>
       setState(() {
         _loading = false;
         _exhausted = notReady || attempt >= _kMaxPoll - 1;
-        _error = notReady
-            ? '채점이 아직 완료되지 않았습니다. 잠시 후 다시 확인해 주세요.'
-            : e.message;
+        _error = notReady ? '채점이 아직 완료되지 않았습니다. 잠시 후 다시 확인해 주세요.' : e.message;
       });
     } catch (_) {
       if (!mounted) return;
@@ -114,8 +89,11 @@ class _ResultScreenState extends State<ResultScreen>
         if (mounted) await _poll(id, attempt + 1);
         return;
       }
-      setState(() { _loading = false; _exhausted = true;
-      _error = '결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'; });
+      setState(() {
+        _loading = false;
+        _exhausted = true;
+        _error = '결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+      });
     }
   }
 
@@ -124,18 +102,27 @@ class _ResultScreenState extends State<ResultScreen>
     final c = context.c;
     return Scaffold(
       backgroundColor: c.bg,
-      appBar: AppBar(elevation: 0, scrolledUnderElevation: 0,
-          backgroundColor: AppColors.transparent,
-          automaticallyImplyLeading: false,
-          titleSpacing: AppTokens.sp4,
-          title: Text('CASE CLOSED',
-              style: AppText.monoLabel.copyWith(color: c.textMute))),
+      appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: AppColors.transparent,
+        automaticallyImplyLeading: false,
+        titleSpacing: AppTokens.sp4,
+        title: Text(
+          'CASE CLOSED',
+          style: AppText.monoLabel.copyWith(color: c.textMute),
+        ),
+      ),
       body: ResultBody(
-        loading: _loading, error: _error, exhausted: _exhausted,
-        data: _data, fallback: widget.result,
-        fade: _fade, slide: _slide,
+        loading: _loading,
+        error: _error,
+        exhausted: _exhausted,
+        data: _data,
+        fade: _fade,
+        slide: _slide,
         onRetry: widget.sessionId != null
-            ? () => _startPoll(widget.sessionId!) : null,
+            ? () => _startPoll(widget.sessionId!)
+            : null,
         onHome: () => Navigator.of(context).popUntil((r) => r.isFirst),
       ),
     );

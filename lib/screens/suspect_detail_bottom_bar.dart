@@ -28,8 +28,7 @@ class SuspectDetailBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // culpritEligible: 증인·레드헤링 등 지목 불가 캐릭터는 버튼을 숨긴다.
-    final showAccuse = suspect.culpritEligible && !suspect.isWitness;
+    final showAccuse = !suspect.isWitness;
 
     return SafeArea(
       top: false,
@@ -133,12 +132,11 @@ class SuspectAccuseDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('범인 지목',
-                style: AppText.titleM.copyWith(color: c.text)),
+            Text('범인 지목', style: AppText.titleM.copyWith(color: c.text)),
             const SizedBox(height: AppTokens.sp3),
             Text(
               '${suspect.name}을(를) 범인으로 지목하고 최종 추리를 작성합니다.\n'
-                  '범행 동기·방법·결정적 증거를 입력해야 제출할 수 있습니다.',
+              '범행 동기·방법·제출 증거를 입력해야 제출할 수 있습니다.',
               style: AppText.body.copyWith(color: c.textSub, height: 1.6),
             ),
             const SizedBox(height: AppTokens.sp6),

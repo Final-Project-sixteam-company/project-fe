@@ -1,4 +1,6 @@
+// lib/components/ms_bottom_nav.dart
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
@@ -33,7 +35,10 @@ class MSBottomNav extends StatelessWidget {
           vertical: AppTokens.sp2,
         ),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.navPadH,
+            vertical: AppTokens.rowGap,
+          ),
           decoration: BoxDecoration(
             color: c.bg,
             border: Border.all(color: c.line),
@@ -78,7 +83,7 @@ class _NavItem extends StatelessWidget {
 
     return Expanded(
       child: Material(
-        color: Colors.transparent,
+        color: AppColors.transparent,
         borderRadius: BorderRadius.circular(AppTokens.r2),
         child: InkWell(
           onTap: onTap,
@@ -86,19 +91,19 @@ class _NavItem extends StatelessWidget {
           highlightColor: c.primary.withValues(alpha: .04),
           borderRadius: BorderRadius.circular(AppTokens.r2),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(vertical: AppTokens.navItemPadV),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 22, color: color),
+                Icon(icon, size: AppTokens.navIconSize, color: color),
                 const SizedBox(height: AppTokens.sp1),
                 Text(
                   label,
                   style: AppText.caption.copyWith(
-                    fontSize: 11,
+                    fontSize: AppTokens.navLabelFs,
                     fontWeight: FontWeight.w500,
                     color: color,
-                    height: 1.0,
+                    height: AppTokens.lhLabel,
                   ),
                 ),
               ],

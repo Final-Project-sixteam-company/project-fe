@@ -148,22 +148,20 @@ class _Tile extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppTokens.r4),
             boxShadow: (evidence.isNew || isNewlyUnlocked)
                 ? [
-              BoxShadow(
-                color: isNewlyUnlocked ? c.successSoft : c.primarySoft,
-                spreadRadius: 2,
-                blurRadius: 0,
-              ),
-            ]
+                    BoxShadow(
+                      color: isNewlyUnlocked ? c.successSoft : c.primarySoft,
+                      spreadRadius: 2,
+                      blurRadius: 0,
+                    ),
+                  ]
                 : null,
           ),
           child: Row(
             children: [
               EvidenceIconThumb(
                 icon: evidence.icon,
-                color: isNewlyUnlocked
-                    ? c.success
-                    : (evidence.isAnalyzed ? c.success : c.primary),
-                imageUrl: evidence.imageUrl ?? evidence.imageAssetKey,
+                color: isNewlyUnlocked ? c.success : c.primary,
+                imageUrl: evidence.imageUrl,
               ),
               const SizedBox(width: AppTokens.sp3),
               Expanded(
@@ -206,10 +204,8 @@ class _Tile extends StatelessWidget {
               const SizedBox(width: AppTokens.sp2),
               if (isNewlyUnlocked)
                 const MSPill('해금', tone: MSPillTone.success)
-              else if (evidence.isAnalyzed)
-                const MSPill('분석완료', tone: MSPillTone.success)
               else if (evidence.isNew)
-                  const MSPill('NEW', tone: MSPillTone.primary),
+                const MSPill('NEW', tone: MSPillTone.primary),
             ],
           ),
         ),

@@ -22,12 +22,12 @@ import 'api_exception.dart';
 ///
 /// /api/auth/signup, /api/auth/login 은 두 문서 모두 인증 불필요로 일치한다.
 const _kNoAuthPaths = <String>{
-  '/api/auth/signup',  // 인증 불필요 (api-spec.md + guide 일치)
-  '/api/auth/login',   // 인증 불필요 (api-spec.md + guide 일치)
-  '/api/auth/oauth',   // ANDROID_AUTH_INTEGRATION_GUIDE.md §7
+  '/api/auth/signup', // 인증 불필요 (api-spec.md + guide 일치)
+  '/api/auth/login', // 인증 불필요 (api-spec.md + guide 일치)
+  '/api/auth/oauth', // ANDROID_AUTH_INTEGRATION_GUIDE.md §7
   '/api/auth/refresh', // ANDROID_AUTH_INTEGRATION_GUIDE.md §7
-  '/api/auth/logout',  // ANDROID_AUTH_INTEGRATION_GUIDE.md §7 (guide 우선)
-  '/api/auth/dev',     // ANDROID_AUTH_INTEGRATION_GUIDE.md §7
+  '/api/auth/logout', // ANDROID_AUTH_INTEGRATION_GUIDE.md §7 (guide 우선)
+  '/api/auth/dev', // ANDROID_AUTH_INTEGRATION_GUIDE.md §7
 };
 
 /// 페이지네이션 응답(`PageResponse<T>`) 표현.
@@ -49,19 +49,20 @@ class Page<T> {
   final bool hasNext;
 
   factory Page.fromJson(
-      Map<String, dynamic> json,
-      T Function(Map<String, dynamic>) itemMapper,
-      ) {
+    Map<String, dynamic> json,
+    T Function(Map<String, dynamic>) itemMapper,
+  ) {
     final rawContent = (json['content'] as List<dynamic>? ?? const []);
     return Page<T>(
       content: rawContent
           .map((e) => itemMapper(e as Map<String, dynamic>))
           .toList(growable: false),
-      page:          (json['page']          as num?)?.toInt() ?? 0,
-      size:          (json['size']          as num?)?.toInt() ?? rawContent.length,
-      totalElements: (json['totalElements'] as num?)?.toInt() ?? rawContent.length,
-      totalPages:    (json['totalPages']    as num?)?.toInt() ?? 1,
-      hasNext:        json['hasNext']       as bool?          ?? false,
+      page: (json['page'] as num?)?.toInt() ?? 0,
+      size: (json['size'] as num?)?.toInt() ?? rawContent.length,
+      totalElements:
+          (json['totalElements'] as num?)?.toInt() ?? rawContent.length,
+      totalPages: (json['totalPages'] as num?)?.toInt() ?? 1,
+      hasNext: json['hasNext'] as bool? ?? false,
     );
   }
 }
@@ -71,6 +72,7 @@ class Page<T> {
 /// Authorization 헤더 정책:
 ///   - 실제 accessToken이 존재할 때만 `Authorization: Bearer {token}` 을 첨부한다.
 ///   - _kNoAuthPaths 에 포함된 경로에는 헤더를 붙이지 않는다.
+///   - public scenario 조회는 토큰이 없어도 backend public 응답을 그대로 사용한다.
 ///   - mock/더미/만료 토큰은 AuthService.init()에서 걸러지므로 여기서는 null 여부만 확인한다.
 class ApiClient {
   ApiClient._();
@@ -80,22 +82,23 @@ class ApiClient {
   /// 외부에서 토큰을 주입할 수 있도록 제공자 연결
   String? Function()? authTokenProvider;
 
+  /// accessToken이 없거나 만료된 보호 API 호출 전에 refresh를 시도하는 hook.
+  Future<bool> Function()? authRefreshProvider;
+
   final http.Client _http = http.Client();
 
   Future<dynamic> get(
-      String path, {
-        Map<String, dynamic>? query,
-        Duration? timeout,
-      }) =>
-      _send('GET', path, query: query, timeout: timeout);
+    String path, {
+    Map<String, dynamic>? query,
+    Duration? timeout,
+  }) => _send('GET', path, query: query, timeout: timeout);
 
   Future<dynamic> post(
-      String path, {
-        Object? body,
-        Map<String, dynamic>? query,
-        Duration? timeout,
-      }) =>
-      _send('POST', path, body: body, query: query, timeout: timeout);
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+    Duration? timeout,
+  }) => _send('POST', path, body: body, query: query, timeout: timeout);
 
   Future<dynamic> patch(String path, {Object? body}) =>
       _send('PATCH', path, body: body);
@@ -104,36 +107,113 @@ class ApiClient {
       _send('DELETE', path, body: body);
 
   Future<dynamic> _send(
-      String method,
-      String path, {
-        Map<String, dynamic>? query,
-        Object? body,
-        Duration? timeout,
-      }) async {
+    String method,
+    String path, {
+    Map<String, dynamic>? query,
+    Object? body,
+    Duration? timeout,
+  }) async {
     final uri = _buildUri(path, query);
+    final requiresAuth = _requiresAuth(method, path);
+    final encodedBody = body == null ? null : jsonEncode(body);
+
+    var headers = await _headersFor(method, path);
+    var res = await _sendOnce(
+      method,
+      uri,
+      headers: headers,
+      encodedBody: encodedBody,
+      timeout: timeout,
+    );
+
+    if (requiresAuth && res.statusCode == 401 && await _tryRefresh()) {
+      headers = await _headersFor(method, path, refreshIfMissing: false);
+      res = await _sendOnce(
+        method,
+        uri,
+        headers: headers,
+        encodedBody: encodedBody,
+        timeout: timeout,
+      );
+    }
+
+    return _parse(res);
+  }
+
+  Future<Map<String, String>> _headersFor(
+    String method,
+    String path, {
+    bool refreshIfMissing = true,
+  }) async {
     final headers = <String, String>{
       'Content-Type': 'application/json; charset=utf-8',
-      'Accept':       'application/json',
+      'Accept': 'application/json',
     };
 
-    // 실제 accessToken이 있고, 인증 불필요 경로가 아닐 때만 헤더를 첨부한다.
-    if (!_kNoAuthPaths.contains(path)) {
-      final token = authTokenProvider?.call();
+    if (_kNoAuthPaths.contains(path)) {
+      return headers;
+    }
+
+    var token = authTokenProvider?.call();
+    if (_isPublicScenarioRead(method, path)) {
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
       }
+      return headers;
     }
 
-    final encodedBody = body == null ? null : jsonEncode(body);
+    if ((token == null || token.isEmpty) && refreshIfMissing) {
+      final refreshed = await _tryRefresh();
+      if (refreshed) {
+        token = authTokenProvider?.call();
+      }
+    }
 
-    http.Response res;
+    if (token == null || token.isEmpty) {
+      throw const ApiException(
+        code: 'AUTH_REQUIRED',
+        message: '로그인이 필요합니다.',
+        status: 401,
+      );
+    }
+
+    headers['Authorization'] = 'Bearer $token';
+
+    return headers;
+  }
+
+  bool _requiresAuth(String method, String path) {
+    return !_kNoAuthPaths.contains(path) &&
+        !_isPublicScenarioRead(method, path);
+  }
+
+  bool _isPublicScenarioRead(String method, String path) {
+    if (method != 'GET') return false;
+    if (path == '/api/scenarios') return true;
+
+    const prefix = '/api/scenarios/';
+    if (!path.startsWith(prefix)) return false;
+
+    final scenarioId = path.substring(prefix.length);
+    return scenarioId.isNotEmpty &&
+        !scenarioId.contains('/') &&
+        int.tryParse(scenarioId) != null;
+  }
+
+  Future<http.Response> _sendOnce(
+    String method,
+    Uri uri, {
+    required Map<String, String> headers,
+    String? encodedBody,
+    Duration? timeout,
+  }) async {
     try {
       final request = http.Request(method, uri)..headers.addAll(headers);
       if (encodedBody != null) request.body = encodedBody;
       final streamed = await _http
           .send(request)
           .timeout(timeout ?? ApiConfig.timeout);
-      res = await http.Response.fromStream(streamed);
+      return http.Response.fromStream(streamed);
     } on TimeoutException {
       throw ApiException.timeout();
     } on SocketException {
@@ -141,8 +221,17 @@ class ApiClient {
     } on http.ClientException {
       throw ApiException.network();
     }
+  }
 
-    return _parse(res);
+  Future<bool> _tryRefresh() async {
+    final refresh = authRefreshProvider;
+    if (refresh == null) return false;
+
+    try {
+      return await refresh();
+    } catch (_) {
+      return false;
+    }
   }
 
   Uri _buildUri(String path, Map<String, dynamic>? query) {
@@ -152,9 +241,7 @@ class ApiClient {
     query.forEach((key, value) {
       if (value != null) qp[key] = value.toString();
     });
-    return base.replace(
-      queryParameters: {...base.queryParameters, ...qp},
-    );
+    return base.replace(queryParameters: {...base.queryParameters, ...qp});
   }
 
   dynamic _parse(http.Response res) {
@@ -173,16 +260,16 @@ class ApiClient {
     final error = map['error'];
     if (error is Map<String, dynamic>) {
       throw ApiException(
-        code:    error['code']?.toString()    ?? 'UNKNOWN',
+        code: error['code']?.toString() ?? 'UNKNOWN',
         message: error['message']?.toString() ?? '알 수 없는 오류가 발생했습니다.',
-        status:  (error['status'] as num?)?.toInt() ?? res.statusCode,
+        status: (error['status'] as num?)?.toInt() ?? res.statusCode,
         details: error['details'] as Map<String, dynamic>?,
       );
     }
     throw ApiException(
-      code:    'UNKNOWN',
+      code: 'UNKNOWN',
       message: '알 수 없는 오류가 발생했습니다.',
-      status:  res.statusCode,
+      status: res.statusCode,
     );
   }
 }

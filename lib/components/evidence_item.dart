@@ -1,3 +1,4 @@
+// lib/components/evidence_item.dart
 import 'package:flutter/material.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
@@ -25,27 +26,27 @@ class EvidenceItem extends StatelessWidget {
         highlightColor: c.primary.withValues(alpha: .04),
         borderRadius: BorderRadius.circular(AppTokens.r4),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.evidencePadH,
+            vertical: AppTokens.evidencePadV,
+          ),
           decoration: BoxDecoration(
             color: c.bg,
             border: Border.all(color: c.line),
             borderRadius: BorderRadius.circular(AppTokens.r4),
             boxShadow: evidence.isNew
                 ? [
-              BoxShadow(
-                color: c.primarySoft,
-                spreadRadius: 2,
-                blurRadius: 0,
-              )
-            ]
+                    BoxShadow(
+                      color: c.primarySoft,
+                      spreadRadius: 2,
+                      blurRadius: 0,
+                    ),
+                  ]
                 : null,
           ),
           child: Row(
             children: [
-              _Thumb(
-                icon: evidence.icon,
-                color: evidence.isAnalyzed ? c.success : c.primary,
-              ),
+              _Thumb(icon: evidence.icon, color: c.primary),
               const SizedBox(width: AppTokens.sp3),
               Expanded(
                 child: Column(
@@ -55,34 +56,27 @@ class EvidenceItem extends StatelessWidget {
                     Text(
                       evidence.name,
                       style: AppText.body.copyWith(
-                        fontSize: 13,
+                        fontSize: AppTokens.fsBase,
                         fontWeight: FontWeight.w600,
-                        height: 1.25,
+                        height: AppTokens.lhBody,
                         color: c.text,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: AppTokens.rowGap),
                     Text(
                       evidence.location,
                       style: AppText.monoLabel.copyWith(
-                        fontSize: 9.5,
-                        letterSpacing: 9.5 * 0.06,
+                        fontSize: AppTokens.fsSm,
+                        letterSpacing: AppTokens.fsSm * 0.06,
                         color: c.textMute,
-                        height: 1.0,
+                        height: AppTokens.lhLabel,
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: AppTokens.sp2),
-              // 확보됨/핵심 증거 — 증거 탭 필터 칩·상세 상태 필과 동일 어휘.
-              // (트리거 없는 'NEW'/'대기' 가짜 단계 라벨 제거.)
-              MSPill(
-                evidence.isAnalyzed ? '핵심 증거' : '확보됨',
-                tone: evidence.isAnalyzed
-                    ? MSPillTone.success
-                    : MSPillTone.primary,
-              ),
+              const MSPill('확보됨', tone: MSPillTone.primary),
             ],
           ),
         ),
@@ -104,15 +98,15 @@ class _Thumb extends StatelessWidget {
     final c = context.c;
 
     return Container(
-      width: 34,
-      height: 34,
+      width: AppTokens.thumbSize,
+      height: AppTokens.thumbSize,
       decoration: BoxDecoration(
         color: c.bgHover,
         border: Border.all(color: c.line),
         borderRadius: BorderRadius.circular(AppTokens.r2),
       ),
       alignment: Alignment.center,
-      child: Icon(icon, size: 17, color: color),
+      child: Icon(icon, size: AppTokens.thumbIconSize, color: color),
     );
   }
 }
