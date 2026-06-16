@@ -1,6 +1,7 @@
 // lib/components/review_write_sheet.dart
 import 'package:flutter/material.dart';
 import '../models/review_models.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
@@ -9,13 +10,13 @@ import 'ms_button.dart';
 /// 리뷰 작성 바텀시트를 띄우고, 등록 시 작성된 [ScenarioReview]를 반환한다.
 /// (취소/닫기 시 null) — 시나리오 상세·결과 화면 양쪽에서 재사용한다.
 Future<ScenarioReview?> showReviewWriteSheet(
-  BuildContext context, {
-  required String scenarioId,
-}) {
+    BuildContext context, {
+      required String scenarioId,
+    }) {
   return showModalBottomSheet<ScenarioReview>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.transparent,
+    backgroundColor: AppColors.transparent,
     builder: (_) => ReviewWriteSheet(scenarioId: scenarioId),
   );
 }
@@ -66,8 +67,8 @@ class _ReviewWriteSheetState extends State<ReviewWriteSheet> {
               children: [
                 Center(
                   child: Container(
-                    width: 36,
-                    height: 4,
+                    width: AppTokens.handleW,
+                    height: AppTokens.handleH,
                     margin: const EdgeInsets.only(bottom: AppTokens.sp4),
                     decoration: BoxDecoration(
                       color: c.line,
@@ -91,9 +92,9 @@ class _ReviewWriteSheetState extends State<ReviewWriteSheet> {
                     Text(
                       '★ ${_rating.toStringAsFixed(1)}',
                       style: AppText.monoNum.copyWith(
-                        fontSize: 16,
+                        fontSize: AppTokens.fsXl2,
                         color: c.primary,
-                        height: 1.0,
+                        height: AppTokens.lhLabel,
                       ),
                     ),
                   ],

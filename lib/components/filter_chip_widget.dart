@@ -1,5 +1,6 @@
 // lib/components/filter_chip_widget.dart
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
@@ -31,7 +32,7 @@ class MSFilterChip extends StatelessWidget {
           vertical: AppTokens.chipPadV,
         ),
         decoration: BoxDecoration(
-          color: active ? c.primarySoft : Colors.transparent,
+          color: active ? c.primarySoft : AppColors.transparent,
           border: Border.all(color: active ? c.primary : c.line),
           borderRadius: BorderRadius.circular(AppTokens.rPill),
         ),
@@ -39,7 +40,7 @@ class MSFilterChip extends StatelessWidget {
           label,
           style: AppText.monoLabel.copyWith(
             color: active ? c.primary : c.textSub,
-            height: 1.0,
+            height: AppTokens.lhLabel,
           ),
         ),
       ),

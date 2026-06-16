@@ -41,10 +41,10 @@ abstract class ScenarioRepository {
 
   /// 페이지 단위 조회(더보기 페이지네이션용). [Page.hasNext] 로 추가 로드 여부 판단.
   Future<Page<Scenario>> queryPage(
-    ScenarioFilter filter, {
-    int page,
-    int size,
-  });
+      ScenarioFilter filter, {
+        int page,
+        int size,
+      });
 
   Future<List<Scenario>> popular({int limit = 5});
   Future<Scenario> detail(String scenarioId);
@@ -59,10 +59,10 @@ class ApiScenarioRepository implements ScenarioRepository {
 
   @override
   Future<Page<Scenario>> queryPage(
-    ScenarioFilter filter, {
-    int page = 0,
-    int size = 20,
-  }) async {
+      ScenarioFilter filter, {
+        int page = 0,
+        int size = 20,
+      }) async {
     final data = await _api.get(
       '/api/scenarios',
       query: {
@@ -125,6 +125,7 @@ Scenario _fromSummaryJson(Map<String, dynamic> json) {
     tags: const [],
     synopsis: desc,
     thumbnailUrl: json['thumbnailUrl'] as String?,
+    canPlay: json['canPlay'] as bool? ?? false,
   );
 }
 
@@ -147,6 +148,7 @@ Scenario _fromDetailJson(Map<String, dynamic> json) {
     synopsis: json['synopsis'] as String? ?? json['description'] as String? ?? '',
     author: creator?['nickname'] as String?,
     thumbnailUrl: json['thumbnailUrl'] as String?,
+    canPlay: json['canPlay'] as bool? ?? false,
   );
 }
 
@@ -160,22 +162,22 @@ String _typeToApi(ScenarioType t) =>
     t == ScenarioType.custom ? 'CUSTOM' : 'OFFICIAL';
 
 Difficulty _difficultyFromApi(String? v) => switch (v) {
-      'EASY' => Difficulty.easy,
-      'HARD' => Difficulty.hard,
-      _ => Difficulty.medium, // NORMAL
-    };
+  'EASY' => Difficulty.easy,
+  'HARD' => Difficulty.hard,
+  _ => Difficulty.medium, // NORMAL
+};
 
 String _difficultyToApi(Difficulty d) => switch (d) {
-      Difficulty.easy => 'EASY',
-      Difficulty.medium => 'NORMAL',
-      Difficulty.hard => 'HARD',
-    };
+  Difficulty.easy => 'EASY',
+  Difficulty.medium => 'NORMAL',
+  Difficulty.hard => 'HARD',
+};
 
 String _sortToApi(ScenarioSort s) => switch (s) {
-      ScenarioSort.popular => 'popular',
-      ScenarioSort.newest => 'latest',
-      ScenarioSort.rating => 'rating',
-    };
+  ScenarioSort.popular => 'popular',
+  ScenarioSort.newest => 'latest',
+  ScenarioSort.rating => 'rating',
+};
 
 /// 전역 싱글턴 — 추후 DI 컨테이너로 교체 가능.
 const ScenarioRepository scenarioRepo = ApiScenarioRepository();

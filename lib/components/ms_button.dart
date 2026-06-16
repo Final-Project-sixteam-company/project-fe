@@ -66,12 +66,12 @@ class _MSButtonState extends State<MSButton> {
         fg = c.primaryInk;
         break;
       case MSButtonVariant.secondary:
-        bg = Colors.transparent;
+        bg = AppColors.transparent;
         fg = c.text;
-        border = Border.all(color: c.line, width: 1);
+        border = Border.all(color: c.line, width: AppTokens.strokeSm);
         break;
       case MSButtonVariant.ghost:
-        bg = Colors.transparent;
+        bg = AppColors.transparent;
         fg = c.textSub;
         break;
       case MSButtonVariant.danger:
@@ -117,13 +117,13 @@ class _MSButtonState extends State<MSButton> {
                   width: AppTokens.btnSpinnerSize,
                   height: AppTokens.btnSpinnerSize,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2,
+                    strokeWidth: AppTokens.strokeMd,
                     color: fg,
                   ),
                 )
               else ...[
                 if (widget.icon != null) ...[
-                  Icon(widget.icon, size: 16, color: fg),
+                  Icon(widget.icon, size: AppTokens.sp4, color: fg),
                   // 아이콘 전용 버튼에서는 스페이서와 텍스트를 렌더링하지 않는다.
                   if (!_iconOnly) const SizedBox(width: AppTokens.btnIconGap),
                 ],
@@ -179,95 +179,5 @@ class _MSButtonState extends State<MSButton> {
       return Flexible(child: text);
     }
     return text;
-  }
-}
-
-// ── 사용 예시 ─────────────────────────────────────────────────────────────────
-
-class MSButtonExample extends StatelessWidget {
-  const MSButtonExample({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppTokens.sp4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 일반 버튼 4종
-          Row(
-            children: [
-              MSButton(
-                label: '추적 시작',
-                onPressed: () {},
-                variant: MSButtonVariant.primary,
-                icon: Icons.search,
-              ),
-              const SizedBox(width: AppTokens.sp2),
-              MSButton(
-                label: '단서 추가',
-                onPressed: () {},
-                variant: MSButtonVariant.secondary,
-              ),
-              const SizedBox(width: AppTokens.sp2),
-              MSButton(
-                label: '취소',
-                onPressed: () {},
-                variant: MSButtonVariant.ghost,
-              ),
-              const SizedBox(width: AppTokens.sp2),
-              MSButton(
-                label: '종결',
-                onPressed: () {},
-                variant: MSButtonVariant.danger,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.sp4),
-          // 아이콘 전용 버튼 (label: '')
-          Row(
-            children: [
-              MSButton(
-                label: '',
-                variant: MSButtonVariant.primary,
-                icon: Icons.send,
-                onPressed: () {},
-              ),
-              const SizedBox(width: AppTokens.sp2),
-              MSButton(
-                label: '',
-                variant: MSButtonVariant.secondary,
-                icon: Icons.bookmark_outline,
-                onPressed: () {},
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.sp4),
-          // 로딩 / 비활성화
-          Row(
-            children: [
-              MSButton(
-                label: '로딩중',
-                onPressed: () {},
-                loading: true,
-              ),
-              const SizedBox(width: AppTokens.sp2),
-              MSButton(
-                label: '비활성화',
-                onPressed: null,
-                variant: MSButtonVariant.secondary,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.sp4),
-          // expanded 버튼
-          MSButton(
-            label: '확장 버튼',
-            onPressed: () {},
-            expanded: true,
-          ),
-        ],
-      ),
-    );
   }
 }

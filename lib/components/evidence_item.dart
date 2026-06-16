@@ -1,3 +1,4 @@
+// lib/components/evidence_item.dart
 import 'package:flutter/material.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
@@ -25,7 +26,10 @@ class EvidenceItem extends StatelessWidget {
         highlightColor: c.primary.withValues(alpha: .04),
         borderRadius: BorderRadius.circular(AppTokens.r4),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.evidencePadH,
+            vertical: AppTokens.evidencePadV,
+          ),
           decoration: BoxDecoration(
             color: c.bg,
             border: Border.all(color: c.line),
@@ -52,20 +56,20 @@ class EvidenceItem extends StatelessWidget {
                     Text(
                       evidence.name,
                       style: AppText.body.copyWith(
-                        fontSize: 13,
+                        fontSize: AppTokens.fsBase,
                         fontWeight: FontWeight.w600,
-                        height: 1.25,
+                        height: AppTokens.lhBody,
                         color: c.text,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: AppTokens.rowGap),
                     Text(
                       evidence.location,
                       style: AppText.monoLabel.copyWith(
-                        fontSize: 9.5,
-                        letterSpacing: 9.5 * 0.06,
+                        fontSize: AppTokens.fsSm,
+                        letterSpacing: AppTokens.fsSm * 0.06,
                         color: c.textMute,
-                        height: 1.0,
+                        height: AppTokens.lhLabel,
                       ),
                     ),
                   ],
@@ -94,15 +98,15 @@ class _Thumb extends StatelessWidget {
     final c = context.c;
 
     return Container(
-      width: 34,
-      height: 34,
+      width: AppTokens.thumbSize,
+      height: AppTokens.thumbSize,
       decoration: BoxDecoration(
         color: c.bgHover,
         border: Border.all(color: c.line),
         borderRadius: BorderRadius.circular(AppTokens.r2),
       ),
       alignment: Alignment.center,
-      child: Icon(icon, size: 17, color: color),
+      child: Icon(icon, size: AppTokens.thumbIconSize, color: color),
     );
   }
 }

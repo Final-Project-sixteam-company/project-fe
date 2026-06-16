@@ -1,3 +1,4 @@
+// lib/components/timeline_list.dart
 import 'package:flutter/material.dart';
 import '../models/case.dart';
 import '../models/sample_case.dart';
@@ -15,7 +16,10 @@ class TimelineList extends StatelessWidget {
     final c = context.c;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTokens.timelinePadH,
+        vertical: AppTokens.timelinePadV,
+      ),
       decoration: BoxDecoration(
         color: c.bg,
         border: Border.all(color: c.line),
@@ -41,19 +45,19 @@ class _Row extends StatelessWidget {
     final bool hasConflict = entry.conflict != null;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: AppTokens.timelineRowPadV),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 46,
+            width: AppTokens.timelineColW,
             child: Text(
               entry.time,
               style: AppText.monoLabel.copyWith(
-                fontSize: 11,
+                fontSize: AppTokens.navLabelFs,
                 fontWeight: FontWeight.w700,
                 color: hasConflict ? c.danger : c.primary,
-                height: 1.45,
+                height: AppTokens.lhBody,
               ),
             ),
           ),
@@ -66,9 +70,9 @@ class _Row extends StatelessWidget {
                 Text(
                   entry.label,
                   style: AppText.body.copyWith(
-                    fontSize: 12,
+                    fontSize: AppTokens.fsMd,
                     color: c.text,
-                    height: 1.45,
+                    height: AppTokens.lhBody,
                   ),
                 ),
                 if (entry.description != null && entry.description!.isNotEmpty) ...[
@@ -76,9 +80,9 @@ class _Row extends StatelessWidget {
                   Text(
                     entry.description!,
                     style: AppText.body.copyWith(
-                      fontSize: 11,
+                      fontSize: AppTokens.navLabelFs,
                       color: c.textSub,
-                      height: 1.45,
+                      height: AppTokens.lhBody,
                     ),
                   ),
                 ],
@@ -86,8 +90,8 @@ class _Row extends StatelessWidget {
                   const SizedBox(height: AppTokens.sp2),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 6,
+                      horizontal: AppTokens.conflictPadH,
+                      vertical: AppTokens.rowGap,
                     ),
                     decoration: BoxDecoration(
                       color: c.dangerSoft,
@@ -97,9 +101,9 @@ class _Row extends StatelessWidget {
                     child: Text(
                       '⚠ ${entry.conflict}',
                       style: AppText.body.copyWith(
-                        fontSize: 11,
+                        fontSize: AppTokens.navLabelFs,
                         color: c.danger,
-                        height: 1.45,
+                        height: AppTokens.lhBody,
                       ),
                     ),
                   ),
