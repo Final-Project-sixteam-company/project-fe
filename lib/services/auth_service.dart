@@ -9,6 +9,8 @@ import '../core/api/api_exception.dart';
 import '../core/device/device_id_provider.dart';
 
 typedef AuthTokenStoreProvider = Future<AuthTokenStore> Function();
+typedef AuthRefreshResponseProvider =
+    Future<Map<String, dynamic>?> Function(String refreshToken);
 
 abstract class AuthTokenStore {
   String? getString(String key);
@@ -99,28 +101,36 @@ class _SecureAuthTokenStore implements AuthTokenStore {
     final prefs = await SharedPreferences.getInstance();
     final legacyAccess = prefs.getString(accessKey);
     final legacyRefresh = prefs.getString(refreshKey);
-    final shouldMigrateAccess =
-        legacyAccess != null &&
-        legacyAccess.isNotEmpty &&
-        cache[accessKey]?.isNotEmpty != true;
-    final shouldMigrateRefresh =
-        legacyRefresh != null &&
-        legacyRefresh.isNotEmpty &&
-        cache[refreshKey]?.isNotEmpty != true;
+    final hasSecureAccess = cache[accessKey]?.isNotEmpty == true;
+    final hasSecureRefresh = cache[refreshKey]?.isNotEmpty == true;
+    final hasLegacyAccess = legacyAccess != null && legacyAccess.isNotEmpty;
+    final hasLegacyRefresh = legacyRefresh != null && legacyRefresh.isNotEmpty;
+    final shouldMigrateCompletePair =
+        !hasSecureAccess &&
+        !hasSecureRefresh &&
+        hasLegacyAccess &&
+        hasLegacyRefresh;
+    final shouldMigrateRefreshOnly =
+        !hasSecureAccess &&
+        !hasSecureRefresh &&
+        !hasLegacyAccess &&
+        hasLegacyRefresh;
     final migratedKeys = <String>[];
 
-    if (!shouldMigrateAccess && !shouldMigrateRefresh) {
+    // refresh-only는 startup refresh 복구를 위해 허용한다. access-only는
+    // refresh 경로 없는 logged-in 상태를 만들 수 있어 migration하지 않는다.
+    if (!shouldMigrateCompletePair && !shouldMigrateRefreshOnly) {
       await _removeLegacyPrefsIfPresent(accessKey, refreshKey);
       return;
     }
 
     try {
-      if (shouldMigrateAccess) {
+      if (shouldMigrateCompletePair) {
         await storage.write(key: accessKey, value: legacyAccess);
         cache[accessKey] = legacyAccess;
         migratedKeys.add(accessKey);
       }
-      if (shouldMigrateRefresh) {
+      if (shouldMigrateCompletePair || shouldMigrateRefreshOnly) {
         await storage.write(key: refreshKey, value: legacyRefresh);
         cache[refreshKey] = legacyRefresh;
         migratedKeys.add(refreshKey);
@@ -198,6 +208,7 @@ class AuthService {
   Future<bool>? _refreshInFlight;
   Future<void> _tokenStoreLock = Future.value();
   AuthTokenStoreProvider _tokenStoreProvider = _defaultTokenStoreProvider;
+  AuthRefreshResponseProvider? _refreshResponseProviderForTesting;
   int _authGeneration = 0;
 
   static Future<AuthTokenStore> _defaultTokenStoreProvider() =>
@@ -250,7 +261,14 @@ class AuthService {
     }
 
     if (stored != null && _isUsableToken(stored)) {
-      // accessToken이 유효하면 둘 다 복원한다.
+      if (refresh == null || refresh.isEmpty) {
+        _cachedAccessToken = null;
+        _cachedRefreshToken = null;
+        await _removeTokenPairIgnoringErrors(store);
+        return;
+      }
+
+      // accessToken과 refreshToken이 모두 있으면 세션을 복원한다.
       _cachedAccessToken = stored;
       _cachedRefreshToken = refresh;
       return;
@@ -394,11 +412,12 @@ class AuthService {
     if (token == null || token.isEmpty) return false;
 
     try {
-      final deviceId = await DeviceIdProvider.getOrCreate();
-      final res = await ApiClient.instance.post(
-        '/api/auth/refresh',
-        body: {'refreshToken': token, 'deviceId': deviceId},
-      );
+      final responseProvider = _refreshResponseProviderForTesting;
+      final res = responseProvider != null
+          ? await responseProvider(token)
+          : await _requestRefreshTokenPair(token);
+      if (res == null) return false;
+
       final access = res['accessToken'] as String?;
       final newRefresh = res['refreshToken'] as String?;
 
@@ -424,6 +443,15 @@ class AuthService {
       // 네트워크/예상 밖 실패는 유효할 수 있는 refresh token을 보존한다.
     }
     return false;
+  }
+
+  Future<Map<String, dynamic>?> _requestRefreshTokenPair(String token) async {
+    final deviceId = await DeviceIdProvider.getOrCreate();
+    final res = await ApiClient.instance.post(
+      '/api/auth/refresh',
+      body: {'refreshToken': token, 'deviceId': deviceId},
+    );
+    return res as Map<String, dynamic>?;
   }
 
   /// 내 정보 조회
@@ -594,11 +622,18 @@ class AuthService {
     _tokenStoreProvider = provider;
   }
 
+  void setRefreshResponseProviderForTesting(
+    AuthRefreshResponseProvider provider,
+  ) {
+    _refreshResponseProviderForTesting = provider;
+  }
+
   void resetForTesting() {
     _cachedAccessToken = null;
     _cachedRefreshToken = null;
     _refreshInFlight = null;
     _tokenStoreLock = Future.value();
+    _refreshResponseProviderForTesting = null;
     _authGeneration = 0;
     _tokenStoreProvider = _defaultTokenStoreProvider;
   }

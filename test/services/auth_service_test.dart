@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:clueroom/services/auth_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -97,8 +99,9 @@ void main() {
   test(
     'init preserves legacy tokens when secure migration write fails',
     () async {
+      final access = _validJwt();
       SharedPreferences.setMockInitialValues({
-        accessKey: 'legacy-access',
+        accessKey: access,
         refreshKey: 'legacy-refresh',
       });
       final secureValues = _setSecureStorageMock(throwOnWriteKey: refreshKey);
@@ -106,7 +109,7 @@ void main() {
       await AuthService.instance.init();
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString(accessKey), 'legacy-access');
+      expect(prefs.getString(accessKey), access);
       expect(prefs.getString(refreshKey), 'legacy-refresh');
       expect(secureValues[accessKey], isNull);
       expect(secureValues[refreshKey], isNull);
@@ -115,6 +118,109 @@ void main() {
       expect(AuthService.instance.isLoggedIn, isFalse);
     },
   );
+
+  test('init clears legacy access-only instead of migrating it', () async {
+    final access = _validJwt();
+    SharedPreferences.setMockInitialValues({accessKey: access});
+    final secureValues = _setSecureStorageMock();
+
+    await AuthService.instance.init();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(accessKey), isNull);
+    expect(prefs.getString(refreshKey), isNull);
+    expect(secureValues[accessKey], isNull);
+    expect(secureValues[refreshKey], isNull);
+    expect(AuthService.instance.bearerToken, isNull);
+    expect(AuthService.instance.refreshToken, isNull);
+    expect(AuthService.instance.isLoggedIn, isFalse);
+  });
+
+  test('init migrates complete legacy token pair', () async {
+    final access = _validJwt();
+    SharedPreferences.setMockInitialValues({
+      accessKey: access,
+      refreshKey: 'legacy-refresh',
+    });
+    final secureValues = _setSecureStorageMock();
+
+    await AuthService.instance.init();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(accessKey), isNull);
+    expect(prefs.getString(refreshKey), isNull);
+    expect(secureValues[accessKey], access);
+    expect(secureValues[refreshKey], 'legacy-refresh');
+    expect(AuthService.instance.bearerToken, access);
+    expect(AuthService.instance.refreshToken, 'legacy-refresh');
+    expect(AuthService.instance.isLoggedIn, isTrue);
+  });
+
+  test('init migrates legacy refresh-only and refreshes session', () async {
+    final refreshedAccess = _validJwt();
+    SharedPreferences.setMockInitialValues({refreshKey: 'legacy-refresh'});
+    final secureValues = _setSecureStorageMock();
+    var refreshCalls = 0;
+    AuthService.instance.setRefreshResponseProviderForTesting((
+      refreshToken,
+    ) async {
+      refreshCalls += 1;
+      expect(refreshToken, 'legacy-refresh');
+      return {
+        'accessToken': refreshedAccess,
+        'refreshToken': 'rotated-refresh',
+      };
+    });
+
+    await AuthService.instance.init();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(refreshCalls, 1);
+    expect(prefs.getString(accessKey), isNull);
+    expect(prefs.getString(refreshKey), isNull);
+    expect(secureValues[accessKey], refreshedAccess);
+    expect(secureValues[refreshKey], 'rotated-refresh');
+    expect(AuthService.instance.bearerToken, refreshedAccess);
+    expect(AuthService.instance.refreshToken, 'rotated-refresh');
+    expect(AuthService.instance.isLoggedIn, isTrue);
+  });
+
+  test('init keeps secure tokens and clears stale legacy prefs', () async {
+    final secureAccess = _validJwt();
+    SharedPreferences.setMockInitialValues({
+      accessKey: _validJwt(),
+      refreshKey: 'legacy-refresh',
+    });
+    final secureValues = _setSecureStorageMock(
+      initialValues: {accessKey: secureAccess, refreshKey: 'secure-refresh'},
+    );
+
+    await AuthService.instance.init();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(accessKey), isNull);
+    expect(prefs.getString(refreshKey), isNull);
+    expect(secureValues[accessKey], secureAccess);
+    expect(secureValues[refreshKey], 'secure-refresh');
+    expect(AuthService.instance.bearerToken, secureAccess);
+    expect(AuthService.instance.refreshToken, 'secure-refresh');
+    expect(AuthService.instance.isLoggedIn, isTrue);
+  });
+
+  test('init clears secure access-only state', () async {
+    final access = _validJwt();
+    final secureValues = _setSecureStorageMock(
+      initialValues: {accessKey: access},
+    );
+
+    await AuthService.instance.init();
+
+    expect(secureValues[accessKey], isNull);
+    expect(secureValues[refreshKey], isNull);
+    expect(AuthService.instance.bearerToken, isNull);
+    expect(AuthService.instance.refreshToken, isNull);
+    expect(AuthService.instance.isLoggedIn, isFalse);
+  });
 
   test('logout completes when token store creation fails', () async {
     AuthService.instance.setTokenStoreProviderForTesting(
@@ -142,8 +248,11 @@ void main() {
   });
 }
 
-Map<String, String> _setSecureStorageMock({String? throwOnWriteKey}) {
-  final values = <String, String>{};
+Map<String, String> _setSecureStorageMock({
+  Map<String, String>? initialValues,
+  String? throwOnWriteKey,
+}) {
+  final values = <String, String>{...?initialValues};
 
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(_secureStorageChannel, (call) async {
@@ -177,6 +286,16 @@ Map<String, String> _setSecureStorageMock({String? throwOnWriteKey}) {
 
   return values;
 }
+
+String _validJwt() {
+  final expiresAt = DateTime.now().add(const Duration(hours: 1));
+  final payload = {'exp': expiresAt.millisecondsSinceEpoch ~/ 1000};
+  return '${_base64UrlJson({'alg': 'none', 'typ': 'JWT'})}.'
+      '${_base64UrlJson(payload)}.signature';
+}
+
+String _base64UrlJson(Map<String, Object> json) =>
+    base64Url.encode(utf8.encode(jsonEncode(json))).replaceAll('=', '');
 
 class _FakeTokenStore implements AuthTokenStore {
   _FakeTokenStore({
