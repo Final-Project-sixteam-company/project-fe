@@ -57,17 +57,48 @@ void main() {
       },
     );
   }
+
+  test('init treats token store creation failure as logged out', () async {
+    AuthService.instance.setTokenStoreProviderForTesting(
+      () async => throw StateError('secure storage unavailable'),
+    );
+
+    await AuthService.instance.init();
+
+    expect(AuthService.instance.bearerToken, isNull);
+    expect(AuthService.instance.refreshToken, isNull);
+    expect(AuthService.instance.isLoggedIn, isFalse);
+  });
+
+  test('init treats token store read failure as logged out', () async {
+    final store = _FakeTokenStore(throwOnGet: true)
+      ..values[accessKey] = 'old-access'
+      ..values[refreshKey] = 'old-refresh';
+    AuthService.instance.setTokenStoreProviderForTesting(() async => store);
+
+    await AuthService.instance.init();
+
+    expect(AuthService.instance.bearerToken, isNull);
+    expect(AuthService.instance.refreshToken, isNull);
+    expect(AuthService.instance.isLoggedIn, isFalse);
+  });
 }
 
 class _FakeTokenStore implements AuthTokenStore {
-  _FakeTokenStore({this.failOnKey, this.falseOnKey});
+  _FakeTokenStore({this.failOnKey, this.falseOnKey, this.throwOnGet = false});
 
   final String? failOnKey;
   final String? falseOnKey;
+  final bool throwOnGet;
   final Map<String, String> values = {};
 
   @override
-  String? getString(String key) => values[key];
+  String? getString(String key) {
+    if (throwOnGet) {
+      throw StateError('get failed for $key');
+    }
+    return values[key];
+  }
 
   @override
   Future<bool> setString(String key, String value) async {

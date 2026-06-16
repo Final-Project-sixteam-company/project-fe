@@ -29,16 +29,41 @@ class _SecureAuthTokenStore implements AuthTokenStore {
     const storage = FlutterSecureStorage();
     final cache = <String, String>{};
 
-    await _readIntoCache(storage, cache, accessKey);
-    await _readIntoCache(storage, cache, refreshKey);
-    await _migrateLegacyPrefsIfNeeded(
+    final secureReadSucceeded = await _readTokenPairIntoCache(
       storage: storage,
       cache: cache,
       accessKey: accessKey,
       refreshKey: refreshKey,
     );
+    if (secureReadSucceeded) {
+      await _migrateLegacyPrefsIfNeeded(
+        storage: storage,
+        cache: cache,
+        accessKey: accessKey,
+        refreshKey: refreshKey,
+      );
+    } else {
+      await _removeLegacyPrefsIfPresent(accessKey, refreshKey);
+    }
 
     return _SecureAuthTokenStore._(storage, cache);
+  }
+
+  static Future<bool> _readTokenPairIntoCache({
+    required FlutterSecureStorage storage,
+    required Map<String, String> cache,
+    required String accessKey,
+    required String refreshKey,
+  }) async {
+    try {
+      await _readIntoCache(storage, cache, accessKey);
+      await _readIntoCache(storage, cache, refreshKey);
+      return true;
+    } catch (_) {
+      cache.clear();
+      await _deleteSecurePairIgnoringErrors(storage, accessKey, refreshKey);
+      return false;
+    }
   }
 
   static Future<void> _readIntoCache(
@@ -49,6 +74,19 @@ class _SecureAuthTokenStore implements AuthTokenStore {
     final value = await storage.read(key: key);
     if (value != null) {
       cache[key] = value;
+    }
+  }
+
+  static Future<void> _removeLegacyPrefsIfPresent(
+    String accessKey,
+    String refreshKey,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString(accessKey) != null) {
+      await prefs.remove(accessKey);
+    }
+    if (prefs.getString(refreshKey) != null) {
+      await prefs.remove(refreshKey);
     }
   }
 
@@ -83,12 +121,7 @@ class _SecureAuthTokenStore implements AuthTokenStore {
       }
     }
 
-    if (legacyAccess != null) {
-      await prefs.remove(accessKey);
-    }
-    if (legacyRefresh != null) {
-      await prefs.remove(refreshKey);
-    }
+    await _removeLegacyPrefsIfPresent(accessKey, refreshKey);
   }
 
   static Future<void> _deleteSecurePairIgnoringErrors(
@@ -189,9 +222,18 @@ class AuthService {
   bool get isLoggedIn => bearerToken != null;
 
   Future<void> init() async {
-    final store = await _tokenStore();
-    final stored = store.getString(_accessKey);
-    final refresh = store.getString(_refreshKey);
+    final AuthTokenStore store;
+    final String? stored;
+    final String? refresh;
+    try {
+      store = await _tokenStore();
+      stored = store.getString(_accessKey);
+      refresh = store.getString(_refreshKey);
+    } catch (_) {
+      _cachedAccessToken = null;
+      _cachedRefreshToken = null;
+      return;
+    }
 
     if (stored != null && _isUsableToken(stored)) {
       // accessToken이 유효하면 둘 다 복원한다.
@@ -202,7 +244,7 @@ class AuthService {
 
     _cachedAccessToken = null;
     _cachedRefreshToken = refresh;
-    await store.remove(_accessKey);
+    await _removeTokenIgnoringErrors(store, _accessKey);
 
     if (refresh != null && refresh.isNotEmpty) {
       // accessToken이 만료되었더라도 refreshToken이 있으면 먼저 세션 복원을 시도한다.
@@ -516,15 +558,18 @@ class AuthService {
   }
 
   Future<void> _removeTokenPairIgnoringErrors(AuthTokenStore store) async {
+    await _removeTokenIgnoringErrors(store, _accessKey);
+    await _removeTokenIgnoringErrors(store, _refreshKey);
+  }
+
+  Future<void> _removeTokenIgnoringErrors(
+    AuthTokenStore store,
+    String key,
+  ) async {
     try {
-      await store.remove(_accessKey);
+      await store.remove(key);
     } catch (_) {
-      // 저장 실패 후 partial state 정리가 목적이므로 정리 실패는 원 예외를 유지한다.
-    }
-    try {
-      await store.remove(_refreshKey);
-    } catch (_) {
-      // 저장 실패 후 partial state 정리가 목적이므로 정리 실패는 원 예외를 유지한다.
+      // 저장/복구 실패 후 partial state 정리가 목적이므로 정리 실패는 원 예외를 유지한다.
     }
   }
 
