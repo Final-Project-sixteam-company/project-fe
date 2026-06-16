@@ -404,8 +404,11 @@ class AuthService {
     required String refresh,
   }) async {
     try {
-      await store.setString(_accessKey, access);
-      await store.setString(_refreshKey, refresh);
+      final accessSaved = await store.setString(_accessKey, access);
+      final refreshSaved = await store.setString(_refreshKey, refresh);
+      if (!accessSaved || !refreshSaved) {
+        throw StateError('Failed to persist auth tokens');
+      }
     } catch (_) {
       _cachedAccessToken = null;
       _cachedRefreshToken = null;

@@ -32,12 +32,38 @@ void main() {
     expect(AuthService.instance.bearerToken, isNull);
     expect(AuthService.instance.refreshToken, isNull);
   });
+
+  for (final failedKey in [accessKey, refreshKey]) {
+    test(
+      'saveTokens clears partial state when $failedKey returns false',
+      () async {
+        final store = _FakeTokenStore(falseOnKey: failedKey)
+          ..values[accessKey] = 'old-access'
+          ..values[refreshKey] = 'old-refresh';
+        AuthService.instance.setTokenStoreProviderForTesting(() async => store);
+
+        await expectLater(
+          AuthService.instance.saveTokens(
+            access: 'new-access',
+            refresh: 'new-refresh',
+          ),
+          throwsA(isA<StateError>()),
+        );
+
+        expect(store.values[accessKey], isNull);
+        expect(store.values[refreshKey], isNull);
+        expect(AuthService.instance.bearerToken, isNull);
+        expect(AuthService.instance.refreshToken, isNull);
+      },
+    );
+  }
 }
 
 class _FakeTokenStore implements AuthTokenStore {
-  _FakeTokenStore({this.failOnKey});
+  _FakeTokenStore({this.failOnKey, this.falseOnKey});
 
   final String? failOnKey;
+  final String? falseOnKey;
   final Map<String, String> values = {};
 
   @override
@@ -47,6 +73,9 @@ class _FakeTokenStore implements AuthTokenStore {
   Future<bool> setString(String key, String value) async {
     if (key == failOnKey) {
       throw StateError('set failed for $key');
+    }
+    if (key == falseOnKey) {
+      return false;
     }
     values[key] = value;
     return true;
