@@ -1,40 +1,6 @@
 // lib/models/play_evidence_models.dart
 // 증거 관련 플레이 DTO (play_models.dart 에서 분리)
 
-import 'case.dart';
-
-enum EvidenceImportance { low, normal, high, core, fake }
-
-EvidenceImportance evidenceImportanceFromApi(String? v) => switch (v) {
-  'LOW' => EvidenceImportance.low,
-  'HIGH' => EvidenceImportance.high,
-  'CORE' => EvidenceImportance.core,
-  'FAKE' => EvidenceImportance.fake,
-  _ => EvidenceImportance.normal,
-};
-
-EvidencePhase evidencePhaseFromApi(int? v) => switch (v) {
-  1 => EvidencePhase.phase1,
-  2 => EvidencePhase.phase2,
-  3 => EvidencePhase.phase3,
-  4 => EvidencePhase.phase4,
-  _ => EvidencePhase.phase0,
-};
-
-List<ProofDimension> proofDimensionsFromApi(List<dynamic>? v) {
-  if (v == null) return const [];
-  return v
-      .map((e) => switch (e as String?) {
-    'TIME_PROOF' => ProofDimension.timeProof,
-    'METHOD_PROOF' => ProofDimension.methodProof,
-    'MOTIVE_PROOF' => ProofDimension.motiveProof,
-    'COVER_UP_PROOF' => ProofDimension.coverUpProof,
-    _ => null,
-  })
-      .whereType<ProofDimension>()
-      .toList();
-}
-
 class RelatedSuspect {
   const RelatedSuspect({required this.suspectId, required this.name});
 
@@ -63,60 +29,44 @@ class PlayEvidence {
   const PlayEvidence({
     required this.evidenceId,
     required this.title,
-    required this.importance,
     required this.isUnlocked,
     this.description,
     this.locationName,
     this.unlockHint,
     this.relatedSuspects = const [],
-    this.phase = EvidencePhase.phase0,
-    this.proofDimensions = const [],
     this.category,
     this.imageUrl,
     this.oneLine,
-    this.imageAssetKey,
     this.categoryLabel,
   });
 
   final int evidenceId;
   final String title;
-  final EvidenceImportance importance;
   final bool isUnlocked;
   final String? description;
   final String? locationName;
   final String? unlockHint;
   final List<RelatedSuspect> relatedSuspects;
-  final EvidencePhase phase;
-  final List<ProofDimension> proofDimensions;
   final String? category;
   final String? imageUrl;
   final String? oneLine;
-  final String? imageAssetKey;
   final String? categoryLabel;
 
   factory PlayEvidence.fromJson(Map<String, dynamic> j) {
-    final url = j['imageUrl'] as String?;
+    final url = (j['imageUrl'] as String?)?.trim();
     return PlayEvidence(
       evidenceId: (j['evidenceId'] as num).toInt(),
       title: j['title'] as String? ?? '',
-      importance: evidenceImportanceFromApi(j['importance'] as String?),
       isUnlocked: j['isUnlocked'] as bool? ?? false,
       description: j['description'] as String?,
       locationName: j['locationName'] as String?,
       unlockHint: j['unlockHint'] as String?,
-      relatedSuspects:
-      ((j['relatedSuspects'] as List<dynamic>?) ?? const [])
+      relatedSuspects: ((j['relatedSuspects'] as List<dynamic>?) ?? const [])
           .map((e) => RelatedSuspect.fromJson(e as Map<String, dynamic>))
           .toList(),
-      phase: evidencePhaseFromApi((j['phase'] as num?)?.toInt()),
-      proofDimensions:
-      proofDimensionsFromApi(j['proofDimensions'] as List<dynamic>?),
       category: j['evidenceType'] as String? ?? j['category'] as String?,
-      imageUrl: url,
+      imageUrl: url?.isNotEmpty == true ? url : null,
       oneLine: j['oneLine'] as String?,
-      imageAssetKey: (url != null && url.isNotEmpty)
-          ? url
-          : j['imageAssetKey'] as String?,
       categoryLabel: j['categoryLabel'] as String?,
     );
   }
@@ -166,7 +116,6 @@ class CompareEvidenceInfo {
 
 class SuggestedQuestionInfo {
   const SuggestedQuestionInfo({
-    this.targetCharacterCode,
     this.targetSuspectId,
     this.targetName,
     required this.question,
@@ -174,7 +123,6 @@ class SuggestedQuestionInfo {
     this.questionType,
   });
 
-  final String? targetCharacterCode;
   final int? targetSuspectId;
   final String? targetName;
   final String question;
@@ -183,7 +131,6 @@ class SuggestedQuestionInfo {
 
   factory SuggestedQuestionInfo.fromJson(Map<String, dynamic> j) =>
       SuggestedQuestionInfo(
-        targetCharacterCode: j['targetCharacterCode'] as String?,
         targetSuspectId: (j['targetSuspectId'] as num?)?.toInt(),
         targetName: j['targetName'] as String?,
         question: j['question'] as String? ?? '',
@@ -204,26 +151,32 @@ class EvidenceGuidance {
   final List<SuggestedQuestionInfo> suggestedQuestions;
 
   factory EvidenceGuidance.fromJson(Map<String, dynamic> j) => EvidenceGuidance(
-        readingPoints: (j['readingPoints'] as List<dynamic>?)
-                ?.map((e) => e as String)
-                .toList() ??
-            const [],
-        compareEvidences: (j['compareEvidences'] as List<dynamic>?)
-                ?.map((e) => CompareEvidenceInfo.fromJson(e as Map<String, dynamic>))
-                .toList() ??
-            const [],
-        suggestedQuestions: (j['suggestedQuestions'] as List<dynamic>?)
-                ?.map((e) => SuggestedQuestionInfo.fromJson(e as Map<String, dynamic>))
-                .toList() ??
-            const [],
-      );
+    readingPoints:
+        (j['readingPoints'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList() ??
+        const [],
+    compareEvidences:
+        (j['compareEvidences'] as List<dynamic>?)
+            ?.map(
+              (e) => CompareEvidenceInfo.fromJson(e as Map<String, dynamic>),
+            )
+            .toList() ??
+        const [],
+    suggestedQuestions:
+        (j['suggestedQuestions'] as List<dynamic>?)
+            ?.map(
+              (e) => SuggestedQuestionInfo.fromJson(e as Map<String, dynamic>),
+            )
+            .toList() ??
+        const [],
+  );
 }
 
 class EvidenceDetail {
   const EvidenceDetail({
     required this.evidenceId,
     required this.title,
-    required this.importance,
     this.description,
     this.imageUrl,
     this.locationName,
@@ -234,7 +187,6 @@ class EvidenceDetail {
 
   final int evidenceId;
   final String title;
-  final EvidenceImportance importance;
   final String? description;
   final String? imageUrl;
   final String? locationName;
@@ -245,20 +197,20 @@ class EvidenceDetail {
   factory EvidenceDetail.fromJson(Map<String, dynamic> j) => EvidenceDetail(
     evidenceId: (j['evidenceId'] as num).toInt(),
     title: j['title'] as String? ?? '',
-    importance: evidenceImportanceFromApi(j['importance'] as String?),
     description: j['description'] as String?,
-    imageUrl: j['imageUrl'] as String?,
-    locationName:
-    (j['location'] as Map<String, dynamic>?)?['name'] as String?,
-    relatedSuspects:
-    ((j['relatedSuspects'] as List<dynamic>?) ?? const [])
+    imageUrl: (j['imageUrl'] as String?)?.trim().isNotEmpty == true
+        ? (j['imageUrl'] as String).trim()
+        : null,
+    locationName: (j['location'] as Map<String, dynamic>?)?['name'] as String?,
+    relatedSuspects: ((j['relatedSuspects'] as List<dynamic>?) ?? const [])
         .map((e) => RelatedSuspect.fromJson(e as Map<String, dynamic>))
         .toList(),
     relatedTimelineEvents:
-    ((j['relatedTimelineEvents'] as List<dynamic>?) ?? const [])
-        .map((e) =>
-        RelatedTimelineEvent.fromJson(e as Map<String, dynamic>))
-        .toList(),
+        ((j['relatedTimelineEvents'] as List<dynamic>?) ?? const [])
+            .map(
+              (e) => RelatedTimelineEvent.fromJson(e as Map<String, dynamic>),
+            )
+            .toList(),
     guidance: j['guidance'] != null
         ? EvidenceGuidance.fromJson(j['guidance'] as Map<String, dynamic>)
         : null,

@@ -11,15 +11,14 @@ import '../models/case.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
 
-enum _Filter { all, acquired, locked, key }
+enum _Filter { all, acquired, locked }
 
 extension _FilterLabel on _Filter {
   String get label => switch (this) {
-        _Filter.all => '전체',
-        _Filter.acquired => '확보됨',
-        _Filter.locked => '잠긴 증거',
-        _Filter.key => '핵심 증거',
-      };
+    _Filter.all => '전체',
+    _Filter.acquired => '확보됨',
+    _Filter.locked => '잠긴 증거',
+  };
 }
 
 class EvidenceScreen extends StatefulWidget {
@@ -52,7 +51,8 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
       });
 
     return sorted.where((e) {
-      final matchesQuery = _query.isEmpty ||
+      final matchesQuery =
+          _query.isEmpty ||
           e.name.contains(_query) ||
           e.location.contains(_query);
       final isTimeLocked = e.isLocked && !unlockedIds.contains(e.id);
@@ -60,7 +60,6 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
         _Filter.all => true,
         _Filter.acquired => !isTimeLocked,
         _Filter.locked => isTimeLocked,
-        _Filter.key => e.isAnalyzed,
       };
       return matchesQuery && matchesFilter;
     }).toList();
@@ -99,9 +98,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
                       children: _Filter.values.map((f) {
                         return Padding(
                           padding: EdgeInsets.only(
-                            right: f != _Filter.values.last
-                                ? AppTokens.sp2
-                                : 0,
+                            right: f != _Filter.values.last ? AppTokens.sp2 : 0,
                           ),
                           child: MSFilterChip(
                             label: f.label,

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../components/game_modals.dart';
 import '../controllers/game_session_provider.dart';
 import '../core/api/api_exception.dart';
-import '../models/play_interrogation_models.dart';
 import '../models/play_models.dart';
 import '../models/session_models.dart';
 import '../repositories/play_session_repository.dart';
@@ -47,10 +46,10 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
 
   // ── 메시지 전송 ─────────────────────────────────────────────────────────────
   Future<void> sendMessage(
-      String text, {
-        String? evidenceId,
-        QuestionType questionType = QuestionType.free,
-      }) async {
+    String text, {
+    String? evidenceId,
+    QuestionType questionType = QuestionType.free,
+  }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || isWaiting) return;
 
@@ -67,26 +66,30 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
     }
 
     setState(() {
-      messages.add(InterrogationMessage(
-        text: trimmed,
-        sender: InterrogationSender.detective,
-        presentedEvidenceId: evidenceId,
-      ));
+      messages.add(
+        InterrogationMessage(
+          text: trimmed,
+          sender: InterrogationSender.detective,
+          presentedEvidenceId: evidenceId,
+        ),
+      );
       isWaiting = true;
-      inputCtrl.clear();
       prefillEvidenceId = null;
       prefillEvidenceTitle = null;
       prefillQuestionType = null; // 전송 시작 시 프리필 타입 초기화
+      inputCtrl.clear();
     });
     scrollToBottom();
 
     if (sessionId == null || suspectIdInt == null) {
       if (mounted) {
         setState(() {
-          messages.add(const InterrogationMessage(
-            text: '세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.',
-            sender: InterrogationSender.suspect,
-          ));
+          messages.add(
+            const InterrogationMessage(
+              text: '세션이 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.',
+              sender: InterrogationSender.suspect,
+            ),
+          );
           isWaiting = false;
         });
         scrollToBottom();
@@ -111,14 +114,16 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
       unlocked = res.unlockedEvidences;
 
       if (mounted) {
-        ctrl.addInterrogationLog(InterrogationLog(
-          suspectId: suspectId,
-          suspectName: suspectName,
-          question: trimmed,
-          answer: answer,
-          askedAt: ctrl.elapsed,
-          presentedEvidenceId: evidenceId,
-        ));
+        ctrl.addInterrogationLog(
+          InterrogationLog(
+            suspectId: suspectId,
+            suspectName: suspectName,
+            question: trimmed,
+            answer: answer,
+            askedAt: ctrl.elapsed,
+            presentedEvidenceId: evidenceId,
+          ),
+        );
       }
     } on ApiException {
       answer = '...지금은 대답하기 어려운 것 같습니다.';
@@ -129,7 +134,12 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
     } finally {
       if (mounted) {
         setState(() {
-          messages.add(InterrogationMessage(text: answer, sender: InterrogationSender.suspect));
+          messages.add(
+            InterrogationMessage(
+              text: answer,
+              sender: InterrogationSender.suspect,
+            ),
+          );
           isWaiting = false;
         });
         scrollToBottom();
@@ -139,16 +149,18 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
     if (!mounted) return;
 
     if (errorNotice != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorNotice)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorNotice)));
     }
 
     if (unlocked.isNotEmpty) {
       await ctrl.refreshEvidences();
       if (mounted) {
         final evidenceNames = unlocked.map((e) => e.title).join(', ');
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('새로운 증거 확보: $evidenceNames'),
-        ));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('새로운 증거 확보: $evidenceNames')));
       }
     }
   }
@@ -158,37 +170,44 @@ mixin InterrogationActionsMixin<T extends StatefulWidget> on State<T> {
     final evidence = await showEvidencePresentModal(context);
     if (evidence != null && mounted) {
       setState(() {
-        prefillEvidenceId = null;
-        prefillEvidenceTitle = null;
-        prefillQuestionType = null;
+        final text = '이 증거를 제시합니다: ${evidence.name}';
+        prefillEvidenceId = evidence.id;
+        prefillEvidenceTitle = evidence.name;
+        prefillQuestionType = QuestionType.evidencePresented;
+        inputCtrl.text = text;
+        inputCtrl.selection = TextSelection.collapsed(
+          offset: inputCtrl.text.length,
+        );
       });
-      await sendMessage(
-        '이 증거를 제시합니다: ${evidence.name}',
-        evidenceId: evidence.id,
-        questionType: QuestionType.evidencePresented,
-      );
     }
   }
 
   // ── chip prefill (전송 금지) ─────────────────────────────────────────────────
   void onChipPrefill(SuggestedQuestionInfo sq) {
+    final question = sq.question.trim();
+    if (question.isEmpty || isWaiting) return;
+
+    final evidenceIdStr = sq.presentedEvidenceId?.toString();
+    final hasEvidence = evidenceIdStr != null && evidenceIdStr.isNotEmpty;
+    final parsedType = questionTypeFromApi(sq.questionType);
+    final pendingType = hasEvidence
+        ? QuestionType.evidencePresented
+        : (sq.questionType == null
+              ? QuestionType.recommended
+              : parsedType == QuestionType.evidencePresented
+              ? QuestionType.free
+              : parsedType);
+
     setState(() {
-      inputCtrl.text = sq.question;
-      inputCtrl.selection = TextSelection.collapsed(offset: inputCtrl.text.length);
-
-      final evidenceIdStr = sq.presentedEvidenceId?.toString();
-      prefillEvidenceId = evidenceIdStr;
-
-      if (evidenceIdStr != null) {
-        prefillEvidenceTitle = (sq.targetName != null && sq.targetName!.trim().isNotEmpty)
-            ? sq.targetName
-            : '연관된 증거';
-      } else {
-        prefillEvidenceTitle = null;
-      }
-
-      // String을 모델 내부 파싱 유틸리티를 활용해 안전하게 매핑
-      prefillQuestionType = questionTypeFromApi(sq.questionType);
+      prefillEvidenceId = hasEvidence ? evidenceIdStr : null;
+      prefillEvidenceTitle = hasEvidence ? '선택된 증거' : null;
+      prefillQuestionType = pendingType == QuestionType.free
+          ? null
+          : pendingType;
+      inputCtrl.text = question;
+      inputCtrl.selection = TextSelection.collapsed(
+        offset: inputCtrl.text.length,
+      );
     });
   }
 

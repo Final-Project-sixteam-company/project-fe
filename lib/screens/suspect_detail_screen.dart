@@ -15,28 +15,22 @@ import '../theme/app_theme.dart';
 import 'suspect_detail_bottom_bar.dart';
 import 'suspect_detail_widgets.dart';
 import 'suspect_detail_cards.dart';
+
 class SuspectDetailScreen extends StatefulWidget {
   const SuspectDetailScreen({required this.suspect, super.key});
   final Suspect suspect;
   @override
   State<SuspectDetailScreen> createState() => _SuspectDetailScreenState();
 }
-class _SuspectDetailScreenState extends State<SuspectDetailScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _opacity;
-  late final Animation<Offset> _slide;
+
+class _SuspectDetailScreenState extends State<SuspectDetailScreen> {
   bool _logsLoaded = false;
   List<InterrogationResult> _logs = const [];
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: AppMotion.dur3);
-    _opacity = CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut);
-    _slide = Tween<Offset>(begin: const Offset(0, 8), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _ctrl, curve: AppMotion.easeOut));
-    _ctrl.forward();
   }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -52,7 +46,9 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
     if (sessionId == null || suspectId == null) return;
     try {
       final logs = await playSessionRepo.interrogationLogs(
-          sessionId, suspectId: suspectId);
+        sessionId,
+        suspectId: suspectId,
+      );
       if (mounted) setState(() => _logs = logs);
     } on ApiException catch (_) {
     } catch (_) {}
@@ -60,7 +56,6 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
 
   @override
   void dispose() {
-    _ctrl.dispose();
     super.dispose();
   }
 
@@ -97,8 +92,7 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
           style: AppText.monoLabel.copyWith(color: c.textMute),
         ),
       ),
-      bottomNavigationBar:
-      SuspectDetailBottomBar(
+      bottomNavigationBar: SuspectDetailBottomBar(
         suspect: widget.suspect,
         onInterrogationDone: _loadLogs,
       ),
@@ -116,20 +110,24 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
                     tag: widget.suspect.id,
                     child: SuspectLargeAvatar(
                       name: widget.suspect.name,
-                      assetKey: raw?.portraitAssetKey ?? widget.suspect.portraitUrl ?? widget.suspect.portraitAssetKey,
+                      assetKey:
+                          raw?.portraitImageUrl ?? widget.suspect.portraitUrl,
                       isWitness: widget.suspect.isWitness,
                     ),
                   ),
                   const SizedBox(height: AppTokens.sp3),
-                  Text(widget.suspect.name,
-                      style: AppText.titleL.copyWith(color: c.text)),
+                  Text(
+                    widget.suspect.name,
+                    style: AppText.titleL.copyWith(color: c.text),
+                  ),
                   const SizedBox(height: AppTokens.sp1),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(raw?.role ?? widget.suspect.role,
-                          style:
-                          AppText.bodySm.copyWith(color: c.textSub)),
+                      Text(
+                        raw?.role ?? widget.suspect.role,
+                        style: AppText.bodySm.copyWith(color: c.textSub),
+                      ),
                       if (widget.suspect.isWitness) ...[
                         const SizedBox(width: AppTokens.sp2),
                         const MSPill('증인', tone: MSPillTone.mute),
@@ -144,21 +142,7 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
               ),
             ),
             const SizedBox(height: AppTokens.sp6),
-            if (!widget.suspect.isWitness)
-              FadeTransition(
-                opacity: _opacity,
-                child: AnimatedBuilder(
-                  animation: _slide,
-                  builder: (_, child) => Transform.translate(
-                      offset: _slide.value, child: child),
-                  child: SuspicionPanel(
-                    suspicion:
-                    raw?.suspicionLevel ?? widget.suspect.suspicion,
-                  ),
-                ),
-              ),
             if (raw?.relationToVictim?.isNotEmpty ?? false) ...[
-              const SizedBox(height: AppTokens.sp6),
               const MSKicker('피해자와의 관계'),
               const SizedBox(height: AppTokens.sp3),
               SuspectInfoCard(text: raw!.relationToVictim!),
@@ -169,7 +153,7 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
               const MSKicker('관련 증거'),
               const SizedBox(height: AppTokens.sp3),
               ...related.map(
-                    (e) => Padding(
+                (e) => Padding(
                   padding: const EdgeInsets.only(bottom: AppTokens.sp3),
                   child: EvidenceItem(e, onTap: () {}),
                 ),
@@ -182,8 +166,7 @@ class _SuspectDetailScreenState extends State<SuspectDetailScreen>
             SuspectStatementCard(
               statement: raw?.publicStatement,
               alibi: raw?.alibi,
-              publicAlibi:
-              raw?.publicAlibi ?? widget.suspect.publicAlibi,
+              publicAlibi: raw?.publicAlibi ?? widget.suspect.publicAlibi,
             ),
             // ── 이전 심문 기록 ─────────────────────────────────────
             if (_logs.isNotEmpty) ...[

@@ -44,13 +44,20 @@ class TimelineScreen extends StatefulWidget {
 class _TimelineScreenState extends State<TimelineScreen> {
   _TimelineFilter _filter = _TimelineFilter.all;
 
-  List<TimelineEntry> _getFiltered(List<TimelineEntry> source) => switch (_filter) {
-    _TimelineFilter.all => source,
-    _TimelineFilter.conflict =>
-        source.where((e) => e.conflict != null).toList(),
-    _TimelineFilter.suspect =>
-        source.where((e) => e.eventType == 'CLAIM' || (e.eventType == null && e.conflict == null)).toList(),
-  };
+  List<TimelineEntry> _getFiltered(List<TimelineEntry> source) =>
+      switch (_filter) {
+        _TimelineFilter.all => source,
+        _TimelineFilter.conflict =>
+          source.where((e) => e.conflict != null).toList(),
+        _TimelineFilter.suspect =>
+          source
+              .where(
+                (e) =>
+                    e.eventType == 'CLAIM' ||
+                    (e.eventType == null && e.conflict == null),
+              )
+              .toList(),
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +65,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
     final session = context.session;
 
     List<TimelineEntry> rawTimeline = session.timeline;
-    if (rawTimeline.isEmpty && session.usesCl001SampleCaseData) {
+    if (rawTimeline.isEmpty && session.usesSampleCaseFallback) {
       rawTimeline = sampleCase.timeline;
     }
 
@@ -102,15 +109,15 @@ class _TimelineScreenState extends State<TimelineScreen> {
             // ── 타임라인 ───────────────────────────────────────────
             entries.isEmpty
                 ? Padding(
-              padding: const EdgeInsets.only(top: AppTokens.sp8),
-              child: MSEmpty(
-                icon: _filter == _TimelineFilter.conflict
-                    ? Icons.report_gmailerrorred_outlined
-                    : Icons.schedule,
-                title: _filter.emptyTitle,
-                subtitle: _filter.emptySubtitle,
-              ),
-            )
+                    padding: const EdgeInsets.only(top: AppTokens.sp8),
+                    child: MSEmpty(
+                      icon: _filter == _TimelineFilter.conflict
+                          ? Icons.report_gmailerrorred_outlined
+                          : Icons.schedule,
+                      title: _filter.emptyTitle,
+                      subtitle: _filter.emptySubtitle,
+                    ),
+                  )
                 : TimelineList(entries),
             const SizedBox(height: AppTokens.sp10),
           ],

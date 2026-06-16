@@ -19,14 +19,16 @@ class EvidenceHero extends StatelessWidget {
   final Evidence evidence;
   @override
   Widget build(BuildContext context) {
-    final imageKey = evidence.imageUrl ?? evidence.imageAssetKey;
+    final imageKey = evidence.imageUrl;
     final hasImage = imageKey != null && imageKey.isNotEmpty;
 
     final fallback = Container(
-      width: 86, height: 86,
+      width: 86,
+      height: 86,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [AppColors.tealBase, AppColors.skyBase],
         ),
         borderRadius: BorderRadius.circular(AppTokens.r6),
@@ -64,48 +66,21 @@ class EvidenceHero extends StatelessWidget {
 
 // ── 상태 + 페이즈 행 ─────────────────────────────────────────────────────────
 class EvidenceStatusRow extends StatelessWidget {
-  const EvidenceStatusRow({
-    required this.statusLabel, required this.phase,
-    required this.effectiveLocked, super.key,
-  });
+  const EvidenceStatusRow({required this.statusLabel, super.key});
   final String statusLabel;
-  final EvidencePhase phase;
-  final bool effectiveLocked;
+
   static MSPillTone _tone(String s) => switch (s) {
-    'UNLOCKED' || 'ANALYZED' => MSPillTone.success,
-    'NEW' => MSPillTone.primary,
+    '해금' || '확보됨' => MSPillTone.success,
+    '신규' => MSPillTone.primary,
     _ => MSPillTone.mute,
   };
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        MSPill(statusLabel, tone: _tone(statusLabel)),
-        if (!effectiveLocked && phase != EvidencePhase.phase0) ...[
-          const SizedBox(width: AppTokens.sp2),
-          MSPill(phase.label, tone: MSPillTone.mute),
-        ],
-      ]),
-    );
-  }
-}
-
-// ── 입증 차원 뱃지 행 ─────────────────────────────────────────────────────────
-class ProofDimensionRow extends StatelessWidget {
-  const ProofDimensionRow({required this.dimensions, super.key});
-  final List<ProofDimension> dimensions;
-  static MSPillTone _tone(ProofDimension d) => switch (d) {
-    ProofDimension.timeProof => MSPillTone.primary,
-    ProofDimension.methodProof => MSPillTone.danger,
-    ProofDimension.motiveProof => MSPillTone.success,
-    ProofDimension.coverUpProof => MSPillTone.mute,
-  };
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: AppTokens.sp2, runSpacing: AppTokens.sp2,
-      children: dimensions.map((d) => MSPill(d.label, tone: _tone(d))).toList(),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [MSPill(statusLabel, tone: _tone(statusLabel))],
+      ),
     );
   }
 }
@@ -115,7 +90,6 @@ class ObservationCard extends StatelessWidget {
   const ObservationCard({
     required this.evidence,
     required this.effectiveLocked,
-    required this.statusLabel,
     this.description,
     this.relatedSuspects = const [],
     this.relatedTimelineEvents = const [],
@@ -128,22 +102,24 @@ class ObservationCard extends StatelessWidget {
 
   final Evidence evidence;
   final bool effectiveLocked;
-  final String statusLabel;
+
   /// 서버 상세 API 또는 목록 DTO 본문. null이면 generic 안내 문구.
   final String? description;
   final List<RelatedSuspect> relatedSuspects;
   final List<RelatedTimelineEvent> relatedTimelineEvents;
   final EvidenceGuidance? guidance;
+
   /// 해금된 비교 증거 탭 콜백. evidenceId를 인자로 전달.
   final void Function(int evidenceId)? onCompareEvidenceTap;
+
   /// 추천 질문 탭 콜백. SuggestedQuestionInfo를 인자로 전달.
   final void Function(SuggestedQuestionInfo question)? onSuggestedQuestionTap;
+
   /// 상세 API 호출 중이며 description 미확보 상태.
   final bool loading;
 
   String _fallback() {
     if (effectiveLocked) return '이 증거는 잠겨 있습니다. 수사가 진행되면 자동으로 공개됩니다.';
-    if (evidence.isAnalyzed) return '분석이 완료되었습니다. 해당 정보로 사건을 추리하세요.';
     return '확보된 증거입니다. 용의자 심문 시 제시하거나 타임라인과 교차 검토하세요.';
   }
 
@@ -151,70 +127,86 @@ class ObservationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final bodyText =
-    (!effectiveLocked && description != null && description!.isNotEmpty)
+        (!effectiveLocked && description != null && description!.isNotEmpty)
         ? description!
         : _fallback();
     return Container(
       padding: const EdgeInsets.all(AppTokens.sp4),
       decoration: BoxDecoration(
-        color: c.bgElev, border: Border.all(color: c.line),
+        color: c.bgElev,
+        border: Border.all(color: c.line),
         borderRadius: BorderRadius.circular(AppTokens.r4),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const MSKicker('관찰 정보'),
-        const SizedBox(height: AppTokens.sp3),
-        if (loading)
-          Row(children: [
-            const MSSpinner(size: 14),
-            const SizedBox(width: AppTokens.sp3),
-            Text('상세 정보를 불러오는 중…',
-                style: AppText.bodySm.copyWith(color: c.textSub)),
-          ])
-        else
-          Text(bodyText,
-              style: AppText.body.copyWith(color: c.text, height: 1.6)),
-        if (!effectiveLocked && relatedSuspects.isNotEmpty) ...[
-          const SizedBox(height: AppTokens.sp4),
-          const MSKicker('관련 용의자'),
-          const SizedBox(height: AppTokens.sp2),
-          Wrap(
-            spacing: AppTokens.sp2, runSpacing: AppTokens.sp2,
-            children: relatedSuspects
-                .map((s) => MSPill(s.name, tone: MSPillTone.primary))
-                .toList(),
-          ),
-        ],
-        if (!effectiveLocked && relatedTimelineEvents.isNotEmpty) ...[
-          const SizedBox(height: AppTokens.sp4),
-          const MSKicker('관련 타임라인'),
-          const SizedBox(height: AppTokens.sp2),
-          ...relatedTimelineEvents
-              .map((e) => EvidenceTimelineRow(time: e.time, title: e.title)),
-        ],
-        if (!effectiveLocked && guidance != null) ...[
-          if (guidance!.readingPoints.isNotEmpty) ...[
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const MSKicker('관찰 정보'),
+          const SizedBox(height: AppTokens.sp3),
+          if (loading)
+            Row(
+              children: [
+                const MSSpinner(size: 14),
+                const SizedBox(width: AppTokens.sp3),
+                Text(
+                  '상세 정보를 불러오는 중…',
+                  style: AppText.bodySm.copyWith(color: c.textSub),
+                ),
+              ],
+            )
+          else
+            Text(
+              bodyText,
+              style: AppText.body.copyWith(color: c.text, height: 1.6),
+            ),
+          if (!effectiveLocked && relatedSuspects.isNotEmpty) ...[
             const SizedBox(height: AppTokens.sp4),
-            const MSKicker('주요 단서'),
+            const MSKicker('관련 용의자'),
             const SizedBox(height: AppTokens.sp2),
-            ...guidance!.readingPoints.map((point) => 
-                Padding(
+            Wrap(
+              spacing: AppTokens.sp2,
+              runSpacing: AppTokens.sp2,
+              children: relatedSuspects
+                  .map((s) => MSPill(s.name, tone: MSPillTone.primary))
+                  .toList(),
+            ),
+          ],
+          if (!effectiveLocked && relatedTimelineEvents.isNotEmpty) ...[
+            const SizedBox(height: AppTokens.sp4),
+            const MSKicker('관련 타임라인'),
+            const SizedBox(height: AppTokens.sp2),
+            ...relatedTimelineEvents.map(
+              (e) => EvidenceTimelineRow(time: e.time, title: e.title),
+            ),
+          ],
+          if (!effectiveLocked && guidance != null) ...[
+            if (guidance!.readingPoints.isNotEmpty) ...[
+              const SizedBox(height: AppTokens.sp4),
+              const MSKicker('이 증거에서 볼 점'),
+              const SizedBox(height: AppTokens.sp2),
+              ...guidance!.readingPoints.map(
+                (point) => Padding(
                   padding: const EdgeInsets.only(bottom: AppTokens.sp2),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('•', style: AppText.body.copyWith(color: c.text)),
                       const SizedBox(width: AppTokens.sp2),
-                      Expanded(child: Text(point, style: AppText.body.copyWith(color: c.text))),
+                      Expanded(
+                        child: Text(
+                          point,
+                          style: AppText.body.copyWith(color: c.text),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-            ),
-          ],
-          if (guidance!.compareEvidences.isNotEmpty) ...[
-            const SizedBox(height: AppTokens.sp4),
-            const MSKicker('함께 볼 증거'),
-            const SizedBox(height: AppTokens.sp2),
-            ...guidance!.compareEvidences.map((ce) {
+              ),
+            ],
+            if (guidance!.compareEvidences.isNotEmpty) ...[
+              const SizedBox(height: AppTokens.sp4),
+              const MSKicker('함께 볼 증거'),
+              const SizedBox(height: AppTokens.sp2),
+              ...guidance!.compareEvidences.map((ce) {
                 final row = Padding(
                   padding: const EdgeInsets.only(bottom: AppTokens.sp2),
                   child: Row(
@@ -231,7 +223,7 @@ class ObservationCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              ce.isUnlocked ? '[이동 가능] ${ce.title}' : '[잠김] ${ce.title}',
+                              ce.isUnlocked ? ce.title : '잠긴 증거',
                               style: AppText.body.copyWith(
                                 color: ce.isUnlocked ? c.text : c.textMute,
                               ),
@@ -240,7 +232,9 @@ class ObservationCard extends StatelessWidget {
                               const SizedBox(height: 2),
                               Text(
                                 '해금 힌트: ${ce.unlockHint}',
-                                style: AppText.bodySm.copyWith(color: c.textSub),
+                                style: AppText.bodySm.copyWith(
+                                  color: c.textSub,
+                                ),
                               ),
                             ],
                           ],
@@ -251,7 +245,9 @@ class ObservationCard extends StatelessWidget {
                     ],
                   ),
                 );
-                if (ce.isUnlocked && ce.evidenceId != null && onCompareEvidenceTap != null) {
+                if (ce.isUnlocked &&
+                    ce.evidenceId != null &&
+                    onCompareEvidenceTap != null) {
                   return GestureDetector(
                     onTap: () => onCompareEvidenceTap!(ce.evidenceId!),
                     behavior: HitTestBehavior.opaque,
@@ -259,14 +255,15 @@ class ObservationCard extends StatelessWidget {
                   );
                 }
                 return row;
-            }),
-          ],
-          if (guidance!.suggestedQuestions.isNotEmpty) ...[
-            const SizedBox(height: AppTokens.sp4),
-            const MSKicker('추천 질문'),
-            const SizedBox(height: AppTokens.sp2),
-            ...guidance!.suggestedQuestions.map((q) {
-                final targetText = q.targetName != null && q.targetName!.isNotEmpty
+              }),
+            ],
+            if (guidance!.suggestedQuestions.isNotEmpty) ...[
+              const SizedBox(height: AppTokens.sp4),
+              const MSKicker('추천 질문'),
+              const SizedBox(height: AppTokens.sp2),
+              ...guidance!.suggestedQuestions.map((q) {
+                final targetText =
+                    q.targetName != null && q.targetName!.isNotEmpty
                     ? '[${q.targetName}에게] '
                     : '';
                 final row = Padding(
@@ -276,7 +273,12 @@ class ObservationCard extends StatelessWidget {
                     children: [
                       Icon(Icons.help_outline, size: 16, color: c.textMute),
                       const SizedBox(width: AppTokens.sp2),
-                      Expanded(child: Text('$targetText${q.question}', style: AppText.body.copyWith(color: c.text))),
+                      Expanded(
+                        child: Text(
+                          '$targetText${q.question}',
+                          style: AppText.body.copyWith(color: c.text),
+                        ),
+                      ),
                       if (onSuggestedQuestionTap != null)
                         Icon(Icons.chevron_right, size: 16, color: c.textMute),
                     ],
@@ -290,17 +292,11 @@ class ObservationCard extends StatelessWidget {
                   );
                 }
                 return row;
-            }),
+              }),
+            ],
           ],
         ],
-        const SizedBox(height: AppTokens.sp4),
-        Row(children: [
-          Expanded(child: EvidenceMetaCell(
-              label: 'EVIDENCE ID', value: evidence.id.toUpperCase())),
-          const SizedBox(width: AppTokens.sp3),
-          Expanded(child: EvidenceMetaCell(label: 'STATUS', value: statusLabel)),
-        ]),
-      ]),
+      ),
     );
   }
 }

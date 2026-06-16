@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import '../components/asset_image_widget.dart';
 import '../components/image_viewer_modal.dart';
-import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
 import '../theme/app_theme.dart';
@@ -78,73 +77,4 @@ class PersonalityBadge extends StatelessWidget {
   }
 }
 
-// ── 의심도 패널 ───────────────────────────────────────────────────────────────
-
-class SuspicionPanel extends StatelessWidget {
-  const SuspicionPanel({required this.suspicion, super.key});
-
-  final int suspicion;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    final double ratio = (suspicion / 100).clamp(0.0, 1.0);
-
-    return Container(
-      padding: const EdgeInsets.all(AppTokens.sp4),
-      decoration: BoxDecoration(
-        color: c.bgElev,
-        border: Border.all(color: c.line),
-        borderRadius: BorderRadius.circular(AppTokens.r6),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('SUSPICION',
-              style: AppText.monoLabel.copyWith(color: c.textMute)),
-          const SizedBox(height: AppTokens.sp1),
-          Text(
-            '$suspicion',
-            style: AppText.monoNum.copyWith(
-              fontSize: 48,
-              fontWeight: FontWeight.w700,
-              color: c.danger,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(height: AppTokens.sp3),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppTokens.r1),
-            child: SizedBox(
-              height: 8,
-              child: LayoutBuilder(
-                builder: (_, constraints) => Stack(
-                  children: [
-                    Positioned.fill(child: ColoredBox(color: c.bgHover)),
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: constraints.maxWidth * ratio,
-                      child: const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [AppColors.skyBase, AppColors.roseBase],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ── 진술 카드 ─────────────────────────────────────────────────────────────────
-
-

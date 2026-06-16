@@ -17,6 +17,7 @@ class InterrogationChatScreen extends StatefulWidget {
     required this.suspect,
     this.suggestedQuestions = const [],
     this.initialQuestion,
+    this.initialQuestionType,
     this.presentedEvidenceId,
     this.presentedEvidenceTitle,
     super.key,
@@ -25,6 +26,7 @@ class InterrogationChatScreen extends StatefulWidget {
   final Suspect suspect;
   final List<SuggestedQuestionInfo> suggestedQuestions;
   final String? initialQuestion;
+  final String? initialQuestionType;
   final String? presentedEvidenceId;
   final String? presentedEvidenceTitle;
 
@@ -35,25 +37,30 @@ class InterrogationChatScreen extends StatefulWidget {
 
 class _InterrogationChatScreenState extends State<InterrogationChatScreen>
     with InterrogationActionsMixin {
-
   @override
   String get suspectId => widget.suspect.id;
+
   @override
   String get suspectName => widget.suspect.name;
+
   @override
   String get backendSessionId_ => '';
 
   @override
   final TextEditingController inputCtrl = TextEditingController();
+
   @override
   final ScrollController scrollCtrl = ScrollController();
+
   @override
   final List<InterrogationMessage> messages = [];
 
   @override
   bool isWaiting = false;
+
   @override
   String? prefillEvidenceId;
+
   @override
   String? prefillEvidenceTitle;
 
@@ -66,21 +73,38 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen>
   @override
   void initState() {
     super.initState();
-
-    // 초기 주입 질문 바인딩 및 타입 추적 초기화
-    if (widget.initialQuestion?.trim().isNotEmpty == true) {
-      final initialText = widget.initialQuestion!.trim();
-      inputCtrl.text = initialText;
-      inputCtrl.selection = TextSelection.collapsed(offset: inputCtrl.text.length);
-      prefillEvidenceId = widget.presentedEvidenceId;
-      prefillEvidenceTitle = widget.presentedEvidenceTitle ?? '선택된 증거';
-
-      prefillQuestionType = QuestionType.recommended;
-      _lastPrefilledText = initialText;
-    }
-
-    // 유저가 프리필된 추천 가이드를 수정하면 즉시 점수 및 가이드 타입(RECOMMENDED) 무효화 처리
+    _hydrateInitialQuestion();
     inputCtrl.addListener(_handleInputTextChanged);
+  }
+
+  void _hydrateInitialQuestion() {
+    final initialText = widget.initialQuestion?.trim();
+    if (initialText == null || initialText.isEmpty) return;
+
+    final evidenceId = widget.presentedEvidenceId?.trim();
+    final hasEvidence = evidenceId != null && evidenceId.isNotEmpty;
+
+    inputCtrl.text = initialText;
+    inputCtrl.selection = TextSelection.collapsed(
+      offset: inputCtrl.text.length,
+    );
+    prefillEvidenceId = hasEvidence ? evidenceId : null;
+    prefillEvidenceTitle = hasEvidence
+        ? (widget.presentedEvidenceTitle?.trim().isNotEmpty == true
+              ? widget.presentedEvidenceTitle!.trim()
+              : '선택된 증거')
+        : null;
+    if (hasEvidence) {
+      prefillQuestionType = QuestionType.evidencePresented;
+    } else if (widget.initialQuestionType == null) {
+      prefillQuestionType = QuestionType.recommended;
+    } else {
+      final parsedType = questionTypeFromApi(widget.initialQuestionType);
+      prefillQuestionType = parsedType == QuestionType.recommended
+          ? parsedType
+          : null;
+    }
+    _lastPrefilledText = initialText;
   }
 
   @override
@@ -90,23 +114,35 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen>
     _initialized = true;
 
     final ctrl = context.sessionRead;
-    final logs = ctrl.interrogationLogs.where((l) => l.suspectId == widget.suspect.id);
+    final logs = ctrl.interrogationLogs.where(
+      (l) => l.suspectId == widget.suspect.id,
+    );
 
     for (final log in logs) {
       messages
-        ..add(InterrogationMessage(
+        ..add(
+          InterrogationMessage(
             text: log.question,
             sender: InterrogationSender.detective,
-            presentedEvidenceId: log.presentedEvidenceId))
-        ..add(InterrogationMessage(text: log.answer, sender: InterrogationSender.suspect));
+            presentedEvidenceId: log.presentedEvidenceId,
+          ),
+        )
+        ..add(
+          InterrogationMessage(
+            text: log.answer,
+            sender: InterrogationSender.suspect,
+          ),
+        );
     }
 
     if (messages.isEmpty) {
       final stmt = ctrl.rawSuspect(widget.suspect.id)?.publicStatement?.trim();
-      messages.add(InterrogationMessage(
-        text: (stmt?.isNotEmpty == true) ? stmt! : '무엇이 궁금하신가요? 질문해 주세요.',
-        sender: InterrogationSender.suspect,
-      ));
+      messages.add(
+        InterrogationMessage(
+          text: (stmt?.isNotEmpty == true) ? stmt! : '무엇이 궁금하신가요? 질문해 주세요.',
+          sender: InterrogationSender.suspect,
+        ),
+      );
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) => scrollToBottom());
@@ -120,19 +156,58 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen>
     super.dispose();
   }
 
-  /// 텍스트 리스너: 추천 질문이 수정되었는지 검증 및 상태 동기화
   void _handleInputTextChanged() {
-    if (prefillQuestionType != null && inputCtrl.text != _lastPrefilledText) {
+    if (prefillQuestionType == QuestionType.recommended &&
+        inputCtrl.text.trim() != _lastPrefilledText) {
       setState(() {
         prefillQuestionType = null;
+        _lastPrefilledText = '';
       });
     }
   }
 
   @override
   void onChipPrefill(SuggestedQuestionInfo sq) {
-    super.onChipPrefill(sq);
-    _lastPrefilledText = sq.question;
+    final question = sq.question.trim();
+    if (question.isEmpty || isWaiting) return;
+
+    final evidenceId = sq.presentedEvidenceId?.toString();
+    final hasEvidence = evidenceId != null && evidenceId.isNotEmpty;
+    final parsedType = questionTypeFromApi(sq.questionType);
+    final pendingType = hasEvidence
+        ? QuestionType.evidencePresented
+        : (sq.questionType == null
+              ? QuestionType.recommended
+              : parsedType == QuestionType.evidencePresented
+              ? QuestionType.free
+              : parsedType);
+
+    setState(() {
+      _lastPrefilledText = question;
+      prefillEvidenceId = hasEvidence ? evidenceId : null;
+      prefillEvidenceTitle = hasEvidence ? '선택된 증거' : null;
+      prefillQuestionType = pendingType == QuestionType.free
+          ? null
+          : pendingType;
+      inputCtrl.text = question;
+      inputCtrl.selection = TextSelection.collapsed(
+        offset: inputCtrl.text.length,
+      );
+    });
+  }
+
+  void _clearPrefill() {
+    setState(() {
+      prefillEvidenceId = null;
+      prefillEvidenceTitle = null;
+      prefillQuestionType = null;
+      _lastPrefilledText = '';
+    });
+  }
+
+  QuestionType _questionTypeForCurrentInput() {
+    if (prefillEvidenceId != null) return QuestionType.evidencePresented;
+    return prefillQuestionType ?? QuestionType.free;
   }
 
   @override
@@ -155,7 +230,7 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen>
                 vertical: AppTokens.sp4,
               ),
               itemCount: messages.length + (isWaiting ? 1 : 0),
-              separatorBuilder: (_, __) => const SizedBox(height: AppTokens.sp2),
+              separatorBuilder: (_, _) => const SizedBox(height: AppTokens.sp2),
               itemBuilder: (_, i) {
                 if (i == messages.length && isWaiting) {
                   return const WaitingBubble();
@@ -164,9 +239,9 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen>
                 return msg.sender == InterrogationSender.suspect
                     ? SuspectBubble(text: msg.text, suspect: widget.suspect)
                     : DetectiveBubble(
-                  text: msg.text,
-                  evidenceId: msg.presentedEvidenceId,
-                );
+                        text: msg.text,
+                        evidenceId: msg.presentedEvidenceId,
+                      );
               },
             ),
           ),
@@ -179,17 +254,10 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen>
           InterrogationInputBar(
             controller: inputCtrl,
             prefillEvidenceTitle: prefillEvidenceTitle,
-            onClearPrefill: () => setState(() {
-              prefillEvidenceId = null;
-              prefillEvidenceTitle = null;
-              prefillQuestionType = null;
-              _lastPrefilledText = '';
-            }),
+            onClearPrefill: _clearPrefill,
             onSend: () {
-              final finalType = prefillEvidenceId != null
-                  ? QuestionType.evidencePresented
-                  : (prefillQuestionType ?? QuestionType.free);
-
+              final finalType = _questionTypeForCurrentInput();
+              _lastPrefilledText = '';
               sendMessage(
                 inputCtrl.text,
                 evidenceId: prefillEvidenceId,

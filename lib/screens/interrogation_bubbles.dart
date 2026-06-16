@@ -10,11 +10,7 @@ import '../theme/app_theme.dart';
 // 용의자 말풍선
 // ─────────────────────────────────────────────────────────────────────────────
 class SuspectBubble extends StatelessWidget {
-  const SuspectBubble({
-    required this.text,
-    required this.suspect,
-    super.key,
-  });
+  const SuspectBubble({required this.text, required this.suspect, super.key});
 
   final String text;
   final Suspect suspect;
@@ -22,8 +18,9 @@ class SuspectBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final initial =
-        suspect.name.isNotEmpty ? suspect.name.characters.first : '?';
+    final initial = suspect.name.isNotEmpty
+        ? suspect.name.characters.first
+        : '?';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -85,11 +82,7 @@ class SuspectBubble extends StatelessWidget {
 // 탐정(유저) 말풍선
 // ─────────────────────────────────────────────────────────────────────────────
 class DetectiveBubble extends StatelessWidget {
-  const DetectiveBubble({
-    required this.text,
-    this.evidenceId,
-    super.key,
-  });
+  const DetectiveBubble({required this.text, this.evidenceId, super.key});
 
   final String text;
   final String? evidenceId;
@@ -111,9 +104,7 @@ class DetectiveBubble extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: isEvidence ? c.successSoft : c.primarySoft,
-              border: Border.all(
-                color: isEvidence ? c.success : c.primary,
-              ),
+              border: Border.all(color: isEvidence ? c.success : c.primary),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(AppTokens.r4),
                 topRight: Radius.circular(AppTokens.r1),

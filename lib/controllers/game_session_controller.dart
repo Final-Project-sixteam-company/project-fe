@@ -10,7 +10,7 @@ import '../repositories/play_session_repository.dart';
 
 class GameSessionController extends ChangeNotifier {
   GameSessionController({required this.scenarioId, PlaySessionRepository? repo})
-      : _repo = repo ?? playSessionRepo;
+    : _repo = repo ?? playSessionRepo;
 
   final String scenarioId;
   final PlaySessionRepository _repo;
@@ -34,10 +34,10 @@ class GameSessionController extends ChangeNotifier {
   /// 전체 캐릭터 목록 (용의자 + 증인).
   List<Suspect> get suspects => _suspects;
 
-  /// 범인 지목 가능한 용의자만(culpritEligible). 증인·레드헤링 등 지목불가 캐릭터 제외.
+  /// 최종 지목 후보. public witness 상태만 제외하고 모든 public suspect를 노출한다.
   /// SubmitScreen 드롭다운과 BottomBar 버튼 모두 이 getter를 사용한다.
   List<Suspect> get accusableSuspects =>
-      _suspects.where((s) => s.culpritEligible).toList();
+      _suspects.where((s) => !s.isWitness).toList();
 
   final Map<String, PlaySuspect> _suspectRaw = {};
   PlaySuspect? rawSuspect(String id) => _suspectRaw[id];
@@ -65,11 +65,15 @@ class GameSessionController extends ChangeNotifier {
 
   bool get isServerBacked => _backendScenarioId != null;
 
-  /// CL-001(데모데이 전야) 정적 샘플 데이터를 사용하는 세션인지 여부.
-  /// 타임라인·힌트 텍스트 등 하드코딩 샘플 데이터를 표시해도 되는지 판단하는 게이트.
-  /// 프론트가 서버 timeline API를 연동하면 항상 false로 교체한다.
-  bool get usesCl001SampleCaseData =>
-      scenarioId == 'demoday-eve' || _backendScenarioId == 1;
+  static const bool _enableSampleCaseFallback = bool.fromEnvironment(
+    'ENABLE_SAMPLE_CASE_FALLBACK',
+    defaultValue: false,
+  );
+
+  /// 로컬 컴포넌트 프리뷰용 중립 샘플 데이터를 표시해도 되는지 판단하는 게이트.
+  /// production/server-backed flow에서는 항상 서버 public API 응답만 사용한다.
+  bool get usesSampleCaseFallback =>
+      _enableSampleCaseFallback && !isServerBacked;
 
   // ── 세션 영속화 ───────────────────────────────────────────────────────────
   static String _activeSessionKey(int scenarioId) =>
@@ -164,6 +168,14 @@ class GameSessionController extends ChangeNotifier {
     if (saved != null) {
       try {
         await _repo.abandon(saved);
+      } on ApiException catch (e) {
+        if (e.code == 'P003') {
+          backendSessionId = saved;
+          await _saveSession(sid, saved);
+          await _refreshAfterAbandonBlocked();
+          return;
+        }
+        // 정리 실패(이미 종료/네트워크 등)는 무시 — 아래에서 신규 생성을 시도한다.
       } catch (_) {
         // 정리 실패(이미 종료/네트워크 등)는 무시 — 아래에서 신규 생성을 시도한다.
       }
@@ -172,7 +184,8 @@ class GameSessionController extends ChangeNotifier {
       return;
     }
     // 저장된 세션이 없으면 자동 복구 불가 — 안내 문구를 명확히 갱신한다.
-    _loadError = '이 기기에서 시작한 세션 기록이 없어 자동으로 정리할 수 없습니다. '
+    _loadError =
+        '이 기기에서 시작한 세션 기록이 없어 자동으로 정리할 수 없습니다. '
         '다른 기기/창에서 진행 중인 수사를 마치거나 중단한 뒤 다시 시도해 주세요.';
     notifyListeners();
   }
@@ -190,15 +203,15 @@ class GameSessionController extends ChangeNotifier {
     final rawSuspects = results[1] as List<PlaySuspect>;
     _suspectRaw
       ..clear()
-      ..addEntries(
-          rawSuspects.map((s) => MapEntry(s.suspectId.toString(), s)));
+      ..addEntries(rawSuspects.map((s) => MapEntry(s.suspectId.toString(), s)));
     _suspects = rawSuspects.map(_toSuspect).toList();
 
     final rawEvidences = results[2] as List<PlayEvidence>;
     _evidenceRaw
       ..clear()
       ..addEntries(
-          rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)));
+        rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)),
+      );
     _evidences = rawEvidences.map(_toEvidence).toList();
     _syncUnlockedFromServer(rawEvidences);
 
@@ -231,7 +244,8 @@ class GameSessionController extends ChangeNotifier {
       _evidenceRaw
         ..clear()
         ..addEntries(
-            rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)));
+          rawEvidences.map((e) => MapEntry(e.evidenceId.toString(), e)),
+        );
       _evidences = rawEvidences.map(_toEvidence).toList();
       _syncUnlockedFromServer(rawEvidences);
       // 현장 탭의 장소별 해금 카운트도 HUD 총합과 어긋나지 않도록 함께 갱신한다.
@@ -255,41 +269,33 @@ class GameSessionController extends ChangeNotifier {
   void _syncUnlockedFromServer(List<PlayEvidence> raw) {
     _unlockedEvidenceIds
       ..clear()
-      ..addAll(raw
-          .where((e) => e.isUnlocked)
-          .map((e) => e.evidenceId.toString()));
+      ..addAll(
+        raw.where((e) => e.isUnlocked).map((e) => e.evidenceId.toString()),
+      );
   }
 
   // ── 모델 변환 ─────────────────────────────────────────────────────────────
 
   Suspect _toSuspect(PlaySuspect s) => Suspect(
-        id: s.suspectId.toString(),
-        name: s.name,
-        role: s.role ?? '',
-        suspicion: s.suspicionLevel,
-        interrogationCount: s.interrogationCount,
-        portraitUrl: s.portraitAssetKey,
-        portraitAssetKey: s.portraitAssetKey,
-        isWitness: s.isWitness,
-        culpritEligible: s.culpritEligible,
-      );
+    id: s.suspectId.toString(),
+    name: s.name,
+    role: s.role ?? '',
+    interrogationCount: s.interrogationCount,
+    portraitUrl: s.portraitImageUrl,
+    isWitness: s.isWitness,
+  );
 
   Evidence _toEvidence(PlayEvidence e) => Evidence(
-        id: e.evidenceId.toString(),
-        name: e.title,
-        location: e.locationName ?? (e.isUnlocked ? '미상' : '???'),
-        icon: _iconForImportance(e.importance),
-        isLocked: !e.isUnlocked,
-        // 핵심(CORE) 증거는 '핵심 증거' 필터에 노출되도록 표시
-        isAnalyzed: e.importance == EvidenceImportance.core,
-        oneLine: e.oneLine,
-        imageUrl: e.imageUrl,
-        imageAssetKey: e.imageAssetKey,
-        categoryLabel: e.categoryLabel,
-        phase: e.phase,
-        proofDimensions: e.proofDimensions,
-        category: e.category,
-      );
+    id: e.evidenceId.toString(),
+    name: e.title,
+    location: e.locationName ?? (e.isUnlocked ? '미상' : '???'),
+    icon: _iconForEvidence(e.category),
+    isLocked: !e.isUnlocked,
+    oneLine: e.oneLine,
+    imageUrl: e.imageUrl,
+    categoryLabel: e.categoryLabel,
+    category: e.category,
+  );
 
   TimelineEntry _toTimelineEntry(PlayTimelineEvent e) {
     return TimelineEntry(
@@ -301,10 +307,11 @@ class GameSessionController extends ChangeNotifier {
     );
   }
 
-  static IconData _iconForImportance(EvidenceImportance imp) => switch (imp) {
-    EvidenceImportance.core => Icons.gpp_maybe_outlined,
-    EvidenceImportance.high => Icons.priority_high,
-    EvidenceImportance.fake => Icons.block_outlined,
+  static IconData _iconForEvidence(String? category) => switch (category) {
+    'PHYSICAL' => Icons.inventory_2_outlined,
+    'DOCUMENT' => Icons.description_outlined,
+    'DIGITAL_LOG' => Icons.dns_outlined,
+    'TESTIMONY' => Icons.record_voice_over_outlined,
     _ => Icons.description_outlined,
   };
 
@@ -321,8 +328,7 @@ class GameSessionController extends ChangeNotifier {
 
   // ── 해금 증거 ─────────────────────────────────────────────────────────────
   final Set<String> _unlockedEvidenceIds = {};
-  Set<String> get unlockedEvidenceIds =>
-      Set.unmodifiable(_unlockedEvidenceIds);
+  Set<String> get unlockedEvidenceIds => Set.unmodifiable(_unlockedEvidenceIds);
 
   int get unlockedCount =>
       _dashboard?.unlockedEvidenceCount ?? _unlockedEvidenceIds.length;
@@ -340,8 +346,16 @@ class GameSessionController extends ChangeNotifier {
 
   bool _isStarted = false;
   bool _isCompleted = false;
+  bool _finalDeductionSubmitting = false;
   bool get isStarted => _isStarted;
   bool get isCompleted => _isCompleted;
+  bool get isFinalDeductionSubmitting => _finalDeductionSubmitting;
+
+  void setFinalDeductionSubmitting(bool value) {
+    if (_finalDeductionSubmitting == value) return;
+    _finalDeductionSubmitting = value;
+    notifyListeners();
+  }
 
   // ── 탭 전환 인텐트 ────────────────────────────────────────────────────────
   // 증거 상세(별도 push 라우트)는 CaseScreen 의 GameSessionProvider 하위가 아니라
@@ -404,14 +418,16 @@ class GameSessionController extends ChangeNotifier {
 
   void completeSession() {
     _isCompleted = true;
+    _finalDeductionSubmitting = false;
     _timer?.cancel();
     final sid = _backendScenarioId;
     if (sid != null) _clearSavedSession(sid);
     notifyListeners();
   }
 
-  Future<void> abandonSession() async {
-    if (_isCompleted) return;
+  Future<bool> abandonSession() async {
+    if (_isCompleted) return false;
+    if (_finalDeductionSubmitting) return false;
     // 세션 생성이 진행 중이면 완료를 기다린 후 abandon을 실행한다.
     // fire-and-forget으로 두면 backendSessionId가 아직 null인 채로
     // abandon이 실행되어 /abandon 호출을 건너뛰고, 이후 in-flight load가
@@ -419,26 +435,57 @@ class GameSessionController extends ChangeNotifier {
     if (_loadFuture != null) {
       await _loadFuture!.catchError((_) {});
     }
-    _timer?.cancel();
     final id = backendSessionId;
     final sid = _backendScenarioId;
 
     if (id != null) {
       try {
         await _repo.abandon(id);
+        _timer?.cancel();
         // abandon 성공 시에만 로컬 세션 키를 삭제한다.
         // 실패하면 백엔드 세션이 PLAYING으로 남으므로 키를 보존해
         // 다음 진입 시 _tryResume 경로로 재개할 수 있게 한다.
         // 키를 지우면 createSession → 409 + 복구 불가 상태가 된다.
         backendSessionId = null;
         if (sid != null) await _clearSavedSession(sid);
+      } on ApiException catch (e) {
+        if (e.code == 'P003') {
+          backendSessionId = id;
+          if (sid != null) await _saveSession(sid, id);
+          await _refreshAfterAbandonBlocked();
+          return false;
+        }
+        _timer?.cancel();
+        // best-effort: 서버 정리 실패 → 키 보존, 타이머만 정리.
+        backendSessionId = null;
+        // sid 키는 의도적으로 유지.
       } catch (_) {
+        _timer?.cancel();
         // best-effort: 서버 정리 실패 → 키 보존, 타이머만 정리.
         backendSessionId = null;
         // sid 키는 의도적으로 유지.
       }
     } else {
+      _timer?.cancel();
       backendSessionId = null;
+    }
+    return true;
+  }
+
+  Future<void> _refreshAfterAbandonBlocked() async {
+    try {
+      final id = backendSessionId;
+      if (id == null) return;
+      _dashboard = await _repo.dashboard(id);
+      if (_dashboard?.status == PlaySessionStatus.playing) {
+        await _refreshAll();
+      }
+      _loadError = null;
+      _sessionConflict = false;
+    } catch (_) {
+      _loadError = '최종 추리 처리 중입니다. 잠시 후 결과를 다시 확인해 주세요.';
+    } finally {
+      notifyListeners();
     }
   }
 

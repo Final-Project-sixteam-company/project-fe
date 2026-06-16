@@ -52,14 +52,12 @@ class InterrogationInputBar extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: AppTokens.sp2),
                 decoration: BoxDecoration(
                   color: c.successSoft,
-                  border: Border.all(
-                      color: c.success.withValues(alpha: 0.3)),
+                  border: Border.all(color: c.success.withValues(alpha: 0.3)),
                   borderRadius: BorderRadius.circular(AppTokens.r3),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.link,
-                        size: AppTokens.iconSm, color: c.success),
+                    Icon(Icons.link, size: AppTokens.iconSm, color: c.success),
                     const SizedBox(width: AppTokens.sp2),
                     Expanded(
                       child: Text(
@@ -73,8 +71,11 @@ class InterrogationInputBar extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.close,
-                          size: AppTokens.iconSm, color: c.success),
+                      icon: Icon(
+                        Icons.close,
+                        size: AppTokens.iconSm,
+                        color: c.success,
+                      ),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),

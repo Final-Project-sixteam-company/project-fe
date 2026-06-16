@@ -35,15 +35,18 @@ class EvidenceItem extends StatelessWidget {
             border: Border.all(color: c.line),
             borderRadius: BorderRadius.circular(AppTokens.r4),
             boxShadow: evidence.isNew
-                ? [BoxShadow(color: c.primarySoft, spreadRadius: 2, blurRadius: 0)]
+                ? [
+                    BoxShadow(
+                      color: c.primarySoft,
+                      spreadRadius: 2,
+                      blurRadius: 0,
+                    ),
+                  ]
                 : null,
           ),
           child: Row(
             children: [
-              _Thumb(
-                icon: evidence.icon,
-                color: evidence.isAnalyzed ? c.success : c.primary,
-              ),
+              _Thumb(icon: evidence.icon, color: c.primary),
               const SizedBox(width: AppTokens.sp3),
               Expanded(
                 child: Column(
@@ -73,12 +76,7 @@ class EvidenceItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppTokens.sp2),
-              MSPill(
-                evidence.isAnalyzed ? '핵심 증거' : '확보됨',
-                tone: evidence.isAnalyzed
-                    ? MSPillTone.success
-                    : MSPillTone.primary,
-              ),
+              const MSPill('확보됨', tone: MSPillTone.primary),
             ],
           ),
         ),

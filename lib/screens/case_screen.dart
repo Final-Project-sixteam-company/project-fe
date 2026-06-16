@@ -18,10 +18,7 @@ import 'suspects_screen.dart';
 import 'timeline_screen.dart';
 
 class CaseScreen extends StatefulWidget {
-  const CaseScreen({
-    this.scenarioId = 'demoday-eve',
-    super.key,
-  });
+  const CaseScreen({this.scenarioId = 'demoday-eve', super.key});
 
   final String scenarioId;
 
@@ -87,6 +84,14 @@ class _CaseScreenState extends State<CaseScreen> {
       navigator.pop();
       return;
     }
+    if (_session.isFinalDeductionSubmitting) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('최종 추리 제출 중입니다. 결과 확인까지 잠시만 기다려 주세요.')),
+        );
+      return;
+    }
     // 서버 세션이 없고 생성 중도 아니면(샘플 시나리오 등) 중단 대상이 아니다.
     // 생성 중(isLoading)이면 다이얼로그를 거쳐 abandonSession 이 생성 완료를 기다린 뒤
     // 정리하도록 한다(생성 직후 이탈 시 PLAYING 세션 잔류 → 409 레이스 방지).
@@ -100,8 +105,17 @@ class _CaseScreenState extends State<CaseScreen> {
       builder: (_) => const _AbandonDialog(),
     );
     if (leave != true || !mounted) return;
-    await _session.abandonSession();
-    if (mounted) navigator.pop();
+    final canLeave = await _session.abandonSession();
+    if (!mounted) return;
+    if (canLeave) {
+      navigator.pop();
+    } else {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('최종 추리 처리 중입니다. 결과 상태를 다시 확인해 주세요.')),
+        );
+    }
   }
 
   @override
@@ -148,10 +162,7 @@ class _CaseScreenState extends State<CaseScreen> {
                   status != PlaySessionStatus.playing) {
                 return _buildClosedSession(context);
               }
-              return IndexedStack(
-                index: _navIndex,
-                children: _kScreens,
-              );
+              return IndexedStack(index: _navIndex, children: _kScreens);
             },
           ),
         ),
@@ -169,9 +180,8 @@ class _CaseScreenState extends State<CaseScreen> {
     final retryButton = MSButton(
       label: conflict ? '기존 세션 포기 후 새로 시작' : '다시 시도',
       variant: conflict ? MSButtonVariant.primary : MSButtonVariant.secondary,
-      onPressed: () => conflict
-          ? _session.abandonConflictAndRestart()
-          : _session.retry(),
+      onPressed: () =>
+          conflict ? _session.abandonConflictAndRestart() : _session.retry(),
     );
     final exitButton = MSButton(
       label: '나가기',
@@ -185,7 +195,8 @@ class _CaseScreenState extends State<CaseScreen> {
         icon: conflict ? Icons.lock_clock_outlined : Icons.cloud_off,
         title: conflict ? '진행 중인 세션이 있습니다' : '세션을 시작하지 못했습니다',
         // 서버 메시지가 있으면 우선 사용하고, 없으면 상황별 구체적 안내를 제공한다.
-        subtitle: _session.loadError ??
+        subtitle:
+            _session.loadError ??
             (conflict
                 ? '다른 기기나 창에서 이미 이 사건을 수사 중입니다. 나가서 기존 수사를 마치거나 중단한 뒤 다시 시작하세요.'
                 : '네트워크 상태를 확인한 뒤 다시 시도해 주세요.'),
@@ -201,7 +212,8 @@ class _CaseScreenState extends State<CaseScreen> {
   Widget _buildClosedSession(BuildContext context) {
     final status = _session.dashboard?.status;
     // 채점이 끝난(SUBMITTED/COMPLETED) 세션이면 결과 화면으로 보낼 수 있다.
-    final scored = status == PlaySessionStatus.submitted ||
+    final scored =
+        status == PlaySessionStatus.submitted ||
         status == PlaySessionStatus.completed;
     final sessionId = _session.backendSessionId;
 
@@ -215,29 +227,27 @@ class _CaseScreenState extends State<CaseScreen> {
             : '이 수사는 더 이상 진행할 수 없습니다.',
         action: (scored && sessionId != null)
             ? MSButton(
-          label: '결과 보기',
-          variant: MSButtonVariant.primary,
-          onPressed: () => Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => ResultScreen(
-                sessionId: sessionId,
-              ),
-            ),
-          ),
-        )
+                label: '결과 보기',
+                variant: MSButtonVariant.primary,
+                onPressed: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => ResultScreen(sessionId: sessionId),
+                  ),
+                ),
+              )
             : MSButton(
-          label: '홈으로 돌아가기',
-          variant: MSButtonVariant.primary,
-          onPressed: () =>
-              Navigator.of(context).popUntil((route) => route.isFirst),
-        ),
+                label: '홈으로 돌아가기',
+                variant: MSButtonVariant.primary,
+                onPressed: () =>
+                    Navigator.of(context).popUntil((route) => route.isFirst),
+              ),
         secondaryAction: (scored && sessionId != null)
             ? MSButton(
-          label: '홈으로 돌아가기',
-          variant: MSButtonVariant.ghost,
-          onPressed: () =>
-              Navigator.of(context).popUntil((route) => route.isFirst),
-        )
+                label: '홈으로 돌아가기',
+                variant: MSButtonVariant.ghost,
+                onPressed: () =>
+                    Navigator.of(context).popUntil((route) => route.isFirst),
+              )
             : null,
       ),
     );
@@ -255,14 +265,10 @@ class _CaseScreenState extends State<CaseScreen> {
           animation: _session,
           builder: (context, _) => Container(
             height: AppTokens.sp10,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.sp4,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
             decoration: BoxDecoration(
               color: c.bg,
-              border: Border(
-                bottom: BorderSide(color: c.lineSoft),
-              ),
+              border: Border(bottom: BorderSide(color: c.lineSoft)),
             ),
             child: Row(
               children: [
@@ -310,11 +316,7 @@ class _CaseScreenState extends State<CaseScreen> {
                 ],
                 const Spacer(),
                 // 경과 시간
-                Icon(
-                  Icons.timer_outlined,
-                  size: 14,
-                  color: c.textMute,
-                ),
+                Icon(Icons.timer_outlined, size: 14, color: c.textMute),
                 const SizedBox(width: AppTokens.sp1),
                 Text(
                   _session.elapsedLabel,
@@ -329,18 +331,14 @@ class _CaseScreenState extends State<CaseScreen> {
                 Icon(
                   Icons.description_outlined,
                   size: 14,
-                  color: _session.unlockedCount == 0
-                      ? c.textMute
-                      : c.success,
+                  color: _session.unlockedCount == 0 ? c.textMute : c.success,
                 ),
                 const SizedBox(width: AppTokens.sp1),
                 Text(
                   '${_session.unlockedCount}/${_session.totalEvidenceCount}',
                   style: AppText.monoNum.copyWith(
                     fontSize: 13,
-                    color: _session.unlockedCount == 0
-                        ? c.textMute
-                        : c.success,
+                    color: _session.unlockedCount == 0 ? c.textMute : c.success,
                     height: 1.0,
                   ),
                 ),
@@ -378,16 +376,13 @@ class _AbandonDialog extends StatelessWidget {
               children: [
                 Icon(Icons.logout, size: 22, color: c.danger),
                 const SizedBox(width: AppTokens.sp2),
-                Text(
-                  '수사 중단',
-                  style: AppText.titleM.copyWith(color: c.text),
-                ),
+                Text('수사 중단', style: AppText.titleM.copyWith(color: c.text)),
               ],
             ),
             const SizedBox(height: AppTokens.sp3),
             Text(
               '지금 나가면 진행 중인 수사가 중단됩니다.\n'
-                  '진행 상황은 저장되지 않으며 다음에 새로 시작해야 합니다.',
+              '진행 상황은 저장되지 않으며 다음에 새로 시작해야 합니다.',
               style: AppText.body.copyWith(color: c.textSub, height: 1.6),
             ),
             const SizedBox(height: AppTokens.sp6),

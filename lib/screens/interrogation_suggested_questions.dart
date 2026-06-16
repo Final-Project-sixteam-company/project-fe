@@ -42,7 +42,7 @@ class SuggestedQuestionsBar extends StatelessWidget {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
         itemCount: questions.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppTokens.sp2),
+        separatorBuilder: (_, _) => const SizedBox(width: AppTokens.sp2),
         itemBuilder: (_, i) {
           final sq = questions[i];
           return GestureDetector(

@@ -18,53 +18,24 @@ class _Location {
   final String name;
   final IconData icon;
   final int clueCount;
-  final bool isIncident;
-  final String? imageAssetKey;
 
   const _Location({
     required this.name,
     required this.icon,
     required this.clueCount,
-    this.isIncident = false,
-    this.imageAssetKey,
   });
 }
 
 const _locations = [
-  _Location(
-    name: '데모룸 (사건 발생지)',
-    icon: Icons.meeting_room_outlined,
-    clueCount: 3,
-    isIncident: true,
-  ),
-  _Location(
-    name: '재무팀 사무실',
-    icon: Icons.business_outlined,
-    clueCount: 2,
-  ),
-  _Location(
-    name: '서버실',
-    icon: Icons.storage_outlined,
-    clueCount: 2,
-  ),
-  _Location(
-    name: '카페',
-    icon: Icons.local_cafe_outlined,
-    clueCount: 1,
-  ),
-  _Location(
-    name: '비상계단',
-    icon: Icons.stairs_outlined,
-    clueCount: 1,
-  ),
-  _Location(
-    name: '보안실',
-    icon: Icons.security_outlined,
-    clueCount: 1,
-  ),
+  _Location(name: '구역 A', icon: Icons.meeting_room_outlined, clueCount: 2),
+  _Location(name: '구역 B', icon: Icons.business_outlined, clueCount: 2),
+  _Location(name: '구역 C', icon: Icons.storage_outlined, clueCount: 1),
+  _Location(name: '구역 D', icon: Icons.local_cafe_outlined, clueCount: 1),
+  _Location(name: '구역 E', icon: Icons.stairs_outlined, clueCount: 1),
+  _Location(name: '구역 F', icon: Icons.security_outlined, clueCount: 1),
 ];
 
-const _victimPinOffset = Offset(0.58, 0.42);
+const _samplePinOffset = Offset(0.58, 0.42);
 
 // ── 화면 ──────────────────────────────────────────────────────────────────────
 
@@ -107,9 +78,8 @@ class _SceneScreenState extends State<SceneScreen> {
             ),
             const SizedBox(height: AppTokens.sp6),
             // ── 2. 주요 현장 정보 ─────────────────────────────────
-            // 서버 locations 데이터가 있으면 우선 사용하고, 없으면 CL-001
-            // 샘플 데이터(usesCl001SampleCaseData)로 폴백한다. 백엔드 locations
-            // 엔드포인트 구현 후 항상 서버 데이터로 교체한다.
+            // 서버 locations 데이터가 있으면 우선 사용한다.
+            // 로컬 프리뷰 샘플 fallback은 명시적으로 켠 비서버 시나리오에서만 노출한다.
             if (items.isNotEmpty) ...[
               const MSKicker('주요 현장 정보'),
               const SizedBox(height: AppTokens.sp3),
@@ -131,9 +101,8 @@ class _SceneScreenState extends State<SceneScreen> {
                   icon: Icons.place_outlined,
                 ),
               ],
-            ] else if (context.sessionRead.usesCl001SampleCaseData) ...[
-              // CL-001 외 시나리오에서는 하드코딩 장소 목록이 스포일러가 되므로
-              // usesCl001SampleCaseData 게이트로 숨긴다.
+            ] else if (context.sessionRead.usesSampleCaseFallback) ...[
+              // production/server-backed flow에서는 샘플 장소 목록을 노출하지 않는다.
               const MSKicker('주요 현장 정보'),
               const SizedBox(height: AppTokens.sp3),
               _SampleLocationList(
@@ -142,17 +111,6 @@ class _SceneScreenState extends State<SceneScreen> {
                   () => _selectedIndex = _selectedIndex == i ? null : i,
                 ),
               ),
-              // ── 3. 선택된 장소 이미지 ──────────────────────────
-              if (_selectedIndex != null &&
-                  _selectedIndex! < _locations.length &&
-                  _locations[_selectedIndex!].imageAssetKey != null) ...[
-                const SizedBox(height: AppTokens.sp4),
-                _LocationImageCard(
-                  imageUrl: _locations[_selectedIndex!].imageAssetKey,
-                  name: _locations[_selectedIndex!].name,
-                  icon: _locations[_selectedIndex!].icon,
-                ),
-              ],
             ] else if (session.isLoading) ...[
               const Padding(
                 padding: EdgeInsets.only(top: AppTokens.sp6),
@@ -225,8 +183,8 @@ class _SceneMap extends StatelessWidget {
     final c = context.c;
     final url = mapImageUrl;
     final hasLiveMap = url != null && url.isNotEmpty;
-    final showVictimPin =
-        context.sessionRead.usesCl001SampleCaseData && !hasLiveMap;
+    final showSamplePin =
+        context.sessionRead.usesSampleCaseFallback && !hasLiveMap;
 
     return AspectRatio(
       aspectRatio: 4 / 3,
@@ -264,18 +222,18 @@ class _SceneMap extends StatelessWidget {
             else
               _MapPlaceholder(),
 
-            // 피해자 위치 핀 오버레이
-            if (showVictimPin)
+            // 로컬 프리뷰용 기준점 마커.
+            if (showSamplePin)
               LayoutBuilder(
                 builder: (_, constraints) {
-                  final dx = constraints.maxWidth * _victimPinOffset.dx;
-                  final dy = constraints.maxHeight * _victimPinOffset.dy;
+                  final dx = constraints.maxWidth * _samplePinOffset.dx;
+                  final dy = constraints.maxHeight * _samplePinOffset.dy;
                   return Stack(
                     children: [
                       Positioned(
                         left: dx - 12,
                         top: dy - 28,
-                        child: _VictimPin(),
+                        child: _SamplePin(),
                       ),
                     ],
                   );
@@ -298,17 +256,14 @@ class _MapPlaceholder extends StatelessWidget {
         children: [
           Icon(Icons.map_outlined, size: 48, color: c.textMute),
           const SizedBox(height: AppTokens.sp3),
-          Text(
-            '건물 평면도 영역',
-            style: AppText.bodySm.copyWith(color: c.textMute),
-          ),
+          Text('건물 평면도 영역', style: AppText.bodySm.copyWith(color: c.textMute)),
         ],
       ),
     );
   }
 }
 
-class _VictimPin extends StatelessWidget {
+class _SamplePin extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
@@ -319,12 +274,12 @@ class _VictimPin extends StatelessWidget {
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: c.danger,
+            color: c.primary,
             shape: BoxShape.circle,
             border: Border.all(color: AppColors.ink0, width: 2),
             boxShadow: [
               BoxShadow(
-                color: c.danger.withValues(alpha: .4),
+                color: c.primary.withValues(alpha: .4),
                 blurRadius: 6,
                 spreadRadius: 1,
               ),
@@ -334,7 +289,7 @@ class _VictimPin extends StatelessWidget {
         ),
         CustomPaint(
           size: const Size(8, 6),
-          painter: _PinTailPainter(color: context.c.danger),
+          painter: _PinTailPainter(color: context.c.primary),
         ),
       ],
     );
@@ -369,7 +324,7 @@ class _LocationImageCard extends StatelessWidget {
     required this.icon,
   });
 
-  /// 이미지 URL 또는 로컬 assetKey. AssetImageWidget이 양쪽을 모두 처리한다.
+  /// 공개 이미지 URL. 없으면 플레이스홀더를 표시한다.
   final String? imageUrl;
   final String name;
   final IconData icon;
@@ -452,14 +407,11 @@ class _LocationList extends StatelessWidget {
   }
 }
 
-// ── 샘플 장소 리스트 (CL-001 하드코딩) ────────────────────────────────────────
-// 백엔드 locations 엔드포인트 미구현 시나리오에서 사용한다.
+// ── 로컬 프리뷰용 샘플 장소 리스트 ─────────────────────────────────────────────
+// production/server-backed flow에서는 gate로 차단한다.
 
 class _SampleLocationList extends StatelessWidget {
-  const _SampleLocationList({
-    required this.selectedIndex,
-    required this.onTap,
-  });
+  const _SampleLocationList({required this.selectedIndex, required this.onTap});
 
   final int? selectedIndex;
   final ValueChanged<int> onTap;
@@ -495,7 +447,6 @@ class _SampleLocationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final bool hasImage = location.imageAssetKey != null;
 
     return AnimatedContainer(
       duration: AppMotion.dur2,
@@ -517,11 +468,7 @@ class _SampleLocationCard extends StatelessWidget {
             padding: const EdgeInsets.all(AppTokens.sp3),
             child: Row(
               children: [
-                Icon(
-                  location.icon,
-                  size: 18,
-                  color: location.isIncident ? c.danger : c.primary,
-                ),
+                Icon(location.icon, size: 18, color: c.primary),
                 const SizedBox(width: AppTokens.sp3),
                 Expanded(
                   child: Text(
@@ -534,19 +481,7 @@ class _SampleLocationCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppTokens.sp2),
-                MSPill(
-                  '단서 ${location.clueCount}',
-                  tone: location.isIncident ? MSPillTone.danger : MSPillTone.mute,
-                ),
-                // 이미지 있음 표시
-                if (hasImage) ...[
-                  const SizedBox(width: AppTokens.sp2),
-                  Icon(
-                    Icons.photo_outlined,
-                    size: 14,
-                    color: c.textMute,
-                  ),
-                ],
+                MSPill('단서 ${location.clueCount}', tone: MSPillTone.mute),
               ],
             ),
           ),
@@ -593,11 +528,7 @@ class _LocationCard extends StatelessWidget {
             padding: const EdgeInsets.all(AppTokens.sp3),
             child: Row(
               children: [
-                Icon(
-                  Icons.place_outlined,
-                  size: 18,
-                  color: c.primary,
-                ),
+                Icon(Icons.place_outlined, size: 18, color: c.primary),
                 const SizedBox(width: AppTokens.sp3),
                 Expanded(
                   child: Column(
@@ -630,11 +561,7 @@ class _LocationCard extends StatelessWidget {
                 // 이미지 있음 표시
                 if (hasImage) ...[
                   const SizedBox(width: AppTokens.sp2),
-                  Icon(
-                    Icons.photo_outlined,
-                    size: 14,
-                    color: c.textMute,
-                  ),
+                  Icon(Icons.photo_outlined, size: 14, color: c.textMute),
                 ],
               ],
             ),

@@ -40,7 +40,8 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
 
   Future<void> _loadBookmark() async {
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getBool('$_kBookmarkPrefix${widget.scenario.id}') ?? false;
+    final saved =
+        prefs.getBool('$_kBookmarkPrefix${widget.scenario.id}') ?? false;
     if (mounted) setState(() => _bookmarked = saved);
   }
 
@@ -71,15 +72,16 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final c       = context.c;
+    final c = context.c;
 
-    final s       = _detailedScenario;
+    final s = _detailedScenario;
     final reviews = sampleReviews.where((r) => r.scenarioId == s.id).toList();
 
     return Scaffold(
       backgroundColor: c.bg,
       appBar: AppBar(
-        elevation: 0, scrolledUnderElevation: 0,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         backgroundColor: AppColors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: c.text),
@@ -100,13 +102,16 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
         ],
       ),
       bottomNavigationBar: ScenarioBottomCta(
-        scenario:   s,
+        scenario: s,
         bookmarked: _bookmarked,
         isPlayable: _isPlayable,
         onBookmark: _toggleBookmark,
         onStart: _isPlayable
-            ? () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => CaseBriefingScreen(scenario: s)))
+            ? () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => CaseBriefingScreen(scenario: s),
+                ),
+              )
             : null,
       ),
       body: SingleChildScrollView(
@@ -119,18 +124,18 @@ class _ScenarioDetailScreenState extends State<ScenarioDetailScreen> {
               padding: const EdgeInsets.symmetric(horizontal: AppTokens.sp4),
               child: _isLoading
                   ? const Center(
-                child: const Padding(
-                  padding: EdgeInsets.all(AppTokens.sp10),
-                  child: CircularProgressIndicator(),
-                ),
-              )
+                      child: Padding(
+                        padding: EdgeInsets.all(AppTokens.sp10),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
                   : _DetailBody(
-                scenario:  s,
-                reviews:   reviews,
-                bookmarked: _bookmarked,
-                onToggleBookmark: _toggleBookmark,
-                onShowReview: () => _showReviewSheet(context),
-              ),
+                      scenario: s,
+                      reviews: reviews,
+                      bookmarked: _bookmarked,
+                      onToggleBookmark: _toggleBookmark,
+                      onShowReview: () => _showReviewSheet(context),
+                    ),
             ),
           ],
         ),
@@ -161,11 +166,11 @@ class _DetailBody extends StatelessWidget {
     required this.onToggleBookmark,
     required this.onShowReview,
   });
-  final Scenario            scenario;
+  final Scenario scenario;
   final List<ScenarioReview> reviews;
-  final bool                bookmarked;
-  final VoidCallback         onToggleBookmark;
-  final VoidCallback         onShowReview;
+  final bool bookmarked;
+  final VoidCallback onToggleBookmark;
+  final VoidCallback onShowReview;
 
   @override
   Widget build(BuildContext context) {
@@ -179,8 +184,10 @@ class _DetailBody extends StatelessWidget {
         const SizedBox(height: AppTokens.sp3),
         Text(s.title, style: AppText.titleL.copyWith(color: c.text)),
         const SizedBox(height: AppTokens.sp1),
-        Text('${s.subtitle} · ${s.code}',
-            style: AppText.monoLabel.copyWith(color: c.textMute)),
+        Text(
+          '${s.subtitle} · ${s.code}',
+          style: AppText.monoLabel.copyWith(color: c.textMute),
+        ),
         const SizedBox(height: AppTokens.sp6),
         ScenarioMetaGrid(scenario: s),
         const SizedBox(height: AppTokens.sp6),
@@ -189,8 +196,8 @@ class _DetailBody extends StatelessWidget {
         ScenarioTagsSection(scenario: s),
         const SizedBox(height: AppTokens.sp6),
         ScenarioReviewsSection(
-          scenario:     s,
-          reviews:      reviews,
+          scenario: s,
+          reviews: reviews,
           onShowReview: onShowReview,
         ),
         const SizedBox(height: AppTokens.sp10),

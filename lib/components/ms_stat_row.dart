@@ -10,11 +10,7 @@ class StatCell {
   final String value;
   final StatTone tone;
 
-  const StatCell(
-      this.label,
-      this.value, {
-        this.tone = StatTone.neutral,
-      });
+  const StatCell(this.label, this.value, {this.tone = StatTone.neutral});
 }
 
 class MSStatRow extends StatelessWidget {
@@ -41,12 +37,7 @@ class MSStatRow extends StatelessWidget {
           );
 
           if (i < cells.length - 1) {
-            children.add(
-              Container(
-                width: 1,
-                color: c.line,
-              ),
-            );
+            children.add(Container(width: 1, color: c.line));
           }
         }
 
@@ -141,7 +132,7 @@ class MSStatRowExample extends StatelessWidget {
             StatCell('확보 단서', '8/12', tone: StatTone.good),
             StatCell('위험도', '94%', tone: StatTone.warn),
           ]),
-          const SizedBox(height: AppTokens.sp4),
+          SizedBox(height: AppTokens.sp4),
           MSStatRow([
             StatCell('알리바이', '불확실', tone: StatTone.warn),
             StatCell('혈액형', 'AB'),
