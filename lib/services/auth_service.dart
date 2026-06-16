@@ -46,8 +46,6 @@ class _SecureAuthTokenStore implements AuthTokenStore {
         accessKey: accessKey,
         refreshKey: refreshKey,
       );
-    } else {
-      await _removeLegacyPrefsIfPresent(accessKey, refreshKey);
     }
 
     return _SecureAuthTokenStore._(storage, cache);

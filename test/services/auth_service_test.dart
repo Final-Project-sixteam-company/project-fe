@@ -113,6 +113,26 @@ void main() {
     expect(AuthService.instance.isLoggedIn, isFalse);
   });
 
+  test('init preserves legacy tokens when secure read fails', () async {
+    final access = _validJwt();
+    SharedPreferences.setMockInitialValues({
+      accessKey: access,
+      refreshKey: 'legacy-refresh',
+    });
+    final secureValues = _setSecureStorageMock(throwOnReadKey: accessKey);
+
+    await AuthService.instance.init();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(accessKey), access);
+    expect(prefs.getString(refreshKey), 'legacy-refresh');
+    expect(secureValues[accessKey], isNull);
+    expect(secureValues[refreshKey], isNull);
+    expect(AuthService.instance.bearerToken, isNull);
+    expect(AuthService.instance.refreshToken, isNull);
+    expect(AuthService.instance.isLoggedIn, isFalse);
+  });
+
   test(
     'init preserves legacy tokens when secure migration write fails',
     () async {
@@ -315,6 +335,7 @@ void main() {
 
 Map<String, String> _setSecureStorageMock({
   Map<String, String>? initialValues,
+  String? throwOnReadKey,
   String? throwOnWriteKey,
 }) {
   final values = <String, String>{...?initialValues};
@@ -335,6 +356,9 @@ Map<String, String> _setSecureStorageMock({
             values.clear();
             return null;
           case 'read':
+            if (key == throwOnReadKey) {
+              throw PlatformException(code: 'secure-storage-read-failed');
+            }
             return values[key];
           case 'readAll':
             return Map<String, String>.from(values);
