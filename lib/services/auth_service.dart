@@ -21,6 +21,8 @@ abstract class AuthTokenStore {
 class _SecureAuthTokenStore implements AuthTokenStore {
   _SecureAuthTokenStore._(this._storage, this._cache);
 
+  static const String _secureStorageResetSentinel = 'Data has been reset';
+
   final FlutterSecureStorage _storage;
   final Map<String, String> _cache;
 
@@ -74,6 +76,9 @@ class _SecureAuthTokenStore implements AuthTokenStore {
     String key,
   ) async {
     final value = await storage.read(key: key);
+    if (value == _secureStorageResetSentinel) {
+      throw StateError('Secure storage was reset');
+    }
     if (value != null) {
       cache[key] = value;
     }
@@ -105,6 +110,11 @@ class _SecureAuthTokenStore implements AuthTokenStore {
     final hasSecureRefresh = cache[refreshKey]?.isNotEmpty == true;
     final hasLegacyAccess = legacyAccess != null && legacyAccess.isNotEmpty;
     final hasLegacyRefresh = legacyRefresh != null && legacyRefresh.isNotEmpty;
+    final shouldRepairSecureAccessOnly =
+        hasSecureAccess &&
+        !hasSecureRefresh &&
+        hasLegacyRefresh &&
+        cache[accessKey] == legacyAccess;
     final shouldMigrateCompletePair =
         !hasSecureAccess &&
         !hasSecureRefresh &&
@@ -119,21 +129,26 @@ class _SecureAuthTokenStore implements AuthTokenStore {
 
     // refresh-only는 startup refresh 복구를 위해 허용한다. access-only는
     // refresh 경로 없는 logged-in 상태를 만들 수 있어 migration하지 않는다.
-    if (!shouldMigrateCompletePair && !shouldMigrateRefreshOnly) {
+    // 단, 이전 migration이 access write 직후 중단된 상태는 legacy refresh로 복구한다.
+    if (!shouldMigrateCompletePair &&
+        !shouldMigrateRefreshOnly &&
+        !shouldRepairSecureAccessOnly) {
       await _removeLegacyPrefsIfPresent(accessKey, refreshKey);
       return;
     }
 
     try {
+      if (shouldMigrateCompletePair ||
+          shouldMigrateRefreshOnly ||
+          shouldRepairSecureAccessOnly) {
+        await storage.write(key: refreshKey, value: legacyRefresh);
+        cache[refreshKey] = legacyRefresh;
+        migratedKeys.add(refreshKey);
+      }
       if (shouldMigrateCompletePair) {
         await storage.write(key: accessKey, value: legacyAccess);
         cache[accessKey] = legacyAccess;
         migratedKeys.add(accessKey);
-      }
-      if (shouldMigrateCompletePair || shouldMigrateRefreshOnly) {
-        await storage.write(key: refreshKey, value: legacyRefresh);
-        cache[refreshKey] = legacyRefresh;
-        migratedKeys.add(refreshKey);
       }
     } catch (_) {
       for (final key in migratedKeys) {

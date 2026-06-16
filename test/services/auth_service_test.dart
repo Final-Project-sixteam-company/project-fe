@@ -96,6 +96,23 @@ void main() {
     expect(AuthService.instance.isLoggedIn, isFalse);
   });
 
+  test('init treats secure storage reset sentinel as logged out', () async {
+    final secureValues = _setSecureStorageMock(
+      initialValues: {
+        accessKey: _validJwt(),
+        refreshKey: 'Data has been reset',
+      },
+    );
+
+    await AuthService.instance.init();
+
+    expect(secureValues[accessKey], isNull);
+    expect(secureValues[refreshKey], isNull);
+    expect(AuthService.instance.bearerToken, isNull);
+    expect(AuthService.instance.refreshToken, isNull);
+    expect(AuthService.instance.isLoggedIn, isFalse);
+  });
+
   test(
     'init preserves legacy tokens when secure migration write fails',
     () async {
@@ -105,6 +122,29 @@ void main() {
         refreshKey: 'legacy-refresh',
       });
       final secureValues = _setSecureStorageMock(throwOnWriteKey: refreshKey);
+
+      await AuthService.instance.init();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(accessKey), access);
+      expect(prefs.getString(refreshKey), 'legacy-refresh');
+      expect(secureValues[accessKey], isNull);
+      expect(secureValues[refreshKey], isNull);
+      expect(AuthService.instance.bearerToken, isNull);
+      expect(AuthService.instance.refreshToken, isNull);
+      expect(AuthService.instance.isLoggedIn, isFalse);
+    },
+  );
+
+  test(
+    'init preserves legacy tokens when secure migration access write fails',
+    () async {
+      final access = _validJwt();
+      SharedPreferences.setMockInitialValues({
+        accessKey: access,
+        refreshKey: 'legacy-refresh',
+      });
+      final secureValues = _setSecureStorageMock(throwOnWriteKey: accessKey);
 
       await AuthService.instance.init();
 
@@ -155,6 +195,31 @@ void main() {
     expect(AuthService.instance.refreshToken, 'legacy-refresh');
     expect(AuthService.instance.isLoggedIn, isTrue);
   });
+
+  test(
+    'init repairs secure access-only state from matching legacy pair',
+    () async {
+      final access = _validJwt();
+      SharedPreferences.setMockInitialValues({
+        accessKey: access,
+        refreshKey: 'legacy-refresh',
+      });
+      final secureValues = _setSecureStorageMock(
+        initialValues: {accessKey: access},
+      );
+
+      await AuthService.instance.init();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(accessKey), isNull);
+      expect(prefs.getString(refreshKey), isNull);
+      expect(secureValues[accessKey], access);
+      expect(secureValues[refreshKey], 'legacy-refresh');
+      expect(AuthService.instance.bearerToken, access);
+      expect(AuthService.instance.refreshToken, 'legacy-refresh');
+      expect(AuthService.instance.isLoggedIn, isTrue);
+    },
+  );
 
   test('init migrates legacy refresh-only and refreshes session', () async {
     final refreshedAccess = _validJwt();
