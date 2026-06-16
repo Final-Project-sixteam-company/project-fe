@@ -109,24 +109,28 @@ class _SecureAuthTokenStore implements AuthTokenStore {
         cache[refreshKey]?.isNotEmpty != true;
     final migratedKeys = <String>[];
 
-    if (shouldMigrateAccess || shouldMigrateRefresh) {
-      try {
-        if (shouldMigrateAccess) {
-          await storage.write(key: accessKey, value: legacyAccess);
-          cache[accessKey] = legacyAccess;
-          migratedKeys.add(accessKey);
-        }
-        if (shouldMigrateRefresh) {
-          await storage.write(key: refreshKey, value: legacyRefresh);
-          cache[refreshKey] = legacyRefresh;
-          migratedKeys.add(refreshKey);
-        }
-      } catch (_) {
-        for (final key in migratedKeys) {
-          cache.remove(key);
-        }
-        await _deleteSecureKeysIgnoringErrors(storage, migratedKeys);
+    if (!shouldMigrateAccess && !shouldMigrateRefresh) {
+      await _removeLegacyPrefsIfPresent(accessKey, refreshKey);
+      return;
+    }
+
+    try {
+      if (shouldMigrateAccess) {
+        await storage.write(key: accessKey, value: legacyAccess);
+        cache[accessKey] = legacyAccess;
+        migratedKeys.add(accessKey);
       }
+      if (shouldMigrateRefresh) {
+        await storage.write(key: refreshKey, value: legacyRefresh);
+        cache[refreshKey] = legacyRefresh;
+        migratedKeys.add(refreshKey);
+      }
+    } catch (_) {
+      for (final key in migratedKeys) {
+        cache.remove(key);
+      }
+      await _deleteSecureKeysIgnoringErrors(storage, migratedKeys);
+      return;
     }
 
     await _removeLegacyPrefsIfPresent(accessKey, refreshKey);

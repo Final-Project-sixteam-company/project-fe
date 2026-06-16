@@ -1,15 +1,26 @@
 import 'package:clueroom/services/auth_service.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+const MethodChannel _secureStorageChannel = MethodChannel(
+  'plugins.it_nomads.com/flutter_secure_storage',
+);
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   const accessKey = 'access_token';
   const refreshKey = 'refresh_token';
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     AuthService.instance.resetForTesting();
   });
 
   tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_secureStorageChannel, null);
     AuthService.instance.resetForTesting();
   });
 
@@ -83,6 +94,28 @@ void main() {
     expect(AuthService.instance.isLoggedIn, isFalse);
   });
 
+  test(
+    'init preserves legacy tokens when secure migration write fails',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        accessKey: 'legacy-access',
+        refreshKey: 'legacy-refresh',
+      });
+      final secureValues = _setSecureStorageMock(throwOnWriteKey: refreshKey);
+
+      await AuthService.instance.init();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(accessKey), 'legacy-access');
+      expect(prefs.getString(refreshKey), 'legacy-refresh');
+      expect(secureValues[accessKey], isNull);
+      expect(secureValues[refreshKey], isNull);
+      expect(AuthService.instance.bearerToken, isNull);
+      expect(AuthService.instance.refreshToken, isNull);
+      expect(AuthService.instance.isLoggedIn, isFalse);
+    },
+  );
+
   test('logout completes when token store creation fails', () async {
     AuthService.instance.setTokenStoreProviderForTesting(
       () async => throw StateError('secure storage unavailable'),
@@ -107,6 +140,42 @@ void main() {
     expect(AuthService.instance.refreshToken, isNull);
     expect(AuthService.instance.isLoggedIn, isFalse);
   });
+}
+
+Map<String, String> _setSecureStorageMock({String? throwOnWriteKey}) {
+  final values = <String, String>{};
+
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(_secureStorageChannel, (call) async {
+        final args =
+            (call.arguments as Map<Object?, Object?>?) ?? <Object?, Object?>{};
+        final key = args['key'] as String?;
+
+        switch (call.method) {
+          case 'containsKey':
+            return values.containsKey(key);
+          case 'delete':
+            values.remove(key);
+            return null;
+          case 'deleteAll':
+            values.clear();
+            return null;
+          case 'read':
+            return values[key];
+          case 'readAll':
+            return Map<String, String>.from(values);
+          case 'write':
+            if (key == throwOnWriteKey) {
+              throw PlatformException(code: 'secure-storage-write-failed');
+            }
+            values[key!] = args['value'] as String;
+            return null;
+          default:
+            throw PlatformException(code: 'unimplemented');
+        }
+      });
+
+  return values;
 }
 
 class _FakeTokenStore implements AuthTokenStore {
