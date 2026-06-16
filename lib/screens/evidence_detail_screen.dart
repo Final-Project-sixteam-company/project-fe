@@ -182,6 +182,7 @@ class _EvidenceDetailScreenState extends State<EvidenceDetailScreen> {
           child: InterrogationChatScreen(
             suspect: suspect,
             initialQuestion: q.question,
+            initialQuestionType: q.questionType,
             presentedEvidenceId: presentedEidStr,
             presentedEvidenceTitle: presentedEidStr != null
                 ? widget.evidence.name

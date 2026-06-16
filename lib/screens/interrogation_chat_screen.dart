@@ -17,6 +17,7 @@ class InterrogationChatScreen extends StatefulWidget {
     required this.suspect,
     this.suggestedQuestions = const [],
     this.initialQuestion,
+    this.initialQuestionType,
     this.presentedEvidenceId,
     this.presentedEvidenceTitle,
     super.key,
@@ -25,6 +26,7 @@ class InterrogationChatScreen extends StatefulWidget {
   final Suspect suspect;
   final List<SuggestedQuestionInfo> suggestedQuestions;
   final String? initialQuestion;
+  final String? initialQuestionType;
   final String? presentedEvidenceId;
   final String? presentedEvidenceTitle;
 
@@ -92,7 +94,16 @@ class _InterrogationChatScreenState extends State<InterrogationChatScreen>
               ? widget.presentedEvidenceTitle!.trim()
               : '선택된 증거')
         : null;
-    prefillQuestionType = hasEvidence ? QuestionType.evidencePresented : null;
+    if (hasEvidence) {
+      prefillQuestionType = QuestionType.evidencePresented;
+    } else if (widget.initialQuestionType == null) {
+      prefillQuestionType = QuestionType.recommended;
+    } else {
+      final parsedType = questionTypeFromApi(widget.initialQuestionType);
+      prefillQuestionType = parsedType == QuestionType.recommended
+          ? parsedType
+          : null;
+    }
     _lastPrefilledText = initialText;
   }
 
