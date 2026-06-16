@@ -99,25 +99,33 @@ class _SecureAuthTokenStore implements AuthTokenStore {
     final prefs = await SharedPreferences.getInstance();
     final legacyAccess = prefs.getString(accessKey);
     final legacyRefresh = prefs.getString(refreshKey);
-    final hasLegacyPair =
+    final shouldMigrateAccess =
         legacyAccess != null &&
         legacyAccess.isNotEmpty &&
+        cache[accessKey]?.isNotEmpty != true;
+    final shouldMigrateRefresh =
         legacyRefresh != null &&
-        legacyRefresh.isNotEmpty;
-    final hasSecurePair =
-        cache[accessKey]?.isNotEmpty == true &&
-        cache[refreshKey]?.isNotEmpty == true;
+        legacyRefresh.isNotEmpty &&
+        cache[refreshKey]?.isNotEmpty != true;
+    final migratedKeys = <String>[];
 
-    if (!hasSecurePair && hasLegacyPair) {
+    if (shouldMigrateAccess || shouldMigrateRefresh) {
       try {
-        await storage.write(key: accessKey, value: legacyAccess);
-        await storage.write(key: refreshKey, value: legacyRefresh);
-        cache[accessKey] = legacyAccess;
-        cache[refreshKey] = legacyRefresh;
+        if (shouldMigrateAccess) {
+          await storage.write(key: accessKey, value: legacyAccess);
+          cache[accessKey] = legacyAccess;
+          migratedKeys.add(accessKey);
+        }
+        if (shouldMigrateRefresh) {
+          await storage.write(key: refreshKey, value: legacyRefresh);
+          cache[refreshKey] = legacyRefresh;
+          migratedKeys.add(refreshKey);
+        }
       } catch (_) {
-        cache.remove(accessKey);
-        cache.remove(refreshKey);
-        await _deleteSecurePairIgnoringErrors(storage, accessKey, refreshKey);
+        for (final key in migratedKeys) {
+          cache.remove(key);
+        }
+        await _deleteSecureKeysIgnoringErrors(storage, migratedKeys);
       }
     }
 
@@ -128,16 +136,18 @@ class _SecureAuthTokenStore implements AuthTokenStore {
     FlutterSecureStorage storage,
     String accessKey,
     String refreshKey,
+  ) => _deleteSecureKeysIgnoringErrors(storage, [accessKey, refreshKey]);
+
+  static Future<void> _deleteSecureKeysIgnoringErrors(
+    FlutterSecureStorage storage,
+    Iterable<String> keys,
   ) async {
-    try {
-      await storage.delete(key: accessKey);
-    } catch (_) {
-      // Migration cleanup best-effort: startup should continue logged out.
-    }
-    try {
-      await storage.delete(key: refreshKey);
-    } catch (_) {
-      // Migration cleanup best-effort: startup should continue logged out.
+    for (final key in keys) {
+      try {
+        await storage.delete(key: key);
+      } catch (_) {
+        // Migration cleanup best-effort: startup should continue logged out.
+      }
     }
   }
 
