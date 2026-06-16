@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_exception.dart';
@@ -15,20 +16,114 @@ abstract class AuthTokenStore {
   Future<bool> remove(String key);
 }
 
-class _SharedPreferencesAuthTokenStore implements AuthTokenStore {
-  _SharedPreferencesAuthTokenStore(this._prefs);
+class _SecureAuthTokenStore implements AuthTokenStore {
+  _SecureAuthTokenStore._(this._storage, this._cache);
 
-  final SharedPreferences _prefs;
+  final FlutterSecureStorage _storage;
+  final Map<String, String> _cache;
+
+  static Future<_SecureAuthTokenStore> create({
+    required String accessKey,
+    required String refreshKey,
+  }) async {
+    const storage = FlutterSecureStorage();
+    final cache = <String, String>{};
+
+    await _readIntoCache(storage, cache, accessKey);
+    await _readIntoCache(storage, cache, refreshKey);
+    await _migrateLegacyPrefsIfNeeded(
+      storage: storage,
+      cache: cache,
+      accessKey: accessKey,
+      refreshKey: refreshKey,
+    );
+
+    return _SecureAuthTokenStore._(storage, cache);
+  }
+
+  static Future<void> _readIntoCache(
+    FlutterSecureStorage storage,
+    Map<String, String> cache,
+    String key,
+  ) async {
+    final value = await storage.read(key: key);
+    if (value != null) {
+      cache[key] = value;
+    }
+  }
+
+  static Future<void> _migrateLegacyPrefsIfNeeded({
+    required FlutterSecureStorage storage,
+    required Map<String, String> cache,
+    required String accessKey,
+    required String refreshKey,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final legacyAccess = prefs.getString(accessKey);
+    final legacyRefresh = prefs.getString(refreshKey);
+    final hasLegacyPair =
+        legacyAccess != null &&
+        legacyAccess.isNotEmpty &&
+        legacyRefresh != null &&
+        legacyRefresh.isNotEmpty;
+    final hasSecurePair =
+        cache[accessKey]?.isNotEmpty == true &&
+        cache[refreshKey]?.isNotEmpty == true;
+
+    if (!hasSecurePair && hasLegacyPair) {
+      try {
+        await storage.write(key: accessKey, value: legacyAccess);
+        await storage.write(key: refreshKey, value: legacyRefresh);
+        cache[accessKey] = legacyAccess;
+        cache[refreshKey] = legacyRefresh;
+      } catch (_) {
+        cache.remove(accessKey);
+        cache.remove(refreshKey);
+        await _deleteSecurePairIgnoringErrors(storage, accessKey, refreshKey);
+      }
+    }
+
+    if (legacyAccess != null) {
+      await prefs.remove(accessKey);
+    }
+    if (legacyRefresh != null) {
+      await prefs.remove(refreshKey);
+    }
+  }
+
+  static Future<void> _deleteSecurePairIgnoringErrors(
+    FlutterSecureStorage storage,
+    String accessKey,
+    String refreshKey,
+  ) async {
+    try {
+      await storage.delete(key: accessKey);
+    } catch (_) {
+      // Migration cleanup best-effort: startup should continue logged out.
+    }
+    try {
+      await storage.delete(key: refreshKey);
+    } catch (_) {
+      // Migration cleanup best-effort: startup should continue logged out.
+    }
+  }
 
   @override
-  String? getString(String key) => _prefs.getString(key);
+  String? getString(String key) => _cache[key];
 
   @override
-  Future<bool> setString(String key, String value) =>
-      _prefs.setString(key, value);
+  Future<bool> setString(String key, String value) async {
+    await _storage.write(key: key, value: value);
+    _cache[key] = value;
+    return true;
+  }
 
   @override
-  Future<bool> remove(String key) => _prefs.remove(key);
+  Future<bool> remove(String key) async {
+    await _storage.delete(key: key);
+    _cache.remove(key);
+    return true;
+  }
 }
 
 /// JWT 토큰 저장/조회 서비스.
@@ -58,8 +153,11 @@ class AuthService {
   AuthTokenStoreProvider _tokenStoreProvider = _defaultTokenStoreProvider;
   int _authGeneration = 0;
 
-  static Future<AuthTokenStore> _defaultTokenStoreProvider() async =>
-      _SharedPreferencesAuthTokenStore(await SharedPreferences.getInstance());
+  static Future<AuthTokenStore> _defaultTokenStoreProvider() =>
+      _SecureAuthTokenStore.create(
+        accessKey: _accessKey,
+        refreshKey: _refreshKey,
+      );
 
   /// Authorization 헤더에 붙일 Bearer 값.
   ///
