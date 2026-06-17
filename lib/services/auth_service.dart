@@ -2,12 +2,15 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_exception.dart';
 import '../core/device/device_id_provider.dart';
 
 typedef AuthTokenStoreProvider = Future<AuthTokenStore> Function();
+typedef AuthRefreshResponseProvider =
+    Future<Map<String, dynamic>?> Function(String refreshToken);
 
 abstract class AuthTokenStore {
   String? getString(String key);
@@ -15,20 +18,182 @@ abstract class AuthTokenStore {
   Future<bool> remove(String key);
 }
 
-class _SharedPreferencesAuthTokenStore implements AuthTokenStore {
-  _SharedPreferencesAuthTokenStore(this._prefs);
+class _SecureAuthTokenStore implements AuthTokenStore {
+  _SecureAuthTokenStore._(this._storage, this._cache);
 
-  final SharedPreferences _prefs;
+  static const String _secureStorageResetSentinel = 'Data has been reset';
+
+  final FlutterSecureStorage _storage;
+  final Map<String, String> _cache;
+
+  static Future<_SecureAuthTokenStore> create({
+    required String accessKey,
+    required String refreshKey,
+  }) async {
+    const storage = FlutterSecureStorage();
+    final cache = <String, String>{};
+
+    final secureReadSucceeded = await _readTokenPairIntoCache(
+      storage: storage,
+      cache: cache,
+      accessKey: accessKey,
+      refreshKey: refreshKey,
+    );
+    if (secureReadSucceeded) {
+      await _migrateLegacyPrefsIfNeeded(
+        storage: storage,
+        cache: cache,
+        accessKey: accessKey,
+        refreshKey: refreshKey,
+      );
+    }
+
+    return _SecureAuthTokenStore._(storage, cache);
+  }
+
+  static Future<bool> _readTokenPairIntoCache({
+    required FlutterSecureStorage storage,
+    required Map<String, String> cache,
+    required String accessKey,
+    required String refreshKey,
+  }) async {
+    try {
+      await _readIntoCache(storage, cache, accessKey);
+      await _readIntoCache(storage, cache, refreshKey);
+      return true;
+    } catch (_) {
+      cache.clear();
+      await _deleteSecurePairIgnoringErrors(storage, accessKey, refreshKey);
+      return false;
+    }
+  }
+
+  static Future<void> _readIntoCache(
+    FlutterSecureStorage storage,
+    Map<String, String> cache,
+    String key,
+  ) async {
+    final value = await storage.read(key: key);
+    if (value == _secureStorageResetSentinel) {
+      throw StateError('Secure storage was reset');
+    }
+    if (value != null) {
+      cache[key] = value;
+    }
+  }
+
+  static Future<void> _removeLegacyPrefsIfPresent(
+    String accessKey,
+    String refreshKey,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString(accessKey) != null) {
+      await prefs.remove(accessKey);
+    }
+    if (prefs.getString(refreshKey) != null) {
+      await prefs.remove(refreshKey);
+    }
+  }
+
+  static Future<void> _migrateLegacyPrefsIfNeeded({
+    required FlutterSecureStorage storage,
+    required Map<String, String> cache,
+    required String accessKey,
+    required String refreshKey,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final legacyAccess = prefs.getString(accessKey);
+    final legacyRefresh = prefs.getString(refreshKey);
+    final hasSecureAccess = cache[accessKey]?.isNotEmpty == true;
+    final hasSecureRefresh = cache[refreshKey]?.isNotEmpty == true;
+    final hasLegacyAccess = legacyAccess != null && legacyAccess.isNotEmpty;
+    final hasLegacyRefresh = legacyRefresh != null && legacyRefresh.isNotEmpty;
+    final shouldRepairSecureAccessOnly =
+        hasSecureAccess &&
+        !hasSecureRefresh &&
+        hasLegacyRefresh &&
+        cache[accessKey] == legacyAccess;
+    final shouldMigrateCompletePair =
+        !hasSecureAccess &&
+        !hasSecureRefresh &&
+        hasLegacyAccess &&
+        hasLegacyRefresh;
+    final shouldMigrateRefreshOnly =
+        !hasSecureAccess &&
+        !hasSecureRefresh &&
+        !hasLegacyAccess &&
+        hasLegacyRefresh;
+    final migratedKeys = <String>[];
+
+    // refresh-only는 startup refresh 복구를 위해 허용한다. access-only는
+    // refresh 경로 없는 logged-in 상태를 만들 수 있어 migration하지 않는다.
+    // 단, 이전 migration이 access write 직후 중단된 상태는 legacy refresh로 복구한다.
+    if (!shouldMigrateCompletePair &&
+        !shouldMigrateRefreshOnly &&
+        !shouldRepairSecureAccessOnly) {
+      await _removeLegacyPrefsIfPresent(accessKey, refreshKey);
+      return;
+    }
+
+    try {
+      if (shouldMigrateCompletePair ||
+          shouldMigrateRefreshOnly ||
+          shouldRepairSecureAccessOnly) {
+        await storage.write(key: refreshKey, value: legacyRefresh);
+        cache[refreshKey] = legacyRefresh;
+        migratedKeys.add(refreshKey);
+      }
+      if (shouldMigrateCompletePair) {
+        await storage.write(key: accessKey, value: legacyAccess);
+        cache[accessKey] = legacyAccess;
+        migratedKeys.add(accessKey);
+      }
+    } catch (_) {
+      for (final key in migratedKeys) {
+        cache.remove(key);
+      }
+      await _deleteSecureKeysIgnoringErrors(storage, migratedKeys);
+      return;
+    }
+
+    await _removeLegacyPrefsIfPresent(accessKey, refreshKey);
+  }
+
+  static Future<void> _deleteSecurePairIgnoringErrors(
+    FlutterSecureStorage storage,
+    String accessKey,
+    String refreshKey,
+  ) => _deleteSecureKeysIgnoringErrors(storage, [accessKey, refreshKey]);
+
+  static Future<void> _deleteSecureKeysIgnoringErrors(
+    FlutterSecureStorage storage,
+    Iterable<String> keys,
+  ) async {
+    for (final key in keys) {
+      try {
+        await storage.delete(key: key);
+      } catch (_) {
+        // Migration cleanup best-effort: startup should continue logged out.
+      }
+    }
+  }
 
   @override
-  String? getString(String key) => _prefs.getString(key);
+  String? getString(String key) => _cache[key];
 
   @override
-  Future<bool> setString(String key, String value) =>
-      _prefs.setString(key, value);
+  Future<bool> setString(String key, String value) async {
+    await _storage.write(key: key, value: value);
+    _cache[key] = value;
+    return true;
+  }
 
   @override
-  Future<bool> remove(String key) => _prefs.remove(key);
+  Future<bool> remove(String key) async {
+    await _storage.delete(key: key);
+    _cache.remove(key);
+    return true;
+  }
 }
 
 /// JWT 토큰 저장/조회 서비스.
@@ -56,10 +221,14 @@ class AuthService {
   Future<bool>? _refreshInFlight;
   Future<void> _tokenStoreLock = Future.value();
   AuthTokenStoreProvider _tokenStoreProvider = _defaultTokenStoreProvider;
+  AuthRefreshResponseProvider? _refreshResponseProviderForTesting;
   int _authGeneration = 0;
 
-  static Future<AuthTokenStore> _defaultTokenStoreProvider() async =>
-      _SharedPreferencesAuthTokenStore(await SharedPreferences.getInstance());
+  static Future<AuthTokenStore> _defaultTokenStoreProvider() =>
+      _SecureAuthTokenStore.create(
+        accessKey: _accessKey,
+        refreshKey: _refreshKey,
+      );
 
   /// Authorization 헤더에 붙일 Bearer 값.
   ///
@@ -91,12 +260,28 @@ class AuthService {
   bool get isLoggedIn => bearerToken != null;
 
   Future<void> init() async {
-    final store = await _tokenStore();
-    final stored = store.getString(_accessKey);
-    final refresh = store.getString(_refreshKey);
+    final AuthTokenStore store;
+    final String? stored;
+    final String? refresh;
+    try {
+      store = await _tokenStore();
+      stored = store.getString(_accessKey);
+      refresh = store.getString(_refreshKey);
+    } catch (_) {
+      _cachedAccessToken = null;
+      _cachedRefreshToken = null;
+      return;
+    }
 
     if (stored != null && _isUsableToken(stored)) {
-      // accessToken이 유효하면 둘 다 복원한다.
+      if (refresh == null || refresh.isEmpty) {
+        _cachedAccessToken = null;
+        _cachedRefreshToken = null;
+        await _removeTokenPairIgnoringErrors(store);
+        return;
+      }
+
+      // accessToken과 refreshToken이 모두 있으면 세션을 복원한다.
       _cachedAccessToken = stored;
       _cachedRefreshToken = refresh;
       return;
@@ -104,7 +289,7 @@ class AuthService {
 
     _cachedAccessToken = null;
     _cachedRefreshToken = refresh;
-    await store.remove(_accessKey);
+    await _removeTokenIgnoringErrors(store, _accessKey);
 
     if (refresh != null && refresh.isNotEmpty) {
       // accessToken이 만료되었더라도 refreshToken이 있으면 먼저 세션 복원을 시도한다.
@@ -134,9 +319,12 @@ class AuthService {
     await _withTokenStoreLock(() async {
       _cachedAccessToken = null;
       _cachedRefreshToken = null;
-      final store = await _tokenStore();
-      await store.remove(_accessKey);
-      await store.remove(_refreshKey);
+      try {
+        final store = await _tokenStore();
+        await _removeTokenPairIgnoringErrors(store);
+      } catch (_) {
+        // Secure storage가 복원/손상 상태여도 logout/revoke 흐름은 계속 진행한다.
+      }
     });
   }
 
@@ -237,11 +425,12 @@ class AuthService {
     if (token == null || token.isEmpty) return false;
 
     try {
-      final deviceId = await DeviceIdProvider.getOrCreate();
-      final res = await ApiClient.instance.post(
-        '/api/auth/refresh',
-        body: {'refreshToken': token, 'deviceId': deviceId},
-      );
+      final responseProvider = _refreshResponseProviderForTesting;
+      final res = responseProvider != null
+          ? await responseProvider(token)
+          : await _requestRefreshTokenPair(token);
+      if (res == null) return false;
+
       final access = res['accessToken'] as String?;
       final newRefresh = res['refreshToken'] as String?;
 
@@ -267,6 +456,15 @@ class AuthService {
       // 네트워크/예상 밖 실패는 유효할 수 있는 refresh token을 보존한다.
     }
     return false;
+  }
+
+  Future<Map<String, dynamic>?> _requestRefreshTokenPair(String token) async {
+    final deviceId = await DeviceIdProvider.getOrCreate();
+    final res = await ApiClient.instance.post(
+      '/api/auth/refresh',
+      body: {'refreshToken': token, 'deviceId': deviceId},
+    );
+    return res as Map<String, dynamic>?;
   }
 
   /// 내 정보 조회
@@ -418,15 +616,18 @@ class AuthService {
   }
 
   Future<void> _removeTokenPairIgnoringErrors(AuthTokenStore store) async {
+    await _removeTokenIgnoringErrors(store, _accessKey);
+    await _removeTokenIgnoringErrors(store, _refreshKey);
+  }
+
+  Future<void> _removeTokenIgnoringErrors(
+    AuthTokenStore store,
+    String key,
+  ) async {
     try {
-      await store.remove(_accessKey);
+      await store.remove(key);
     } catch (_) {
-      // 저장 실패 후 partial state 정리가 목적이므로 정리 실패는 원 예외를 유지한다.
-    }
-    try {
-      await store.remove(_refreshKey);
-    } catch (_) {
-      // 저장 실패 후 partial state 정리가 목적이므로 정리 실패는 원 예외를 유지한다.
+      // 저장/복구 실패 후 partial state 정리가 목적이므로 정리 실패는 원 예외를 유지한다.
     }
   }
 
@@ -434,11 +635,18 @@ class AuthService {
     _tokenStoreProvider = provider;
   }
 
+  void setRefreshResponseProviderForTesting(
+    AuthRefreshResponseProvider provider,
+  ) {
+    _refreshResponseProviderForTesting = provider;
+  }
+
   void resetForTesting() {
     _cachedAccessToken = null;
     _cachedRefreshToken = null;
     _refreshInFlight = null;
     _tokenStoreLock = Future.value();
+    _refreshResponseProviderForTesting = null;
     _authGeneration = 0;
     _tokenStoreProvider = _defaultTokenStoreProvider;
   }
