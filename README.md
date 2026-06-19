@@ -63,6 +63,8 @@ ClueRoom은 Android 앱, Web 프론트, Spring Boot 백엔드가 함께 동작�
 | [`clueroom-toss-miniapp`](https://github.com/Final-Project-sixteam-company/clueroom-toss-miniapp) | React/Vite web deployment surface |
 | [Organization profile](https://github.com/Final-Project-sixteam-company) | 제품 소개, 팀 소개, repo map |
 
+> `clueroom-toss-miniapp`은 초기 실험 이름이 남은 legacy repository name이며, 현재 용도는 일반 Web frontend 배포입니다.
+
 ---
 
 ## Product Flow
@@ -256,7 +258,7 @@ flutter test
 | Secure Storage | `flutter_secure_storage`, `shared_preferences` |
 | API | `http`, custom `ApiClient`, timeout/error normalization |
 | Push | Firebase Core, Firebase Messaging |
-| Images | `cached_network_image` |
+| Images | `Image.network` + loading/error fallback |
 | Design | Pretendard font, custom theme tokens, dark investigation UI |
 | Test | `flutter_test`, model/controller/service tests |
 
@@ -283,6 +285,8 @@ flutter run
 | Android emulator | `http://10.0.2.2:18080` |
 | desktop / simulator | `http://localhost:18080` |
 | release | `https://api.clueroom.xyz` |
+
+앱 레포의 local default는 포트 충돌 회피를 위해 `18080`을 사용합니다. 백엔드 repo를 기본 `8080`으로 띄운 경우 아래처럼 `API_BASE_URL`을 override합니다.
 
 API override:
 
