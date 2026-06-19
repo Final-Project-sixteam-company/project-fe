@@ -1,50 +1,268 @@
-# ClueRoom Flutter Frontend
+# ClueRoom Android App
 
-ClueRoom 프론트엔드 앱이다.
+<p align="center">
+  <img src="docs/readme-assets/clueroom-hero-casefile-cover.png" alt="ClueRoom case file cover" width="100%">
+</p>
 
-사용자는 공식 시나리오를 선택하고, 사건 브리핑과 현장/증거/용의자 정보를 확인한 뒤 AI 심문과 최종 추리 제출을 통해 사건을 해결한다.
+<p align="center">
+  <a href="https://www.clueroom.xyz"><img alt="Web" src="https://img.shields.io/badge/Web-www.clueroom.xyz-111827?style=for-the-badge"></a>
+  <a href="https://api.clueroom.xyz/actuator/health"><img alt="API" src="https://img.shields.io/badge/API-api.clueroom.xyz-2563EB?style=for-the-badge"></a>
+  <img alt="Flutter" src="https://img.shields.io/badge/Flutter-Android-0284C7?style=for-the-badge">
+  <img alt="Dart" src="https://img.shields.io/badge/Dart-3.12-0175C2?style=for-the-badge">
+</p>
 
-이 repo는 Flutter/Dart 기반 앱이며, 백엔드는 별도 Spring Boot repo인 `Final-Project-sixteam-company/start-up-project`에서 제공한다.
+ClueRoom Android 앱은 플레이어가 탐정이 되어 사건을 조사하고, 증거를 바탕으로 AI 용의자를 심문하며, 최종 추리를 제출하는 Flutter 기반 모바일 클라이언트입니다.
 
-## 현재 기준
+이 저장소는 **Android 화면 흐름, OAuth 로그인, JWT 세션 처리, 플레이 런타임 API 연동, 증거/심문/타임라인 UI, QA 검증 표면**을 담당합니다.
 
-| 항목 | 값 |
+---
+
+## Proof Snapshot
+
+| Flutter Test | Auth | Session | Gameplay API | Safety | Release |
+|---:|---:|---:|---:|---:|---:|
+| **32 PASS** | Google/Kakao OAuth | active session recovery | scenario/play/evidence/AI/result | spoiler metadata safe | release APK build |
+
+> Public-safe 기준에 따라 README에는 session token, QA 계정, 정답성/점수/범인명, raw user question, AI answer 전문을 포함하지 않습니다.
+
+---
+
+## Visual Evidence
+
+<p align="center">
+  <img src="docs/readme-assets/clueroom-android-e2e-board.png" alt="ClueRoom Android E2E screen board" width="100%">
+  <br>
+  <sub>Local Android emulator E2E capture. 백엔드 local profile + 공식 시나리오 import 후 앱 화면을 직접 통과한 캡처입니다.</sub>
+</p>
+
+<table>
+  <tr>
+    <td width="25%"><img src="docs/readme-assets/screens/01-library.png" alt="Scenario library" width="100%"><br><sub>Scenario Library</sub></td>
+    <td width="25%"><img src="docs/readme-assets/screens/02-scenario-detail.png" alt="Scenario detail" width="100%"><br><sub>Scenario Detail</sub></td>
+    <td width="25%"><img src="docs/readme-assets/screens/03-case-briefing.png" alt="Case briefing" width="100%"><br><sub>Case Briefing</sub></td>
+    <td width="25%"><img src="docs/readme-assets/screens/04-investigation-scene.png" alt="Investigation scene" width="100%"><br><sub>Investigation Scene</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="docs/readme-assets/screens/05-evidence-list.png" alt="Evidence list" width="100%"><br><sub>Evidence Board</sub></td>
+    <td width="25%"><img src="docs/readme-assets/screens/06-evidence-detail-guidance.png" alt="Evidence detail guidance" width="100%"><br><sub>Evidence Guidance</sub></td>
+    <td width="25%"><img src="docs/readme-assets/screens/07-interrogation.png" alt="AI interrogation" width="100%"><br><sub>AI Interrogation</sub></td>
+    <td width="25%"><img src="docs/readme-assets/screens/08-timeline.png" alt="Case timeline" width="100%"><br><sub>Timeline</sub></td>
+  </tr>
+</table>
+
+---
+
+## App Role
+
+ClueRoom은 Android 앱, Web 프론트, Spring Boot 백엔드가 함께 동작합니다. 이 저장소는 모바일 앱의 사용자 경험과 백엔드 API 계약을 연결하는 클라이언트 레이어입니다.
+
+| Repository | Scope |
 |---|---|
-| 앱 이름 | ClueRoom |
-| 기술 스택 | Flutter / Dart |
-| Dart SDK | `^3.12.0` |
-| Android package | `xyz.clueroom.clueroom` |
-| 운영 API | `https://api.clueroom.xyz` |
-| 로컬 API 기본값 | Android emulator `http://10.0.2.2:18080`, desktop `http://localhost:18080` |
-| API override | `--dart-define=API_BASE_URL=...` |
-| 주요 상태 저장 | `shared_preferences` |
-| Push token | Firebase Messaging token 획득까지만 구현 |
+| `project-fe` | Flutter Android app, OAuth, session runtime, gameplay UI |
+| [`start-up-project`](https://github.com/Final-Project-sixteam-company/start-up-project) | Spring Boot backend, AI/gameplay domain, infra, LLMOps, QA docs |
+| [`clueroom-toss-miniapp`](https://github.com/Final-Project-sixteam-company/clueroom-toss-miniapp) | React/Vite web deployment surface |
+| [Organization profile](https://github.com/Final-Project-sixteam-company) | 제품 소개, 팀 소개, repo map |
 
-## 문서
+---
 
-| 문서 | 역할 |
-|---|---|
-| [docs/README.md](docs/README.md) | 프론트 문서 index / 흡수 계획 |
-| [docs/FRONTEND_DOCUMENT_AUDIT.md](docs/FRONTEND_DOCUMENT_AUDIT.md) | 현재 문서/코드 인벤토리와 백엔드 계약 drift |
-| [docs/FRONTEND_IMPLEMENTATION_STATUS.md](docs/FRONTEND_IMPLEMENTATION_STATUS.md) | 실제 Flutter 코드 기준 구현 현황 |
-| [docs/FRONTEND_BACKEND_DRIFT.md](docs/FRONTEND_BACKEND_DRIFT.md) | 백엔드 최신 계약 대비 drift와 수정 우선순위 |
-| [docs/FRONTEND_API_INTEGRATION_GUIDE.md](docs/FRONTEND_API_INTEGRATION_GUIDE.md) | 백엔드 최신 계약 반영을 위한 프론트 구현 가이드 |
-| [docs/FRONTEND_GUIDANCE_UX_IMPLEMENTATION_PLAN.md](docs/FRONTEND_GUIDANCE_UX_IMPLEMENTATION_PLAN.md) | evidence guidance와 suggested question UX 구현 계획 |
-| [api-spec.md](api-spec.md) | 최신 API 정본 위치를 안내하는 notice |
-| [docs/archive/README.md](docs/archive/README.md) | 흡수 완료된 과거 프론트 문서 archive |
-
-백엔드 API/운영/시나리오 정본은 backend repo의 아래 문서를 기준으로 본다.
+## Product Flow
 
 ```text
-start-up-project/docs/CaseLab_AI_API_Spec.md
-start-up-project/docs/frontend/CLUEROOM_APP_FLOW_API_GUIDE.md
-start-up-project/docs/scenarios/SCENARIO_GUIDANCE_UX_SPEC.md
-start-up-project/docs/RUN_AND_DEPLOY.md
+로그인
+  -> 시나리오 라이브러리
+  -> 사건 상세
+  -> 사건 브리핑
+  -> 현장 / 증거 / 용의자 / 타임라인 조사
+  -> 증거 기반 AI 심문
+  -> 최종 추리 제출
+  -> 결과 조회
 ```
 
-`SCENARIO_GUIDANCE_UX_SPEC.md`는 backend #56 문서 통합 PR 머지 후 develop 기준 정본으로 본다.
+```mermaid
+flowchart LR
+    Login[OAuth Login] --> Library[Scenario Library]
+    Library --> Detail[Scenario Detail]
+    Detail --> Briefing[Case Briefing]
+    Briefing --> Runtime[Play Session]
+    Runtime --> Evidence[Evidence / Guidance]
+    Runtime --> Suspects[Suspects]
+    Runtime --> Timeline[Timeline]
+    Evidence --> Chat[AI Interrogation]
+    Suspects --> Chat
+    Chat --> Submit[Final Deduction]
+    Submit --> Result[Result]
+```
 
-## 실행
+---
+
+## Feature Highlights
+
+| Area | Implementation | Why It Matters |
+|---|---|---|
+| OAuth Login | Google Sign-In, Kakao SDK, backend OAuth token exchange | 앱과 백엔드 JWT 세션을 실제 provider 로그인으로 연결 |
+| Secure Session | `flutter_secure_storage`, refresh token recovery, logout/revoke flow | 앱 재실행/토큰 만료/로그아웃 race에서 세션 일관성 유지 |
+| Scenario Library | `GET /api/scenarios`, keyword/type/difficulty/sort/page | 공식 시나리오를 운영 API 기준으로 목록/검색 |
+| Scenario Detail | `GET /api/scenarios/{id}`, server `canPlay` | 플레이 가능 여부를 local allowlist가 아니라 백엔드 계약으로 제어 |
+| Active Session | `GET /api/play-sessions/active`, 409 recovery | local 저장소가 비어도 서버의 진행 중 세션을 이어가기 |
+| Investigation UI | locations, evidences, suspects, hints, timeline API | 사건 조사 화면을 백엔드 플레이 세션 상태와 동기화 |
+| Evidence Guidance | reading points, compare evidence, suggested questions | “무엇을 누구에게 물어볼지”를 증거 상세에서 자연스럽게 연결 |
+| Interrogation | `POST /interrogations`, evidence-presented question type | 사용자가 선택한 증거와 질문을 AI 심문 API에 전달 |
+| Final Deduction | culprit/motive/method/cover-up/evidence submit, result screen | 앱에서 플레이 루프를 결과까지 완결 |
+| FCM | Firebase Messaging permission, token refresh, backend registration | 알림 인프라와 연결 가능한 모바일 surface 확보 |
+
+---
+
+## Auth & Session
+
+앱은 OAuth provider token을 직접 서비스 세션으로 쓰지 않습니다. provider SDK에서 받은 토큰을 백엔드에 전달하고, 백엔드는 ClueRoom JWT access/refresh token을 발급합니다.
+
+```mermaid
+sequenceDiagram
+    participant App as Flutter App
+    participant Provider as Google/Kakao SDK
+    participant API as ClueRoom API
+    participant Store as Secure Storage
+
+    App->>Provider: authenticate
+    Provider-->>App: idToken or accessToken
+    App->>API: POST /api/auth/oauth
+    API-->>App: accessToken, refreshToken
+    App->>Store: persist token pair
+    App->>API: protected gameplay request
+```
+
+세션 처리 원칙:
+
+- access/refresh token은 `flutter_secure_storage`에 저장합니다.
+- access token 만료 시 refresh token으로 silent refresh를 시도합니다.
+- 동시 401 refresh는 single-flight로 병합합니다.
+- logout 중 in-flight refresh가 돌아와도 stale token을 저장하지 않습니다.
+- secure storage read/migration 실패 시 앱이 죽지 않고 logged-out 상태로 복구합니다.
+
+---
+
+## Gameplay Runtime
+
+앱의 `GameSessionController`는 플레이 화면이 공유하는 상태를 관리합니다.
+
+| Runtime State | Source |
+|---|---|
+| active session | local saved session + `GET /api/play-sessions/active` |
+| dashboard | `GET /api/play-sessions/{sessionId}/dashboard` |
+| evidence unlock | `GET /api/play-sessions/{sessionId}/evidences?includeLocked=true` |
+| locations | `GET /api/play-sessions/{sessionId}/locations` |
+| suspects | `GET /api/play-sessions/{sessionId}/suspects` |
+| timeline | `GET /api/play-sessions/{sessionId}/timeline` |
+| hints | `GET/POST /api/play-sessions/{sessionId}/hints` |
+| interrogation | `POST /api/play-sessions/{sessionId}/interrogations` |
+| final deduction | `POST /api/play-sessions/{sessionId}/final-deduction` |
+| result | `GET /api/play-sessions/{sessionId}/result` |
+
+진행 중 세션 복구 흐름:
+
+```text
+local saved session resume
+  -> server active session lookup
+  -> create new play session
+  -> on 409, active session lookup and resume
+```
+
+---
+
+## Safety / Spoiler-Free UI
+
+ClueRoom의 정답과 private solution은 백엔드 경계 안에 있어야 합니다. 앱은 public play API가 주는 안전한 표시용 필드만 사용합니다.
+
+앱에서 지키는 기준:
+
+- `imageAssetKey`, `portraitAssetKey` 같은 raw asset key를 화면 로직에 사용하지 않습니다.
+- `importance`, `culpritEligible`, `suspicionLevel` 같은 정답성/추론 shortcut metadata에 의존하지 않습니다.
+- 최종 지목 후보는 public witness 여부를 기준으로 구성합니다.
+- suggested question chip은 자동 전송하지 않고 입력창 prefill로만 동작합니다.
+- locked evidence는 백엔드 masking 정책을 그대로 존중합니다.
+
+---
+
+## Backend API Integration
+
+| Feature | Endpoint |
+|---|---|
+| OAuth Login | `POST /api/auth/oauth` |
+| Refresh | `POST /api/auth/refresh` |
+| Logout | `POST /api/auth/logout` |
+| Me | `GET /api/auth/me` |
+| Device Token | `POST /api/device-tokens` |
+| Scenario List | `GET /api/scenarios` |
+| Scenario Detail | `GET /api/scenarios/{scenarioId}` |
+| Active Session | `GET /api/play-sessions/active?scenarioId={scenarioId}` |
+| Create Session | `POST /api/play-sessions` |
+| Dashboard | `GET /api/play-sessions/{sessionId}/dashboard` |
+| Locations | `GET /api/play-sessions/{sessionId}/locations` |
+| Evidences | `GET /api/play-sessions/{sessionId}/evidences` |
+| Evidence Detail | `GET /api/play-sessions/{sessionId}/evidences/{evidenceId}` |
+| Suspects | `GET /api/play-sessions/{sessionId}/suspects` |
+| Timeline | `GET /api/play-sessions/{sessionId}/timeline` |
+| Hints | `GET /api/play-sessions/{sessionId}/hints` |
+| Use Hint | `POST /api/play-sessions/{sessionId}/hints/{hintId}/use` |
+| Interrogation | `POST /api/play-sessions/{sessionId}/interrogations` |
+| Final Deduction | `POST /api/play-sessions/{sessionId}/final-deduction` |
+| Result | `GET /api/play-sessions/{sessionId}/result` |
+| Abandon | `POST /api/play-sessions/{sessionId}/abandon` |
+
+API 계약의 정본은 백엔드 repo의 [CaseLab AI API Spec](https://github.com/Final-Project-sixteam-company/start-up-project/blob/develop/docs/CaseLab_AI_API_Spec.md)과 [Frontend Flow API Guide](https://github.com/Final-Project-sixteam-company/start-up-project/blob/develop/docs/frontend/CLUEROOM_APP_FLOW_API_GUIDE.md)를 따릅니다.
+
+---
+
+## QA & Tests
+
+```bash
+flutter test
+```
+
+현재 기준:
+
+```text
+32 tests passed
+```
+
+테스트 범위:
+
+| Test Area | Coverage |
+|---|---|
+| AuthService | secure storage failure recovery, legacy migration, partial write cleanup, refresh/logout race |
+| GameSessionController | active session recovery, 409 recovery |
+| Models | play session, evidence, guidance, suspect, interrogation, final result parsing |
+| Spoiler Safety | raw asset key fallback 차단, suggested question target parsing |
+
+관련 QA 문서:
+
+| Document | Role |
+|---|---|
+| [docs/FRONTEND_QA_E2E_CULPRIT_CONFIRMATION_REPORT_2026-06-15.md](docs/FRONTEND_QA_E2E_CULPRIT_CONFIRMATION_REPORT_2026-06-15.md) | Android E2E / API fallback QA history |
+| [docs/FRONTEND_E2E_QA_2026-06-12_CODEX.md](docs/FRONTEND_E2E_QA_2026-06-12_CODEX.md) | frontend E2E QA follow-up |
+| [docs/README.md](docs/README.md) | frontend docs index |
+
+> QA 보고서는 public-safe 기준을 따르며 정답성 세부, 점수, session/token, raw transcript를 공개하지 않습니다.
+
+---
+
+## Tech Stack
+
+| Category | Stack |
+|---|---|
+| Language | Dart 3.12 |
+| Framework | Flutter |
+| Auth | Google Sign-In, Kakao Flutter SDK, JWT token flow |
+| Secure Storage | `flutter_secure_storage`, `shared_preferences` |
+| API | `http`, custom `ApiClient`, timeout/error normalization |
+| Push | Firebase Core, Firebase Messaging |
+| Images | `cached_network_image` |
+| Design | Pretendard font, custom theme tokens, dark investigation UI |
+| Test | `flutter_test`, model/controller/service tests |
+
+---
+
+## Run Locally
 
 의존성 설치:
 
@@ -52,135 +270,72 @@ start-up-project/docs/RUN_AND_DEPLOY.md
 flutter pub get
 ```
 
-로컬 백엔드에 연결:
+로컬 백엔드 기본 연결:
 
 ```bash
 flutter run
 ```
 
-디버그 기본 URL은 플랫폼별로 자동 결정된다.
+기본 API URL:
 
-```text
-Android emulator: http://10.0.2.2:18080
-desktop/iOS simulator: http://localhost:18080
-```
+| Platform | Default |
+|---|---|
+| Android emulator | `http://10.0.2.2:18080` |
+| desktop / simulator | `http://localhost:18080` |
+| release | `https://api.clueroom.xyz` |
 
-특정 API 서버로 override:
+API override:
 
 ```bash
 flutter run --dart-define=API_BASE_URL=https://api.clueroom.xyz
-```
-
-로컬 백엔드 포트가 다르면:
-
-```bash
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080
 ```
 
-릴리즈 APK 빌드 예시:
+OAuth 설정은 `lib/core/oauth/oauth_config.dart`의 `--dart-define` 값을 기준으로 합니다. 실제 key/secret은 public README에 쓰지 않습니다.
+
+---
+
+## Build APK
+
+운영 API 기준 release APK:
 
 ```bash
 flutter build apk --release --dart-define=API_BASE_URL=https://api.clueroom.xyz
 ```
 
-## 검증
+QA/dev login이 필요한 내부 테스트 빌드는 backend dev login 설정과 함께 별도 dart-define으로 관리합니다. 공개 배포 빌드에서는 QA/dev login 노출을 피합니다.
 
-테스트:
+---
 
-```bash
-flutter test
-```
-
-정적 분석:
-
-```bash
-flutter analyze
-```
-
-현재 기준:
-
-```text
-flutter test: PASS
-flutter analyze: warning/info 25건으로 FAIL
-```
-
-`flutter analyze`는 compile error가 아니라 lint/warning 중심이지만, PR 전에는 별도 정리 대상이다.
-
-## 폴더 구조
+## Repository Map
 
 ```text
 lib/
-  core/api/          API base URL, 공통 HTTP client, API exception
-  services/          AuthService 등 앱 공통 서비스
-  repositories/      backend API 호출 계층
-  controllers/       플레이 세션 상태와 화면 공유 state
-  models/            화면/백엔드 DTO 모델
-  screens/           Flutter 화면
-  components/        공통 UI 컴포넌트
-  theme/             색상, 텍스트, 토큰, 테마
+  core/
+    api/           API base URL, ApiClient, ApiException
+    device/        device id provider
+    oauth/         OAuth dart-define config
+  services/        AuthService, secure token handling
+  repositories/    scenario/play-session API clients
+  controllers/     GameSessionController and provider
+  models/          backend DTO and UI models
+  screens/         login, library, detail, case, evidence, suspect, chat, timeline, result
+  components/      buttons, chips, evidence tiles, modals, shared UI
+  theme/           colors, typography, tokens
 
-docs/                프론트 문서 정본 후보와 audit
-docs/archive/        흡수 완료된 과거 작업/handoff 문서
-test/                모델 파싱 테스트
+docs/
+  readme-assets/   README visual evidence
+  archive/         historical frontend docs
+  *.md             frontend integration and QA docs
+
+test/
+  controllers/     active session recovery tests
+  models/          DTO parsing and spoiler-safe tests
+  services/        auth secure storage and refresh/logout tests
 ```
 
-## 현재 구현된 주요 API 연동
+---
 
-| 기능 | Endpoint |
-|---|---|
-| 시나리오 목록 | `GET /api/scenarios` |
-| 시나리오 상세 | `GET /api/scenarios/{scenarioId}` |
-| 플레이 세션 생성 | `POST /api/play-sessions` |
-| 대시보드 | `GET /api/play-sessions/{sessionId}/dashboard` |
-| 현장 정보 | `GET /api/play-sessions/{sessionId}/locations` |
-| 증거 목록 | `GET /api/play-sessions/{sessionId}/evidences?includeLocked=true` |
-| 증거 상세 | `GET /api/play-sessions/{sessionId}/evidences/{evidenceId}` |
-| 용의자 목록 | `GET /api/play-sessions/{sessionId}/suspects` |
-| 힌트 목록/사용 | `GET /api/play-sessions/{sessionId}/hints`, `POST /api/play-sessions/{sessionId}/hints/{hintId}/use` |
-| AI 심문 | `POST /api/play-sessions/{sessionId}/interrogations` |
-| 심문 로그 조회 | `GET /api/play-sessions/{sessionId}/interrogations` |
-| 최종 추리 제출 | `POST /api/play-sessions/{sessionId}/final-deduction` |
-| 결과 조회 | `GET /api/play-sessions/{sessionId}/result` |
-| 세션 포기 | `POST /api/play-sessions/{sessionId}/abandon` |
+## Notes
 
-## 백엔드 최신 계약 대비 주의할 점
-
-아래 항목은 현재 코드와 백엔드 최신 계약 사이에 drift가 있다.
-
-| 우선순위 | 항목 | 현재 상태 |
-|---|---|---|
-| P0 | 인증 강제 모드 대비 | `AuthService`는 mock token 중심이고 `ApiClient.authTokenProvider`와 실제 연결되지 않았다 |
-| P0/P1 | active session 복구 | local `SharedPreferences` 저장 session만 사용한다. `GET /api/play-sessions/active?scenarioId=...` 미사용 |
-| P1 | FCM device token 등록 | token 획득만 하고 backend 등록은 TODO. 최신 endpoint는 `POST /api/device-tokens` |
-| P1 | evidence guidance | evidence detail 응답의 `guidance` 모델/화면 미구현 |
-| P1 | suggested question UX | hardcoded chip을 `RECOMMENDED`로 즉시 전송한다. 최신 계약은 prefill-only, 자동 전송 금지 |
-| P1 | timeline API | `GET /api/play-sessions/{sessionId}/timeline` 미사용. 현재 sample timeline 표시 |
-| P2 | scenario canPlay | `_kLocalPlayableIds` local allowlist 사용. backend `canPlay` 신뢰 구조로 전환 필요 |
-| P2 | 과거 API 문서 | `api-spec.md`는 최신 정본 notice이고, 원문은 `docs/archive/`에 보존되어 있다 |
-
-## 현재 플레이 흐름
-
-```text
-시나리오 목록
--> 시나리오 상세
--> 플레이 세션 생성
--> 사건 브리핑 / 대시보드
--> 현장 / 증거 / 용의자
--> AI 심문
--> 최종 추리 제출
--> 결과 조회
-```
-
-## 개발 원칙
-
-- 프론트 문서는 backend repo의 최신 API 정본과 충돌하지 않게 유지한다.
-- 오래된 문서는 삭제보다 흡수를 우선한다.
-- 증거/정답/해설 관련 문서는 public-safe 기준을 지킨다.
-- suggested question은 사용자가 최종 전송을 통제해야 하며, 자동 전송 UX로 구현하지 않는다.
-- locked evidence와 locked compare evidence는 백엔드 마스킹 정책을 그대로 존중한다.
-- 인증 강제 전환에 대비해 token wiring을 문서/구현에서 명확히 분리한다.
-
-## 다음 문서 작업
-
-1. 필요하면 `docs/FRONTEND_QA_CHECKLIST.md`를 추가해 프론트 수동 QA 절차를 정리한다.
-2. 구현 PR이 올라오면 `FRONTEND_BACKEND_DRIFT.md`의 P0/P1 항목을 해결 상태로 갱신한다.
+이 앱은 Android 중심으로 구현됐고, 최종 프로젝트 시연은 APK와 웹 배포를 함께 사용합니다. 웹 배포 surface는 별도 React/Vite repo에서 관리합니다.
