@@ -108,7 +108,7 @@ flowchart LR
 | Active Session | `GET /api/play-sessions/active`, 409 recovery | local 저장소가 비어도 서버의 진행 중 세션을 이어가기 |
 | Investigation UI | locations, evidences, suspects, hints, timeline API | 사건 조사 화면을 백엔드 플레이 세션 상태와 동기화 |
 | Evidence Guidance | reading points, compare evidence, suggested questions | “무엇을 누구에게 물어볼지”를 증거 상세에서 자연스럽게 연결 |
-| Interrogation | `POST /interrogations`, evidence-presented question type | 사용자가 선택한 증거와 질문을 AI 심문 API에 전달 |
+| Interrogation | `POST /interrogations`, evidence-presented question type | 사용자가 선택한 증거와 질문을 AI 심문 API에 전달하고, 백엔드 rate-limit error는 공통 `ApiException` 경로로 수신 |
 | Final Deduction | culprit/motive/method/cover-up/evidence submit, result screen | 앱에서 플레이 루프를 결과까지 완결 |
 | FCM | Firebase Messaging permission, token refresh, backend registration | 알림 인프라와 연결 가능한 모바일 surface 확보 |
 
@@ -212,6 +212,12 @@ ClueRoom의 정답과 private solution은 백엔드 경계 안에 있어야 합�
 | Abandon | `POST /api/play-sessions/{sessionId}/abandon` |
 
 API 계약의 정본은 백엔드 repo의 [CaseLab AI API Spec](https://github.com/Final-Project-sixteam-company/start-up-project/blob/develop/docs/CaseLab_AI_API_Spec.md)과 [Frontend Flow API Guide](https://github.com/Final-Project-sixteam-company/start-up-project/blob/develop/docs/frontend/CLUEROOM_APP_FLOW_API_GUIDE.md)를 따릅니다.
+
+백엔드 AI quota 계약:
+
+- 심문 성공 응답에는 `aiQuota` 안내 metadata가 포함될 수 있습니다.
+- quota 초과는 `429 / AI_RATE_002`, quota 상태 확인 불가는 `503 / AI_RATE_003`으로 내려옵니다.
+- 앱은 현재 공통 `ApiException` 경로로 status/code/message를 보존합니다. 전용 quota 안내 UI는 백엔드 계약에 맞춰 붙일 수 있습니다.
 
 ---
 
