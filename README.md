@@ -253,11 +253,17 @@ flutter test
 | Models | play session, evidence, guidance, suspect, interrogation, final result parsing |
 | Spoiler Safety | raw asset key fallback 차단, suggested question target parsing |
 
-최신 QA 기준:
+현재 QA 운영 기준:
 
 | Document | Role |
 |---|---|
-| [QA_ANDROID_E2E_LOCAL_RETEST_REPORT_2026-06-18](https://github.com/Final-Project-sixteam-company/start-up-project/blob/develop/docs/qa/archive/QA_ANDROID_E2E_LOCAL_RETEST_REPORT_2026-06-18.md) | 최신 Android/local backend E2E retest. 로그인, 라이브러리, 상세, 브리핑, 조사 탭, 심문, 제출 화면 도달과 공식 시나리오 `25/25`, `35/35` evidence reachability 기준 |
+| [QA_OPERATING_GUIDE](https://github.com/Final-Project-sixteam-company/start-up-project/blob/develop/docs/QA_OPERATING_GUIDE.md) | 현재 QA 운영 절차, public-safe 보고 기준, open issue board, 보고서 template 기준 |
+
+최근 검증 근거:
+
+| Document | Role |
+|---|---|
+| [QA_ANDROID_E2E_LOCAL_RETEST_REPORT_2026-06-18](https://github.com/Final-Project-sixteam-company/start-up-project/blob/develop/docs/qa/archive/QA_ANDROID_E2E_LOCAL_RETEST_REPORT_2026-06-18.md) | Android/local backend E2E evidence report. 로그인, 라이브러리, 상세, 브리핑, 조사 탭, 심문, 제출 화면 도달과 공식 시나리오 `25/25`, `35/35` evidence reachability 확인 |
 
 Historical frontend issue reports:
 
