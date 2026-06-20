@@ -19,9 +19,9 @@ ClueRoom Android 앱은 플레이어가 탐정이 되어 사건을 조사하고,
 
 ## Proof Snapshot
 
-| Flutter Test | Auth | Session | Gameplay API | Safety | Release |
-|---:|---:|---:|---:|---:|---:|
-| **32 PASS** | Google/Kakao OAuth | active session recovery | scenario/play/evidence/AI/result | spoiler metadata safe | release APK build |
+| Flutter Test | Analyze | Auth | Session | Gameplay API | Safety | Release |
+|---:|---:|---:|---:|---:|---:|---:|
+| **32 PASS** | **No issues** | Google/Kakao OAuth | active session recovery | scenario/play/evidence/AI/result | spoiler metadata safe | release APK build |
 
 > Public-safe 기준에 따라 README에는 session token, QA 계정, 정답성/점수/범인명, raw user question, AI answer 전문을 포함하지 않습니다.
 
@@ -33,7 +33,7 @@ ClueRoom Android 앱은 플레이어가 탐정이 되어 사건을 조사하고,
 |---|---|---|
 | Android APK | release APK build 가능 | Play Store 배포가 아니라 직접 설치 파일입니다. 설치 중 출처 확인/검사 안내가 뜰 수 있습니다. |
 | Web | https://www.clueroom.xyz | 보안상 APK 직접 설치가 부담스러운 사용자를 위한 공개 브라우저 surface입니다. |
-| Backend API | https://api.clueroom.xyz | Android와 Web이 같은 gameplay/auth API 계약을 사용합니다. |
+| Backend API | Host: `https://api.clueroom.xyz` / [health](https://api.clueroom.xyz/actuator/health) | Android와 Web이 같은 gameplay/auth API 계약을 사용합니다. |
 
 앱 README는 Android 클라이언트의 구현과 QA 표면을 설명합니다. 최종 사용자 홍보나 공개 체험은 Web과 APK를 함께 안내하되, APK는 직접 설치 파일이라는 점을 명확히 표시합니다.
 
@@ -236,12 +236,14 @@ API 계약의 정본은 백엔드 repo의 [CaseLab AI API Spec](https://github.c
 
 ```bash
 flutter test
+flutter analyze
 ```
 
 현재 기준:
 
 ```text
 32 tests passed
+No issues found
 ```
 
 테스트 범위:
