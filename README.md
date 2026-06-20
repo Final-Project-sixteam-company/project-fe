@@ -27,6 +27,18 @@ ClueRoom Android 앱은 플레이어가 탐정이 되어 사건을 조사하고,
 
 ---
 
+## Release / Demo Boundary
+
+| Surface | Status | Note |
+|---|---|---|
+| Android APK | release APK build 가능 | Play Store 배포가 아니라 직접 설치 파일입니다. 설치 중 출처 확인/검사 안내가 뜰 수 있습니다. |
+| Web | https://www.clueroom.xyz | 보안상 APK 직접 설치가 부담스러운 사용자를 위한 공개 브라우저 surface입니다. |
+| Backend API | https://api.clueroom.xyz | Android와 Web이 같은 gameplay/auth API 계약을 사용합니다. |
+
+앱 README는 Android 클라이언트의 구현과 QA 표면을 설명합니다. 최종 사용자 홍보나 공개 체험은 Web과 APK를 함께 안내하되, APK는 직접 설치 파일이라는 점을 명확히 표시합니다.
+
+---
+
 ## Visual Evidence
 
 <p align="center">
@@ -106,7 +118,7 @@ flowchart LR
 | Active Session | `GET /api/play-sessions/active`, 409 recovery | local 저장소가 비어도 서버의 진행 중 세션을 이어가기 |
 | Investigation UI | locations, evidences, suspects, hints, timeline API | 사건 조사 화면을 백엔드 플레이 세션 상태와 동기화 |
 | Evidence Guidance | reading points, compare evidence, suggested questions | “무엇을 누구에게 물어볼지”를 증거 상세에서 자연스럽게 연결 |
-| Interrogation | `POST /interrogations`, evidence-presented question type | 사용자가 선택한 증거와 질문을 AI 심문 API에 전달하고, 백엔드 rate-limit error는 공통 `ApiException` 경로로 수신 |
+| Interrogation | `POST /interrogations`, evidence-presented question type | 사용자가 선택한 증거와 질문을 AI 심문 API에 전달하고, 35/50/70/100/120회 안내 단계와 `AI_RATE_002` 같은 rate-limit error는 공통 `ApiException` 경로로 수신 |
 | Final Deduction | culprit/motive/method/cover-up/evidence submit, result screen | 앱에서 플레이 루프를 결과까지 완결 |
 | FCM | Firebase Messaging permission, token refresh, backend registration | 알림 인프라와 연결 가능한 모바일 surface 확보 |
 
