@@ -60,10 +60,8 @@ ClueRoom은 Android 앱, Web 프론트, Spring Boot 백엔드가 함께 동작�
 |---|---|
 | `project-fe` | Flutter Android app, OAuth, session runtime, gameplay UI |
 | [`start-up-project`](https://github.com/Final-Project-sixteam-company/start-up-project) | Spring Boot backend, AI/gameplay domain, infra, LLMOps, QA docs |
-| [`clueroom-toss-miniapp`](https://github.com/Final-Project-sixteam-company/clueroom-toss-miniapp) | React/Vite web deployment surface |
+| [`clueroom-web-fe`](https://github.com/Final-Project-sixteam-company/clueroom-web-fe) | React/Vite web deployment surface |
 | [Organization profile](https://github.com/Final-Project-sixteam-company) | 제품 소개, 팀 소개, repo map |
-
-> `clueroom-toss-miniapp`은 초기 실험 이름이 남은 legacy repository name이며, 현재 용도는 일반 Web frontend 배포입니다.
 
 ---
 
