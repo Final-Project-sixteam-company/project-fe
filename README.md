@@ -253,12 +253,18 @@ flutter test
 | Models | play session, evidence, guidance, suspect, interrogation, final result parsing |
 | Spoiler Safety | raw asset key fallback 차단, suggested question target parsing |
 
-관련 QA 문서:
+최신 QA 기준:
 
 | Document | Role |
 |---|---|
-| [docs/FRONTEND_QA_E2E_CULPRIT_CONFIRMATION_REPORT_2026-06-15.md](docs/FRONTEND_QA_E2E_CULPRIT_CONFIRMATION_REPORT_2026-06-15.md) | Android E2E / API fallback QA history |
-| [docs/FRONTEND_E2E_QA_2026-06-12_CODEX.md](docs/FRONTEND_E2E_QA_2026-06-12_CODEX.md) | frontend E2E QA follow-up |
+| [QA_ANDROID_E2E_LOCAL_RETEST_REPORT_2026-06-18](https://github.com/Final-Project-sixteam-company/start-up-project/blob/develop/docs/qa/archive/QA_ANDROID_E2E_LOCAL_RETEST_REPORT_2026-06-18.md) | 최신 Android/local backend E2E retest. 로그인, 라이브러리, 상세, 브리핑, 조사 탭, 심문, 제출 화면 도달과 공식 시나리오 `25/25`, `35/35` evidence reachability 기준 |
+
+Historical frontend issue reports:
+
+| Document | Role |
+|---|---|
+| [docs/FRONTEND_QA_E2E_CULPRIT_CONFIRMATION_REPORT_2026-06-15.md](docs/FRONTEND_QA_E2E_CULPRIT_CONFIRMATION_REPORT_2026-06-15.md) | Android E2E / API fallback historical issue report |
+| [docs/FRONTEND_E2E_QA_2026-06-12_CODEX.md](docs/FRONTEND_E2E_QA_2026-06-12_CODEX.md) | frontend E2E historical follow-up |
 | [docs/README.md](docs/README.md) | frontend docs index |
 
 > QA 보고서는 public-safe 기준을 따르며 정답성 세부, 점수, session/token, raw transcript를 공개하지 않습니다.
