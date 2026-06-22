@@ -4,13 +4,18 @@
 
 대상 repo: `start-up-fe`
 
+> 상태: HISTORICAL DOCUMENT AUDIT.
+> 이 문서는 2026-06-11 문서 다이어트/코드 인벤토리 기준점이다.
+> 최신 구현 상태와 QA 근거는 [../README.md](../README.md), 백엔드 `QA_OPERATING_GUIDE`, 2026-06-18 Android local retest를 따른다.
+> 이 문서의 `flutter analyze 25건`, mock token, timeline/guidance 미연동 표기는 당시 drift를 설명하기 위한 기록이며 현재 정본 상태가 아니다.
+
 목적:
 
 - 프론트 문서 정리를 삭제 중심이 아니라 흡수 중심으로 진행한다.
-- 현재 Flutter 코드가 실제로 구현한 범위와 문서가 설명하는 범위를 분리한다.
+- 2026-06-11 당시 Flutter 코드가 실제로 구현한 범위와 문서가 설명하는 범위를 분리한다.
 - 백엔드 최신 정본 계약과 프론트 구현 사이의 drift를 이후 단계에서 바로 수정할 수 있게 고정한다.
 
-## 현재 프로젝트 상태
+## 2026-06-11 프로젝트 상태
 
 | 항목 | 상태 |
 |---|---|

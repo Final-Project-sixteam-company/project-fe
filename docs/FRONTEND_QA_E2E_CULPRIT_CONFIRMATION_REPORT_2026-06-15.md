@@ -1,5 +1,10 @@
 # ClueRoom Frontend QA E2E / Culprit Confirmation Report - 2026-06-15
 
+> 상태: HISTORICAL QA REPORT.
+> 이 문서는 2026-06-15 Pixel_10/API37 emulator와 운영 API fallback 기준 이슈 보고서다.
+> Android 앱 reachability 최신 근거는 백엔드 repo의 `QA_ANDROID_E2E_LOCAL_RETEST_REPORT_2026-06-18.md`와 현재 [../README.md](../README.md)를 따른다.
+> 아래 `Android app E2E: FAIL`은 6/15 당시 운영 로그인/에뮬레이터 조건의 실패를 뜻하며, 현재 Android 앱 전체 상태나 발표자료의 최신 QA 근거로 해석하지 않는다.
+
 ## 0. Scope
 
 이 문서는 2026-06-15 Flutter Android emulator 실행과 운영 API fallback QA 결과를 프론트엔드 관점에서 정리한 보고서다.
