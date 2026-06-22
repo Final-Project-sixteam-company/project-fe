@@ -4,7 +4,13 @@
 
 대상 repo: `start-up-fe`
 
-이 문서는 현재 Flutter 코드가 실제로 구현한 범위를 정리한다. 백엔드 최신 계약과의 차이는 후속 `FRONTEND_BACKEND_DRIFT.md`에서 별도 관리한다.
+> 상태: HISTORICAL SNAPSHOT.
+> 이 문서는 2026-06-11 당시 Flutter 앱 구현 상태를 보존한 기록이다.
+> 최신 Android 앱 정본은 [../README.md](../README.md)를 따른다.
+> 특히 `flutter analyze 25 issues`, auth partial, active session/timeline/guidance 미구현 표기는 당시 상태이며, 현재 release/readme 상태로 해석하지 않는다.
+> 최신 공개 요약은 `32 PASS`, `flutter analyze No issues`, OAuth/session/gameplay API 연동, active session recovery 기준이다.
+
+이 문서는 2026-06-11 당시 Flutter 코드가 실제로 구현한 범위를 정리한다. 최신 구현 상태는 루트 README를 우선한다.
 
 ## 요약
 

@@ -6,7 +6,12 @@
 
 백엔드 기준 repo: `Final-Project-sixteam-company/start-up-project`
 
-이 문서는 현재 Flutter 프론트 구현과 Spring Boot 백엔드 최신 계약 사이의 차이를 정리한다. 목표는 blame이 아니라 수정 순서를 명확히 하는 것이다.
+> 상태: HISTORICAL DRIFT BASELINE.
+> 이 문서는 2026-06-11 당시 Flutter 앱과 백엔드 계약 사이의 차이를 고정한 작업 기록이다.
+> 최신 Android 앱 정본은 [../README.md](../README.md)와 백엔드 QA 문서의 2026-06-18 Android local retest를 따른다.
+> 아래 P0/P1 항목 중 OAuth/session/gameplay API, active session recovery, guidance/timeline 모델, `flutter analyze` 상태는 이후 README 기준으로 갱신되었으므로 현재 release blocker 목록으로 직접 사용하지 않는다.
+
+이 문서는 2026-06-11 당시 Flutter 프론트 구현과 Spring Boot 백엔드 계약 사이의 차이를 정리한 historical baseline이다. 최신 구현 상태는 루트 README를 우선한다.
 
 ## 우선순위 기준
 
