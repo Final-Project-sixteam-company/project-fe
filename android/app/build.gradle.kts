@@ -1,7 +1,39 @@
+import java.util.Base64
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Add the Google services Gradle plugin
+    id("com.google.gms.google-services")
+
+}
+
+val defaultKakaoNativeAppKey = "17ecda588dc1798c2dd902f5dd1084f1"
+
+fun dartDefineValue(name: String): String? {
+    val dartDefines = project.findProperty("dart-defines")?.toString()
+        ?: return null
+
+    return dartDefines
+        .split(",")
+        .asSequence()
+        .mapNotNull { encoded ->
+            runCatching {
+                String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+            }.getOrNull()
+        }
+        .firstOrNull { it.startsWith("$name=") }
+        ?.substringAfter("=")
+        ?.takeIf { it.isNotBlank() }
+}
+
+val kakaoNativeAppKey = dartDefineValue("KAKAO_NATIVE_APP_KEY") ?: defaultKakaoNativeAppKey
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
 android {
@@ -23,13 +55,27 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKey
+    }
+
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String?
+            keyPassword = keystoreProperties["keyPassword"] as String?
+            storePassword = keystoreProperties["storePassword"] as String?
+            storeFile = (keystoreProperties["storeFile"] as String?)?.let {
+                rootProject.file(it)
+            }
+        }
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

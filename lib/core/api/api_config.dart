@@ -1,0 +1,44 @@
+import 'package:flutter/foundation.dart';
+
+/// API 환경 설정.
+///
+/// - 안드로이드 에뮬레이터에서는 호스트 PC의 localhost 가 `10.0.2.2` 로 매핑된다.
+/// - iOS 시뮬레이터/데스크톱에서는 `localhost` 가 그대로 호스트를 가리킨다.
+/// - 릴리즈 빌드에서는 운영 서버를 사용한다.
+class ApiConfig {
+  ApiConfig._();
+
+  static const String _prodBaseUrl = 'https://api.clueroom.xyz';
+  // 컴파일 타임 override. 디버그 빌드에서 실서버로 붙일 때 사용:
+  //   flutter run --dart-define=API_BASE_URL=https://api.clueroom.xyz
+  // 빈 값(미지정)이면 아래 환경 자동 판별 로직을 그대로 따른다.
+  static const String _envBaseUrl =
+      String.fromEnvironment('API_BASE_URL');
+  // 로컬 docker 백엔드 호스트 포트. 기본 8080이지만 다른 프로젝트(theo-core)가
+  // 8080을 점유 중이라 ClueRoom 백엔드는 18080으로 띄워 연동한다.
+  // 8080이 비면 18080 → 8080으로 되돌린다.
+  static const int _devPort = 18080;
+
+  /// 현재 빌드 환경에 맞는 API base URL.
+  static String get baseUrl {
+    // 컴파일 타임 override가 있으면 환경 판별보다 우선(디버그→실서버 연동 등).
+    if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
+    if (kReleaseMode) return _prodBaseUrl;
+
+    // 디버그/프로파일: 로컬 도커 백엔드(localhost:8080)
+    final host = defaultTargetPlatform == TargetPlatform.android
+        ? '10.0.2.2' // 안드로이드 에뮬레이터 → 호스트 localhost
+        : 'localhost';
+    return 'http://$host:$_devPort';
+  }
+
+  /// 모든 컨트롤러 경로 공통 prefix.
+  static const String apiPrefix = '/api';
+
+  /// 네트워크 타임아웃.
+  static const Duration timeout = Duration(seconds: 20);
+
+  /// AI 엔드포인트(심문/최종추리) 전용 타임아웃.
+  /// 동기 LLM 응답/채점이 일반 요청보다 길어 기본 타임아웃과 분리한다.
+  static const Duration aiTimeout = Duration(seconds: 60);
+}

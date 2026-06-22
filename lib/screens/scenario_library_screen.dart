@@ -1,0 +1,579 @@
+// lib/screens/scenario_library_screen.dart
+import 'dart:async';
+import 'package:flutter/material.dart';
+import '../components/ms_button.dart';
+import '../components/ms_kicker.dart';
+import '../components/ms_pill.dart';
+import '../components/ms_text_field.dart';
+import '../components/states.dart';
+import '../core/api/api_exception.dart';
+import '../models/scenario.dart';
+import '../repositories/scenario_repository.dart';
+import '../theme/app_text.dart';
+import '../theme/app_tokens.dart';
+import '../theme/app_theme.dart';
+import 'scenario_detail_screen.dart';
+
+// ── 필터 탭 정의 ──────────────────────────────────────────────────────────────
+
+enum _LibraryTab {
+  all,
+  official,
+  custom,
+  popular,
+  newest,
+  easy,
+  medium,
+  hard,
+}
+
+extension _LibraryTabX on _LibraryTab {
+  String get label => switch (this) {
+        _LibraryTab.all => '전체',
+        _LibraryTab.official => '공식',
+        _LibraryTab.custom => '커스텀',
+        _LibraryTab.popular => '인기',
+        _LibraryTab.newest => '최신',
+        _LibraryTab.easy => '쉬움',
+        _LibraryTab.medium => '보통',
+        _LibraryTab.hard => '어려움',
+      };
+
+  /// 탭을 ScenarioFilter로 변환
+  ScenarioFilter toFilter(String query) => switch (this) {
+        _LibraryTab.all => ScenarioFilter(query: query),
+        _LibraryTab.official => ScenarioFilter(
+            type: ScenarioType.official,
+            query: query,
+          ),
+        _LibraryTab.custom => ScenarioFilter(
+            type: ScenarioType.custom,
+            query: query,
+          ),
+        _LibraryTab.popular => ScenarioFilter(
+            sort: ScenarioSort.popular,
+            query: query,
+          ),
+        _LibraryTab.newest => ScenarioFilter(
+            sort: ScenarioSort.newest,
+            query: query,
+          ),
+        _LibraryTab.easy => ScenarioFilter(
+            difficulty: Difficulty.easy,
+            query: query,
+          ),
+        _LibraryTab.medium => ScenarioFilter(
+            difficulty: Difficulty.medium,
+            query: query,
+          ),
+        _LibraryTab.hard => ScenarioFilter(
+            difficulty: Difficulty.hard,
+            query: query,
+          ),
+      };
+}
+
+// ── 화면 ──────────────────────────────────────────────────────────────────────
+
+class ScenarioLibraryScreen extends StatefulWidget {
+  const ScenarioLibraryScreen({super.key});
+
+  @override
+  State<ScenarioLibraryScreen> createState() =>
+      _ScenarioLibraryScreenState();
+}
+
+class _ScenarioLibraryScreenState
+    extends State<ScenarioLibraryScreen> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  _LibraryTab _tab = _LibraryTab.all;
+  String _query = '';
+
+  List<Scenario> _results = const [];
+  bool _loading = true;
+  String? _error;
+
+  // ── 페이지네이션 ──────────────────────────────────────────────────────────
+  static const int _pageSize = 20;
+  int _page = 0;
+  bool _hasNext = false;
+  bool _loadingMore = false;
+
+  /// 검색어 입력 디바운스
+  Timer? _debounce;
+
+  /// 마지막 요청 식별자 — 늦게 도착한 응답이 최신 결과를 덮어쓰지 않도록 한다.
+  int _requestSeq = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final seq = ++_requestSeq;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final page = await scenarioRepo.queryPage(
+        _tab.toFilter(_query),
+        page: 0,
+        size: _pageSize,
+      );
+      if (!mounted || seq != _requestSeq) return;
+      setState(() {
+        _results = page.content;
+        _page = 0;
+        _hasNext = page.hasNext;
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted || seq != _requestSeq) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted || seq != _requestSeq) return;
+      setState(() {
+        _error = '시나리오를 불러오지 못했습니다.';
+        _loading = false;
+      });
+    }
+  }
+
+  /// 다음 페이지를 이어서 로드해 기존 결과에 덧붙인다('더보기').
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasNext) return;
+    final seq = _requestSeq; // 필터/검색이 바뀌면 seq 가 달라져 결과를 버린다.
+    setState(() => _loadingMore = true);
+    try {
+      final page = await scenarioRepo.queryPage(
+        _tab.toFilter(_query),
+        page: _page + 1,
+        size: _pageSize,
+      );
+      if (!mounted || seq != _requestSeq) return;
+      setState(() {
+        _results = [..._results, ...page.content];
+        _page = page.page;
+        _hasNext = page.hasNext;
+        _loadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted || seq != _requestSeq) return;
+      // 추가 로드 실패는 기존 목록 유지 + 더보기 버튼 재노출(조용히 복구 가능).
+      setState(() => _loadingMore = false);
+    }
+  }
+
+  void _onTabChanged(_LibraryTab tab) {
+    setState(() => _tab = tab);
+    _load();
+  }
+
+  void _onQueryChanged(String v) {
+    _query = v.trim();
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _load);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final results = _results;
+
+    return Scaffold(
+      backgroundColor: c.bg,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTokens.sp4,
+                AppTokens.sp4,
+                AppTokens.sp4,
+                0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '시나리오 라이브러리',
+                    style: AppText.titleL.copyWith(color: c.text),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'MYSTERY LIBRARY',
+                    style: AppText.monoLabel.copyWith(color: c.textMute),
+                  ),
+                  const SizedBox(height: AppTokens.sp4),
+                  MSTextField(
+                    controller: _searchCtrl,
+                    hintText: '사건명, 태그, 제작자 검색…',
+                    suffixIcon: Icons.search,
+                    onChanged: _onQueryChanged,
+                  ),
+                  const SizedBox(height: AppTokens.sp3),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // 첫 칩 좌측 여백(끝 칩 우측 여백과 대칭) + 끝 칩 터치 여유.
+                        const SizedBox(width: AppTokens.sp2),
+                        for (final tab in _LibraryTab.values)
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(right: AppTokens.sp2),
+                            child: _FilterChip(
+                              label: tab.label,
+                              active: _tab == tab,
+                              onTap: () => _onTabChanged(tab),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppTokens.sp4),
+                  // 필터 영역 ↔ 결과 목록 경계 구분.
+                  Divider(height: 1, thickness: 1, color: c.line),
+                  const SizedBox(height: AppTokens.sp4),
+                  Row(
+                    children: [
+                      const MSKicker('사건 목록'),
+                      const SizedBox(width: AppTokens.sp2),
+                      Text(
+                        '${results.length}건',
+                        style: AppText.monoLabel.copyWith(
+                          color: c.textMute,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppTokens.sp3),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? const MSListSkeleton(itemHeight: 96)
+                  : _error != null
+                      ? MSEmpty(
+                          icon: Icons.cloud_off,
+                          title: '불러오지 못했습니다',
+                          subtitle: _error,
+                          action: MSButton(
+                            label: '다시 시도',
+                            variant: MSButtonVariant.secondary,
+                            onPressed: _load,
+                          ),
+                        )
+                      : results.isEmpty
+                  ? const MSEmpty(
+                      icon: Icons.search_off,
+                      title: '일치하는 사건이 없습니다',
+                    )
+                  : ListView.separated(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppTokens.sp4,
+                        0,
+                        AppTokens.sp4,
+                        AppTokens.sp10,
+                      ),
+                      itemCount: results.length + (_hasNext ? 1 : 0),
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(height: AppTokens.sp3),
+                      itemBuilder: (_, i) {
+                        // 마지막 행: 더보기 버튼(페이지네이션)
+                        if (i == results.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: AppTokens.sp2),
+                            child: _loadingMore
+                                ? const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(AppTokens.sp3),
+                                      child: MSSpinner(size: 20),
+                                    ),
+                                  )
+                                : MSButton(
+                                    label: '더보기',
+                                    variant: MSButtonVariant.secondary,
+                                    expanded: true,
+                                    onPressed: _loadMore,
+                                  ),
+                          );
+                        }
+                        return _ScenarioRow(
+                          scenario: results[i],
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ScenarioDetailScreen(
+                                scenario: results[i],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── 시나리오 카드 ─────────────────────────────────────────────────────────────
+
+class _ScenarioRow extends StatelessWidget {
+  const _ScenarioRow({
+    required this.scenario,
+    required this.onTap,
+  });
+
+  final Scenario scenario;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Material(
+      color: c.bgElev,
+      borderRadius: BorderRadius.circular(AppTokens.r4),
+      child: InkWell(
+        onTap: onTap,
+        splashColor: c.primary.withValues(alpha: .06),
+        borderRadius: BorderRadius.circular(AppTokens.r4),
+        child: Container(
+          padding: const EdgeInsets.all(AppTokens.sp3),
+          decoration: BoxDecoration(
+            border: Border.all(color: c.line),
+            borderRadius: BorderRadius.circular(AppTokens.r4),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _CodeThumb(scenario: scenario),
+              const SizedBox(width: AppTokens.sp3),
+              Expanded(child: _ScenarioMeta(scenario: scenario)),
+              const SizedBox(width: AppTokens.sp3),
+              _ScenarioStats(scenario: scenario),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CodeThumb extends StatelessWidget {
+  const _CodeThumb({required this.scenario});
+
+  final Scenario scenario;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Container(
+      width: 48,
+      height: 60,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: scenario.type == ScenarioType.official
+              ? [c.bgHover, c.primarySoft]
+              : [c.bgHover, c.successSoft],
+        ),
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(AppTokens.r3),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        scenario.code,
+        style: AppText.monoLabel.copyWith(
+          fontSize: 8,
+          color: c.primary,
+          height: 1.2,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+class _ScenarioMeta extends StatelessWidget {
+  const _ScenarioMeta({required this.scenario});
+
+  final Scenario scenario;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            MSPill(
+              scenario.difficultyLabel,
+              tone: switch (scenario.difficulty) {
+                Difficulty.easy => MSPillTone.success,
+                Difficulty.medium => MSPillTone.primary,
+                Difficulty.hard => MSPillTone.danger,
+              },
+            ),
+            const SizedBox(width: AppTokens.sp2),
+            Text(
+              // 백엔드가 suspectCount 를 0(미집계)으로 주는 경우 "용의자 0명"이
+              // 오인되므로 그 구절을 숨긴다(상세화면 _MetaGrid 의 "—" 처리와 일관).
+              scenario.suspectsCount > 0
+                  ? '${scenario.estimatedMinutes}분 · 용의자 ${scenario.suspectsCount}명'
+                  : '${scenario.estimatedMinutes}분',
+              style: AppText.monoLabel.copyWith(
+                fontSize: 9.5,
+                color: c.textMute,
+                height: 1.0,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          scenario.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: AppText.body.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: c.text,
+            height: 1.3,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Wrap(
+          spacing: AppTokens.sp1,
+          runSpacing: AppTokens.sp1,
+          children: scenario.tags.take(3).map((tag) {
+            return Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 2,
+              ),
+              decoration: BoxDecoration(
+                color: c.bgHover,
+                borderRadius: BorderRadius.circular(AppTokens.r1),
+              ),
+              child: Text(
+                '#$tag',
+                style: AppText.monoLabel.copyWith(
+                  fontSize: 9,
+                  color: c.textMute,
+                  height: 1.0,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _ScenarioStats extends StatelessWidget {
+  const _ScenarioStats({required this.scenario});
+
+  final Scenario scenario;
+
+  String _formatPlays(int p) {
+    if (p >= 1000) return '${(p / 1000).toStringAsFixed(1)}k';
+    return p.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '★ ${scenario.rating}',
+          style: AppText.monoLabel.copyWith(
+            color: c.primary,
+            height: 1.0,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _formatPlays(scenario.plays),
+          style: AppText.monoLabel.copyWith(
+            fontSize: 9.5,
+            color: c.textMute,
+            height: 1.0,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── 필터 칩 ───────────────────────────────────────────────────────────────────
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: AppMotion.dur2,
+        curve: AppMotion.easeOut,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.chipPadH,
+          vertical: AppTokens.chipPadV,
+        ),
+        decoration: BoxDecoration(
+          color: active ? c.primarySoft : Colors.transparent,
+          border: Border.all(color: active ? c.primary : c.line),
+          borderRadius: BorderRadius.circular(AppTokens.rPill),
+        ),
+        child: Text(
+          label,
+          style: AppText.monoLabel.copyWith(
+            color: active ? c.primary : c.textSub,
+            height: 1.0,
+          ),
+        ),
+      ),
+    );
+  }
+}
