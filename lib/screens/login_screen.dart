@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -167,6 +169,15 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     }
 
+    unawaited(_registerDeviceTokenBestEffort());
+
+    if (!mounted) return;
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const AppShell()));
+  }
+
+  Future<void> _registerDeviceTokenBestEffort() async {
     try {
       final messaging = FirebaseMessaging.instance;
       final token = await messaging.getToken();
@@ -179,11 +190,6 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (_) {
       // 토큰 등록 실패해도 로그인 흐름은 계속 진행
     }
-
-    if (!mounted) return;
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const AppShell()));
   }
 
   String _errorMessage(Object error, String fallback) {

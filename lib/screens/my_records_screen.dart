@@ -4,7 +4,7 @@ import '../components/ms_kicker.dart';
 import '../components/ms_stat_row.dart';
 import '../components/states.dart';
 import '../models/scenario.dart';
-import '../models/sample_scenarios.dart';
+import '../repositories/play_session_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../theme/app_tokens.dart';
@@ -50,11 +50,43 @@ class MyRecordsScreen extends StatefulWidget {
 
 class _MyRecordsScreenState extends State<MyRecordsScreen> {
   _RecordsFilter _filter = _RecordsFilter.all;
+  bool _loading = true;
+  String? _error;
+  List<PlaySession> _sessions = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecords();
+  }
+
+  Future<void> _loadRecords() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final page = await playSessionRepo.records();
+      if (!mounted) return;
+      setState(() {
+        _sessions = page.content;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = '플레이 기록을 불러오지 못했습니다.';
+        _sessions = const [];
+        _loading = false;
+      });
+    }
+  }
 
   // ── 통계 (세션 데이터에서 직접 파생) ───────────────────────────────────────
 
   List<PlaySession> get _completedSessions =>
-      samplePlaySessions.where((s) => s.state == PlayState.completed).toList();
+      _sessions.where((s) => s.state == PlayState.completed).toList();
 
   int get _solvedCount => _completedSessions.length;
 
@@ -72,11 +104,11 @@ class _MyRecordsScreenState extends State<MyRecordsScreen> {
   List<PlaySession> get _filtered => switch (_filter) {
     _RecordsFilter.completed => _completedSessions,
     _RecordsFilter.inProgress =>
-        samplePlaySessions.where((s) => s.state == PlayState.inProgress).toList(),
-  // 현재 유저가 제작한 시나리오 세션이 없으므로 빈 목록 반환.
-  // 추후 authored scenario IDs와 교차 필터링으로 교체 예정.
+      _sessions.where((s) => s.state == PlayState.inProgress).toList(),
+    // 현재 유저가 제작한 시나리오 세션이 없으므로 빈 목록 반환.
+    // 추후 authored scenario IDs와 교차 필터링으로 교체 예정.
     _RecordsFilter.mine => const [],
-    _RecordsFilter.all => samplePlaySessions,
+    _RecordsFilter.all => _sessions,
   };
 
   @override
@@ -94,10 +126,7 @@ class _MyRecordsScreenState extends State<MyRecordsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: AppTokens.sp4),
-              Text(
-                '내 기록',
-                style: AppText.titleL.copyWith(color: c.text),
-              ),
+              Text('내 기록', style: AppText.titleL.copyWith(color: c.text)),
               const SizedBox(height: 2),
               Text(
                 'DETECTIVE FILE',
@@ -139,7 +168,21 @@ class _MyRecordsScreenState extends State<MyRecordsScreen> {
               ),
               const SizedBox(height: AppTokens.sp3),
               // ── 기록 목록 ────────────────────────────────────────
-              if (sessions.isEmpty)
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.only(top: AppTokens.sp8),
+                  child: Center(child: MSSpinner(size: 22)),
+                )
+              else if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppTokens.sp8),
+                  child: MSEmpty(
+                    icon: Icons.cloud_off,
+                    title: '기록을 불러오지 못했습니다',
+                    subtitle: _error,
+                  ),
+                )
+              else if (sessions.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: AppTokens.sp8),
                   child: MSEmpty(
@@ -149,10 +192,12 @@ class _MyRecordsScreenState extends State<MyRecordsScreen> {
                   ),
                 )
               else
-                ...sessions.map((s) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppTokens.sp3),
-                  child: _SessionCard(session: s),
-                )),
+                ...sessions.map(
+                  (s) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppTokens.sp3),
+                    child: _SessionCard(session: s),
+                  ),
+                ),
               const SizedBox(height: AppTokens.sp10),
             ],
           ),
@@ -206,10 +251,7 @@ class _DetectiveGradeCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '주임 탐정',
-                  style: AppText.titleM.copyWith(color: c.text),
-                ),
+                Text('주임 탐정', style: AppText.titleM.copyWith(color: c.text)),
                 const SizedBox(height: 2),
                 Text(
                   'ASSOCIATE DETECTIVE',
@@ -350,7 +392,9 @@ class _ProgressBar extends StatelessWidget {
             children: [
               Positioned.fill(child: ColoredBox(color: c.bgHover)),
               Positioned(
-                left: 0, top: 0, bottom: 0,
+                left: 0,
+                top: 0,
+                bottom: 0,
                 width: constraints.maxWidth * ratio,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
