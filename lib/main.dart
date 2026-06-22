@@ -1,4 +1,6 @@
 // lib/main.dart
+import 'dart:async';
+
 import 'package:clueroom/core/api/api_client.dart';
 import 'package:clueroom/core/oauth/oauth_config.dart';
 import 'package:clueroom/screens/splash_screen.dart';
@@ -45,12 +47,12 @@ Future<void> _configureFirebaseMessaging() async {
   final token = await messaging.getToken();
   debugPrint('FCM token: ${_describeFcmToken(token)}');
   if (token != null) {
-    await _registerFcmTokenWithBackend(token);
+    unawaited(_registerFcmTokenWithBackend(token));
   }
 
-  messaging.onTokenRefresh.listen((newToken) async {
+  messaging.onTokenRefresh.listen((newToken) {
     debugPrint('FCM token 갱신: ${_describeFcmToken(newToken)}');
-    await _registerFcmTokenWithBackend(newToken);
+    unawaited(_registerFcmTokenWithBackend(newToken));
   });
 
   FirebaseMessaging.onMessage.listen((message) {
