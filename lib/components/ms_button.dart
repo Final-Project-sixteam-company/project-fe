@@ -63,7 +63,7 @@ class _MSButtonState extends State<MSButton> {
     switch (widget.variant) {
       case MSButtonVariant.primary:
         bg = c.primary;
-        fg = c.primaryInk;
+        fg = AppColors.ink950;
         break;
       case MSButtonVariant.secondary:
         bg = AppColors.transparent;
