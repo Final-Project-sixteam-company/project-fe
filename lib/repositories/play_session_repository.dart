@@ -1,6 +1,7 @@
 // lib/repositories/play_session_repository.dart
 import '../core/api/api_client.dart';
 import '../core/api/api_config.dart';
+import '../models/scenario.dart';
 import '../models/play_models.dart';
 
 /// 플레이 세션 전체 API(`/api/play-sessions/...`) 연동.
@@ -169,7 +170,45 @@ class PlaySessionRepository {
     final data = await _api.get('/api/play-sessions/$sessionId/result');
     return DeductionResult.fromJson(data as Map<String, dynamic>);
   }
+
+  Future<Page<PlaySession>> records({int page = 0, int size = 20}) async {
+    final data = await _api.get(
+      '/api/play-sessions/records',
+      query: {'page': page, 'size': size},
+    );
+    return Page.fromJson(
+      data as Map<String, dynamic>,
+      _playSessionRecordFromJson,
+    );
+  }
 }
 
 /// 전역 싱글턴.
 const PlaySessionRepository playSessionRepo = PlaySessionRepository();
+
+PlaySession _playSessionRecordFromJson(Map<String, dynamic> json) {
+  final status = (json['status'] as String? ?? '').toUpperCase();
+  final state = switch (status) {
+    'COMPLETED' => PlayState.completed,
+    'ABANDONED' => PlayState.abandoned,
+    _ => PlayState.inProgress,
+  };
+  final updatedAt = DateTime.tryParse(json['updatedAt'] as String? ?? '');
+  final completedAt = DateTime.tryParse(json['completedAt'] as String? ?? '');
+  final scenarioId = (json['scenarioId'] as num?)?.toInt();
+
+  return PlaySession(
+    id:
+        (json['recordId'] as String?) ??
+        'session-${(json['sessionId'] as num?)?.toInt() ?? 0}',
+    scenarioId: scenarioId?.toString() ?? '',
+    scenarioTitle: json['scenarioTitle'] as String? ?? '삭제된 사건',
+    scenarioCode: scenarioId?.toString() ?? '',
+    state: state,
+    progressPercent: state == PlayState.completed ? 100 : 0,
+    startedAt: updatedAt ?? completedAt ?? DateTime.now(),
+    completedAt: completedAt,
+    score: (json['score'] as num?)?.toInt(),
+    grade: json['grade'] as String?,
+  );
+}

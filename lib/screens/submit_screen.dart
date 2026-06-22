@@ -96,9 +96,14 @@ class _SubmitScreenState extends State<SubmitScreen> {
   bool get _canSubmit => !_submitting && _allMet;
 
   void _toggle(Evidence e) => setState(() {
-    _evidence.contains(e)
-        ? _evidence.remove(e)
-        : (_evidence.length < _maxEvidence ? _evidence.add(e) : null);
+    final selectedIndex = _evidence.indexWhere(
+      (selected) => selected.id == e.id,
+    );
+    if (selectedIndex >= 0) {
+      _evidence.removeAt(selectedIndex);
+    } else if (_evidence.length < _maxEvidence) {
+      _evidence.add(e);
+    }
   });
 
   void _navigateToResult(int sessionId) {

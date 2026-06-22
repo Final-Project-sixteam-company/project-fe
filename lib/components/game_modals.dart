@@ -444,26 +444,33 @@ class _EvidencePresentSheetState extends State<_EvidencePresentSheet> {
                             itemBuilder: (sheetContext, i) => _EvidencePickItem(
                               // 💡 상위 컨텍스트 식별을 위해 sheetContext 명시
                               evidence: results[i],
-                              onTap: () {
+                              onTap: () async {
                                 final picked = results[i];
                                 if (widget.controller == null) return;
-
-                                Navigator.of(sheetContext).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => EvidenceDetailScreen(
-                                      evidence: picked,
-                                      controller: widget.controller!,
-                                      sessionId: widget.sessionId,
-                                      listData: widget.rawResolver?.call(
-                                        picked.id,
-                                      ),
-                                      isUnlocked: !picked.isLocked,
-                                      onPresent: () {
-                                        Navigator.of(sheetContext).pop(picked);
-                                      },
-                                    ),
-                                  ),
+                                final detailNavigator = Navigator.of(
+                                  sheetContext,
                                 );
+                                final sheetNavigator = Navigator.of(context);
+
+                                final selected = await detailNavigator
+                                    .push<Evidence>(
+                                      MaterialPageRoute(
+                                        builder: (_) => EvidenceDetailScreen(
+                                          evidence: picked,
+                                          controller: widget.controller!,
+                                          sessionId: widget.sessionId,
+                                          listData: widget.rawResolver?.call(
+                                            picked.id,
+                                          ),
+                                          isUnlocked: !picked.isLocked,
+                                          onPresent: () {
+                                            detailNavigator.pop(picked);
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                if (!mounted || selected == null) return;
+                                sheetNavigator.pop(selected);
                               },
                             ),
                             padding: const EdgeInsets.only(
